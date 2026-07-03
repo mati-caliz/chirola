@@ -1,8 +1,8 @@
 {
-  "name": "@facturita/api",
+  "name": "@chirola/api",
   "version": "0.0.0",
   "private": true,
-  "description": "Backend de Facturita: API REST + integración ARCA (WSAA/WSFEv1).",
+  "description": "Backend de Chirola: API REST + integración ARCA (WSAA/WSFEv1).",
   "scripts": {
     "build": "nest build",
     "start": "nest start",

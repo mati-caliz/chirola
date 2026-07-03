@@ -1,4 +1,4 @@
-# Arquitectura de Facturita
+# Arquitectura de Chirola
 
 ## Visión
 

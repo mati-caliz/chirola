@@ -1,4 +1,4 @@
-# Facturita
+# Chirola
 
 App mobile (iOS + Android) para operar **ARCA** (ex AFIP) de forma simple. MVP: **facturación
 electrónica** (comprobantes A/B/C y notas de crédito/débito) con obtención de **CAE**.

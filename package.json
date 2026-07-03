@@ -1,5 +1,5 @@
 {
-  "name": "facturita",
+  "name": "chirola",
   "version": "0.0.0",
   "private": true,
   "description": "App mobile (iOS/Android) para operar ARCA de forma simple: facturación electrónica y más.",
@@ -11,8 +11,8 @@
     "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "@nestjs/core"]
   },
   "scripts": {
-    "api:dev": "pnpm --filter @facturita/api start:dev",
-    "mobile:dev": "pnpm --filter @facturita/mobile start",
+    "api:dev": "pnpm --filter @chirola/api start:dev",
+    "mobile:dev": "pnpm --filter @chirola/mobile start",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "build": "pnpm -r build",

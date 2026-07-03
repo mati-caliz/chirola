@@ -11,6 +11,6 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`Facturita API escuchando en http://localhost:${port}/api`);
+  console.log(`Chirola API escuchando en http://localhost:${port}/api`);
 }
 void bootstrap();
