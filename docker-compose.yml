@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: facturita-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: facturita
+      POSTGRES_PASSWORD: facturita
+      POSTGRES_DB: facturita
+    ports:
+      - "5432:5432"
+    volumes:
+      - facturita_pgdata:/var/lib/postgresql/data
+
+volumes:
+  facturita_pgdata:

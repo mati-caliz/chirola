@@ -1,0 +1,22 @@
+{
+  "name": "facturita",
+  "version": "0.0.0",
+  "private": true,
+  "description": "App mobile (iOS/Android) para operar ARCA de forma simple: facturación electrónica y más.",
+  "packageManager": "pnpm@10.10.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "@nestjs/core"]
+  },
+  "scripts": {
+    "api:dev": "pnpm --filter @facturita/api start:dev",
+    "mobile:dev": "pnpm --filter @facturita/mobile start",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  }
+}

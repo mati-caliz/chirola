@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+web-build/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Certificados y claves (NUNCA commitear datos fiscales)
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+certs/
+!certs/.gitkeep
+
+# Expo / React Native
+.expo/
+apps/mobile/ios/
+apps/mobile/android/
+*.orig.*
+
+# Prisma
+services/api/prisma/*.db
+
+# Logs
+*.log
+npm-debug.*
+pnpm-debug.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

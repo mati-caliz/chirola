@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuario de la app mobile
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String // hash
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  emisores  Emisor[]
+}
+
+// Contribuyente en cuyo nombre se factura (1 user puede tener varios CUIT)
+model Emisor {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cuit            String
+  razonSocial     String
+  // Condición frente al IVA: RESPONSABLE_INSCRIPTO | MONOTRIBUTO | EXENTO ...
+  condicionIva    String
+  ambiente        String        @default("homologacion") // homologacion | produccion
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  certificado     Certificado?
+  puntosVenta     PuntoVenta[]
+  clientes        Cliente[]
+  comprobantes    Comprobante[]
+
+  @@unique([userId, cuit, ambiente])
+}
+
+// Certificado ARCA por emisor. La clave privada se guarda CIFRADA.
+model Certificado {
+  id            String   @id @default(cuid())
+  emisorId      String   @unique
+  emisor        Emisor   @relation(fields: [emisorId], references: [id], onDelete: Cascade)
+  // clave privada cifrada (AES-256-GCM) — nunca en texto plano
+  privateKeyEnc String
+  // certificado .crt en PEM (público, no sensible)
+  certPem       String?
+  alias         String?
+  validoHasta   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PuntoVenta {
+  id           String        @id @default(cuid())
+  emisorId     String
+  emisor       Emisor        @relation(fields: [emisorId], references: [id], onDelete: Cascade)
+  numero       Int
+  descripcion  String?
+  comprobantes Comprobante[]
+
+  @@unique([emisorId, numero])
+}
+
+model Cliente {
+  id           String        @id @default(cuid())
+  emisorId     String
+  emisor       Emisor        @relation(fields: [emisorId], references: [id], onDelete: Cascade)
+  tipoDoc      Int // 80=CUIT, 96=DNI, 99=Consumidor Final ...
+  numeroDoc    String
+  razonSocial  String?
+  condicionIva String?
+  email        String?
+  comprobantes Comprobante[]
+
+  @@unique([emisorId, tipoDoc, numeroDoc])
+}
+
+model Comprobante {
+  id            String            @id @default(cuid())
+  emisorId      String
+  emisor        Emisor            @relation(fields: [emisorId], references: [id], onDelete: Cascade)
+  puntoVentaId  String
+  puntoVenta    PuntoVenta        @relation(fields: [puntoVentaId], references: [id])
+  clienteId     String?
+  cliente       Cliente?          @relation(fields: [clienteId], references: [id])
+
+  tipoCbte      Int // 1=Fact A, 6=Fact B, 11=Fact C, 3/8/13=NC, 2/7/12=ND ...
+  numero        Int
+  fechaCbte     DateTime
+  concepto      Int // 1=Productos, 2=Servicios, 3=Ambos
+
+  impNeto       Decimal           @db.Decimal(15, 2)
+  impIva        Decimal           @db.Decimal(15, 2)
+  impTotal      Decimal           @db.Decimal(15, 2)
+  moneda        String            @default("PES")
+  cotizacion    Decimal           @default(1) @db.Decimal(15, 6)
+
+  // Respuesta de ARCA
+  estado        String            @default("PENDIENTE") // PENDIENTE | AUTORIZADO | RECHAZADO
+  cae           String?
+  caeVto        DateTime?
+  qrData        String?
+  arcaObs       Json?
+
+  items         ItemComprobante[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([puntoVentaId, tipoCbte, numero])
+}
+
+model ItemComprobante {
+  id            String      @id @default(cuid())
+  comprobanteId String
+  comprobante   Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  descripcion   String
+  cantidad      Decimal     @db.Decimal(15, 4)
+  precioUnit    Decimal     @db.Decimal(15, 4)
+  alicuotaIva   Decimal     @db.Decimal(5, 2) // 21, 10.5, 0 ...
+  subtotal      Decimal     @db.Decimal(15, 2)
+}
