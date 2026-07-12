@@ -41,7 +41,7 @@ para tener una sola fuente de verdad entre front y back.
 | **1** | WSAA homologación | Backend obtiene y cachea un TA válido con cert de testing. | 🟡 Código listo, sin probar contra ARCA (falta cert homolog.) |
 | **2** | Emitir Factura C | `FECAESolicitar` devuelve CAE en homologación. | 🟡 Flujo completo cableado y verificado local; falta CAE real |
 | **3** | A/B + IVA + NC/ND | Comprobantes discriminando IVA y notas de crédito/débito. | ✅ A/B con IVA discriminado + NC/ND con `CbtesAsoc` |
-| **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. | ⬜ Pendiente (`apps/mobile` no existe aún) |
+| **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. | ✅ App Expo (`apps/mobile`): login → emisores → cert → clientes → emisión → CAE/PDF/QR |
 | **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. | ✅ QR PNG (`qrcode`) + PDF (`pdfkit`) con QR embebido |
 | **6** | Producción | Onboarding de certs reales y pasaje a endpoints de producción. | ⬜ Pendiente |
 
@@ -63,8 +63,20 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
 1. **Cerrar Fase 1/2 de verdad:** con el onboarding ya listo, falta la parte externa del
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
    Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
-2. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
-3. **Faltantes transversales:** onboarding guiado del cert (UX paso a paso en la app).
+2. **Probar la app en un dispositivo/emulador** apuntando `EXPO_PUBLIC_API_URL` al backend de
+   la LAN, y pulir UX (loading/errores, selección de cliente al facturar).
+
+### App mobile (Fase 4, implementada)
+Expo (SDK 57) + expo-router en `apps/mobile` (`@chirola/mobile`). Navegación por grupos
+`(auth)` / `(app)` con guard de sesión en el layout raíz. Estado de datos con React Query;
+tokens en `expo-secure-store`; cliente API (`lib/api.ts`) con `Authorization: Bearer` y
+**rotación automática del refresh token** en 401. Reutiliza los schemas de `@chirola/shared`.
+Pantallas: login/registro → lista/alta de emisores → detalle → onboarding de certificado
+(genera CSR, lo copia, empareja el `.crt`) → ABM de clientes → emisión de comprobante
+(ítems + IVA + receptor) → detalle con CAE, QR (PNG del backend) y descarga/compartir del PDF
+(`expo-file-system` + `expo-sharing`). Base URL configurable con `EXPO_PUBLIC_API_URL`
+(default `http://localhost:3000/api`). Verificado: `tsc --noEmit`, `eslint` y bundle de Metro
+(`expo export`, 1664 módulos) en verde. Falta correrla en un device real contra el backend.
 
 ### Auth: refresh tokens + logout (implementado)
 - Access token JWT de corta duración (`JWT_ACCESS_TTL`, default `1h`).
