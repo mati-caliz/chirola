@@ -3,6 +3,7 @@ import { z } from 'zod';
 export * from './auth';
 export * from './issuer';
 export * from './client';
+export * from './purchase-invoice';
 
 export const VoucherType = {
   FACTURA_A: 1,

@@ -39,12 +39,39 @@ model Issuer {
   environment  String       @default("homologacion")
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-  certificate  Certificate?
-  salesPoints  SalesPoint[]
-  clients      Client[]
-  vouchers     Voucher[]
+  certificate      Certificate?
+  salesPoints      SalesPoint[]
+  clients          Client[]
+  vouchers         Voucher[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@unique([userId, cuit, environment])
+}
+
+model PurchaseInvoice {
+  id           String    @id @default(cuid())
+  issuerId     String
+  issuer       Issuer    @relation(fields: [issuerId], references: [id], onDelete: Cascade)
+  supplierCuit String
+  supplierName String
+  invoiceType  Int
+  salesPoint   Int
+  number       Int
+  issueDate    DateTime
+  dueDate      DateTime?
+  netAmount21  Decimal   @default(0) @db.Decimal(15, 2)
+  iva21        Decimal   @default(0) @db.Decimal(15, 2)
+  netAmount105 Decimal   @default(0) @db.Decimal(15, 2)
+  iva105       Decimal   @default(0) @db.Decimal(15, 2)
+  netAmount27  Decimal   @default(0) @db.Decimal(15, 2)
+  iva27        Decimal   @default(0) @db.Decimal(15, 2)
+  exempt       Decimal   @default(0) @db.Decimal(15, 2)
+  untaxed      Decimal   @default(0) @db.Decimal(15, 2)
+  total        Decimal   @db.Decimal(15, 2)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([issuerId, issueDate])
 }
 
 model Certificate {
