@@ -34,6 +34,14 @@ export class VouchersController {
     return this.vouchers.issue(user.sub, body, idempotencyKey);
   }
 
+  @Post('preview')
+  preview(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
+  ) {
+    return this.vouchers.previewForUser(user.sub, body);
+  }
+
   @Get(':id')
   get(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.vouchers.get(user.sub, id);

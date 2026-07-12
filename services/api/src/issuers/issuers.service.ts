@@ -33,4 +33,10 @@ export class IssuersService {
     }
     return issuer;
   }
+
+  async getById(id: string) {
+    const issuer = await this.prisma.issuer.findUnique({ where: { id } });
+    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    return issuer;
+  }
 }

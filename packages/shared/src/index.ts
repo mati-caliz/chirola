@@ -39,6 +39,39 @@ export function isCreditDebitNote(voucherType: number): boolean {
   return creditDebitNoteTypes.includes(voucherType);
 }
 
+const creditNoteTypes: readonly number[] = [
+  VoucherType.NOTA_CREDITO_A,
+  VoucherType.NOTA_CREDITO_B,
+  VoucherType.NOTA_CREDITO_C,
+];
+
+export function isCreditNote(voucherType: number): boolean {
+  return creditNoteTypes.includes(voucherType);
+}
+
+export const FiscalCondition = {
+  RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',
+  MONOTRIBUTISTA: 'MONOTRIBUTISTA',
+} as const;
+
+export type FiscalConditionType =
+  (typeof FiscalCondition)[keyof typeof FiscalCondition];
+
+export function inferFiscalCondition(
+  voucherTypeIds: readonly number[],
+): FiscalConditionType | null {
+  if (
+    voucherTypeIds.includes(VoucherType.FACTURA_A) ||
+    voucherTypeIds.includes(VoucherType.FACTURA_B)
+  ) {
+    return FiscalCondition.RESPONSABLE_INSCRIPTO;
+  }
+  if (voucherTypeIds.includes(VoucherType.FACTURA_C)) {
+    return FiscalCondition.MONOTRIBUTISTA;
+  }
+  return null;
+}
+
 export const voucherTypeName: Record<number, string> = {
   1: 'Factura A',
   2: 'Nota de Débito A',

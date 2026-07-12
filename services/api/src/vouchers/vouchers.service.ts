@@ -196,6 +196,30 @@ export class VouchersService {
     return this.issueAuthorized(issuer, input, idempotencyKey);
   }
 
+  async previewForUser(
+    userId: string,
+    input: IssueVoucher,
+  ): Promise<VoucherAmounts> {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: input.issuerId },
+    });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    if (issuer.userId !== userId) {
+      throw new ForbiddenException('El emisor no pertenece al usuario.');
+    }
+    return calculateAmounts(input.voucherType, input.items);
+  }
+
+  async previewForApiClient(
+    apiClient: AuthenticatedApiClient,
+    input: IssueVoucher,
+  ): Promise<VoucherAmounts> {
+    await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
+    return calculateAmounts(input.voucherType, input.items);
+  }
+
   private async issueAuthorized(
     issuer: { id: string; cuit: string },
     input: IssueVoucher,

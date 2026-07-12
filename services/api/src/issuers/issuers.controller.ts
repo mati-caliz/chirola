@@ -23,6 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.service';
 import { IssuersService } from './issuers.service';
 import { CertsService } from '../certs/certs.service';
+import { ArcaParamsService } from './arca-params.service';
 
 @Controller('issuers')
 @UseGuards(JwtAuthGuard)
@@ -30,7 +31,23 @@ export class IssuersController {
   constructor(
     private readonly issuers: IssuersService,
     private readonly certs: CertsService,
+    private readonly params: ArcaParamsService,
   ) {}
+
+  @Get(':id/sales-points')
+  async salesPoints(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.params.getSalesPoints(issuer);
+  }
+
+  @Get(':id/fiscal-condition')
+  async fiscalCondition(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.params.detectFiscalCondition(issuer);
+  }
 
   @Post()
   create(

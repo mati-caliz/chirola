@@ -1,14 +1,40 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { XMLParser } from 'fast-xml-parser';
 import { buildAuthBlock, callSoap, ParsedXml } from '../arca-soap.util';
 import { ArcaRejectionError } from './arca-errors';
 import type {
   AuthContext,
   CaeRequest,
   CaeResult,
+  SalesPointInfo,
 } from './wsfe.types';
 
 const WSFEV1_NS = 'http://ar.gov.afip.dif.FEV1/';
+const BLOCKED_FLAG = 'S';
+const EMISSION_TYPE_CAE = 'CAE';
+
+function collectByTag(root: unknown, tag: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const walk = (node: unknown): void => {
+    if (node == null || typeof node !== 'object') return;
+    const record = node as Record<string, unknown>;
+    for (const [key, value] of Object.entries(record)) {
+      if (key === tag) {
+        const entries = Array.isArray(value) ? value : [value];
+        for (const entry of entries) {
+          if (entry && typeof entry === 'object') {
+            out.push(entry as Record<string, unknown>);
+          }
+        }
+      } else {
+        walk(value);
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
 
 function toArcaDate(d: Date): string {
   const y = d.getFullYear();
@@ -29,6 +55,7 @@ const num = (n: number): string => n.toFixed(2);
 @Injectable()
 export class WsfeService {
   private readonly logger = new Logger(WsfeService.name);
+  private readonly parser = new XMLParser({ ignoreAttributes: false });
 
   constructor(private readonly config: ConfigService) {}
 
@@ -80,6 +107,50 @@ export class WsfeService {
     );
     const xml = new ParsedXml(res);
     return Number(xml.required('CbteNro'));
+  }
+
+  async getSalesPoints(auth: AuthContext): Promise<SalesPointInfo[]> {
+    const soap = this.envelope(
+      '<ar:FEParamGetPtosVenta>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        '</ar:FEParamGetPtosVenta>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FEParamGetPtosVenta`,
+      soap,
+    );
+    const parsed = this.parser.parse(res) as Record<string, unknown>;
+    return collectByTag(parsed, 'PtoVta')
+      .filter((node) => this.isActiveCaePoint(node))
+      .map((node) => ({
+        number: Number(node.Nro),
+        emissionType: String(node.EmisionTipo ?? ''),
+      }));
+  }
+
+  async getVoucherTypeIds(auth: AuthContext): Promise<number[]> {
+    const soap = this.envelope(
+      '<ar:FEParamGetTiposCbte>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        '</ar:FEParamGetTiposCbte>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FEParamGetTiposCbte`,
+      soap,
+    );
+    const parsed = this.parser.parse(res) as Record<string, unknown>;
+    return collectByTag(parsed, 'CbteTipo')
+      .map((node) => Number(node.Id))
+      .filter((id) => Number.isFinite(id));
+  }
+
+  private isActiveCaePoint(node: Record<string, unknown>): boolean {
+    const blocked = String(node.Bloqueado ?? '') === BLOCKED_FLAG;
+    const fchBaja = String(node.FchBaja ?? '').trim();
+    const emissionType = String(node.EmisionTipo ?? '');
+    return !blocked && fchBaja.length === 0 && emissionType === EMISSION_TYPE_CAE;
   }
 
   async queryVoucher(

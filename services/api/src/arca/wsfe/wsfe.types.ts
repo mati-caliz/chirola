@@ -48,6 +48,11 @@ export interface CaeResult {
   caeVto: Date;
 }
 
+export interface SalesPointInfo {
+  number: number;
+  emissionType: string;
+}
+
 export interface VoucherCalculationInput {
   voucherType: number;
   items: Item[];

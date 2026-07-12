@@ -96,3 +96,46 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
     expect(xml.match(/<ar:CbteAsoc>/g)).toHaveLength(2);
   });
 });
+
+describe('WsfeService — FEParamGetPtosVenta', () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+
+  function respondWith(xml: string): void {
+    global.fetch = (async () =>
+      new Response(xml, { status: 200 })) as unknown as typeof fetch;
+  }
+
+  it('devuelve sólo puntos de venta activos con emisión CAE', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetPtosVentaResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetPtosVentaResult><ResultGet>' +
+        '<PtoVta><Nro>1</Nro><EmisionTipo>CAE</EmisionTipo><Bloqueado>N</Bloqueado><FchBaja></FchBaja></PtoVta>' +
+        '<PtoVta><Nro>2</Nro><EmisionTipo>CAE</EmisionTipo><Bloqueado>S</Bloqueado><FchBaja></FchBaja></PtoVta>' +
+        '<PtoVta><Nro>3</Nro><EmisionTipo>CAEA</EmisionTipo><Bloqueado>N</Bloqueado></PtoVta>' +
+        '</ResultGet></FEParamGetPtosVentaResult></FEParamGetPtosVentaResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getSalesPoints(auth);
+
+    expect(result).toEqual([{ number: 1, emissionType: 'CAE' }]);
+  });
+
+  it('extrae los ids de tipos de comprobante', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetTiposCbteResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetTiposCbteResult><ResultGet>' +
+        '<CbteTipo><Id>1</Id><Desc>Factura A</Desc></CbteTipo>' +
+        '<CbteTipo><Id>6</Id><Desc>Factura B</Desc></CbteTipo>' +
+        '</ResultGet></FEParamGetTiposCbteResult></FEParamGetTiposCbteResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getVoucherTypeIds(auth);
+
+    expect(result).toEqual([1, 6]);
+  });
+});

@@ -32,6 +32,14 @@ export class V1VouchersController {
     return this.vouchers.issueForApiClient(apiClient, body, idempotencyKey);
   }
 
+  @Post('preview')
+  preview(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
+  ) {
+    return this.vouchers.previewForApiClient(apiClient, body);
+  }
+
   @Get(':id')
   get(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
