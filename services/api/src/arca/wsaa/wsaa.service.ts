@@ -2,19 +2,24 @@ import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { XMLParser } from 'fast-xml-parser';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   CertificateCredentials,
   ArcaService,
   AccessTicket,
 } from './wsaa.types';
 
+const TICKET_RENEWAL_MARGIN_MS = 10 * 60_000;
+
 @Injectable()
 export class WsaaService {
   private readonly logger = new Logger(WsaaService.name);
-  private readonly cache = new Map<string, AccessTicket>();
   private readonly parser = new XMLParser({ ignoreAttributes: false });
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private get wsaaUrl(): string {
     const env = this.config.get<string>('ARCA_ENV', 'homologacion');
@@ -30,21 +35,34 @@ export class WsaaService {
   }
 
   async getAccessTicket(
-    cuit: string,
+    issuerId: string,
     creds: CertificateCredentials,
     service: ArcaService = 'wsfe',
   ): Promise<AccessTicket> {
-    const key = `${cuit}:${service}`;
-    const cached = this.cache.get(key);
+    const cached = await this.prisma.accessTicketCache.findUnique({
+      where: { issuerId_service: { issuerId, service } },
+    });
 
-    if (cached && cached.expiration.getTime() - Date.now() > 10 * 60_000) {
-      return cached;
+    if (
+      cached &&
+      cached.expiration.getTime() - Date.now() > TICKET_RENEWAL_MARGIN_MS
+    ) {
+      return {
+        token: cached.token,
+        sign: cached.sign,
+        expiration: cached.expiration,
+        generation: cached.generation,
+      };
     }
 
     const accessTicket = await this.login(creds, service);
-    this.cache.set(key, accessTicket);
+    await this.prisma.accessTicketCache.upsert({
+      where: { issuerId_service: { issuerId, service } },
+      create: { issuerId, service, ...accessTicket },
+      update: { ...accessTicket },
+    });
     this.logger.log(
-      `TA nuevo para ${key}, vence ${accessTicket.expiration.toISOString()}`,
+      `TA nuevo para ${issuerId}:${service}, vence ${accessTicket.expiration.toISOString()}`,
     );
     return accessTicket;
   }

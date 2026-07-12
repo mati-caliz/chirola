@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Res,
@@ -28,8 +29,9 @@ export class VouchersController {
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(issueVoucherSchema))
     body: IssueVoucher,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.vouchers.issue(user.sub, body);
+    return this.vouchers.issue(user.sub, body, idempotencyKey);
   }
 
   @Get(':id')

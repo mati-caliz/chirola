@@ -71,15 +71,27 @@ export class ParsedXml {
   }
 
   errors(): string[] {
+    return this.errorEntries().map(({ code, message }) =>
+      code ? `(${code}) ${message}` : message,
+    );
+  }
+
+  errorCodes(): string[] {
+    return this.errorEntries()
+      .map(({ code }) => code)
+      .filter((code): code is string => code.length > 0);
+  }
+
+  private errorEntries(): { code: string; message: string }[] {
     const errRoot = this.find('Errors');
     if (errRoot == null || typeof errRoot !== 'object') return [];
-    const out: string[] = [];
+    const out: { code: string; message: string }[] = [];
     const collect = (err: unknown): void => {
       if (err == null || typeof err !== 'object') return;
       const rec = err as Record<string, unknown>;
       const code = rec.Code != null ? String(rec.Code) : '';
-      const msg = rec.Msg != null ? String(rec.Msg) : '';
-      if (msg) out.push(code ? `(${code}) ${msg}` : msg);
+      const message = rec.Msg != null ? String(rec.Msg) : '';
+      if (message) out.push({ code, message });
     };
     const errNode = (errRoot as Record<string, unknown>).Err;
     if (Array.isArray(errNode)) errNode.forEach(collect);

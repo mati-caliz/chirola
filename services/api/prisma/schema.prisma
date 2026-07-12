@@ -118,6 +118,30 @@ model Voucher {
   @@unique([salesPointId, voucherType, number])
 }
 
+model AccessTicketCache {
+  id         String   @id @default(cuid())
+  issuerId   String
+  service    String
+  token      String   @db.Text
+  sign       String   @db.Text
+  generation DateTime
+  expiration DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([issuerId, service])
+}
+
+model IdempotencyRecord {
+  id        String   @id @default(cuid())
+  issuerId  String
+  key       String
+  voucherId String
+  createdAt DateTime @default(now())
+
+  @@unique([issuerId, key])
+}
+
 model VoucherItem {
   id          String  @id @default(cuid())
   voucherId   String

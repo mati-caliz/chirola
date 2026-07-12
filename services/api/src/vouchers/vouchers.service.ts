@@ -12,10 +12,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
+import type { AuthContext, CaeRequest, CaeResult } from '../arca/wsfe/wsfe.types';
+import {
+  ArcaRejectionError,
+  ARCA_DUPLICATE_NUMBER_CODE,
+} from '../arca/wsfe/arca-errors';
 import { calculateAmounts } from '../arca/wsfe/iva-calculator';
+import { IssuerLockService } from './issuer-lock.service';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf } from './pdf.util';
+
+interface CaeWithNumber {
+  result: CaeResult;
+  number: number;
+}
 
 export interface IssuedVoucher {
   id: string;
@@ -39,6 +50,7 @@ export class VouchersService {
     private readonly certs: CertsService,
     private readonly wsaa: WsaaService,
     private readonly wsfe: WsfeService,
+    private readonly issuerLock: IssuerLockService,
   ) {}
 
   async get(userId: string, id: string) {
@@ -109,6 +121,7 @@ export class VouchersService {
   async issue(
     userId: string,
     input: IssueVoucher,
+    idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
     const issuer = await this.prisma.issuer.findUnique({
       where: { id: input.issuerId },
@@ -120,16 +133,40 @@ export class VouchersService {
       throw new ForbiddenException('El emisor no pertenece al usuario.');
     }
 
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(issuer.cuit, credentials, 'wsfe');
-    const auth = { cuit: issuer.cuit, token: accessTicket.token, sign: accessTicket.sign };
+    if (idempotencyKey) {
+      const replay = await this.replayIdempotent(issuer.id, idempotencyKey);
+      if (replay) {
+        return replay;
+      }
+    }
 
-    const last = await this.wsfe.getLastAuthorized(
-      auth,
-      input.salesPoint,
-      input.voucherType,
+    return this.issuerLock.runExclusive(issuer.id, async () => {
+      if (idempotencyKey) {
+        const replay = await this.replayIdempotent(issuer.id, idempotencyKey);
+        if (replay) {
+          return replay;
+        }
+      }
+      return this.emit(issuer, input, idempotencyKey);
+    });
+  }
+
+  private async emit(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+    idempotencyKey?: string,
+  ): Promise<IssuedVoucher> {
+    const credentials = await this.certs.getCredentials(issuer.id);
+    const accessTicket = await this.wsaa.getAccessTicket(
+      issuer.id,
+      credentials,
+      'wsfe',
     );
-    const number = last + 1;
+    const auth: AuthContext = {
+      cuit: issuer.cuit,
+      token: accessTicket.token,
+      sign: accessTicket.sign,
+    };
 
     const amounts = calculateAmounts(input.voucherType, input.items);
     const date = new Date();
@@ -137,11 +174,11 @@ export class VouchersService {
       input.recipient.ivaConditionId ??
       defaultRecipientIvaCondition(input.voucherType);
 
-    const cae = await this.wsfe.requestCae(auth, {
+    const buildRequest = (voucherNumber: number): CaeRequest => ({
       salesPoint: input.salesPoint,
       voucherType: input.voucherType,
       concept: input.concept,
-      number,
+      number: voucherNumber,
       date,
       recipient: {
         docType: input.recipient.docType,
@@ -153,6 +190,11 @@ export class VouchersService {
       exchangeRate: input.exchangeRate,
       associatedVouchers: input.associatedVouchers,
     });
+
+    const { result: cae, number } = await this.requestCaeWithRecovery(
+      auth,
+      buildRequest,
+    );
 
     const qrData = buildQrUrl({
       date,
@@ -204,6 +246,12 @@ export class VouchersService {
       },
     });
 
+    if (idempotencyKey) {
+      await this.prisma.idempotencyRecord.create({
+        data: { issuerId: issuer.id, key: idempotencyKey, voucherId: voucher.id },
+      });
+    }
+
     this.logger.log(
       `Comprobante ${input.voucherType}-${input.salesPoint}-${number} emitido, CAE ${cae.cae}`,
     );
@@ -219,6 +267,76 @@ export class VouchersService {
       ivaAmount: amounts.ivaAmount,
       totalAmount: amounts.totalAmount,
       qrData,
+    };
+  }
+
+  private async requestCaeWithRecovery(
+    auth: AuthContext,
+    buildRequest: (number: number) => CaeRequest,
+  ): Promise<CaeWithNumber> {
+    const { salesPoint, voucherType } = buildRequest(0);
+    const last = await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType);
+    const number = last + 1;
+    try {
+      const result = await this.wsfe.requestCae(auth, buildRequest(number));
+      return { result, number };
+    } catch (err) {
+      if (
+        !(err instanceof ArcaRejectionError) ||
+        !err.hasCode(ARCA_DUPLICATE_NUMBER_CODE)
+      ) {
+        throw err;
+      }
+      const existing = await this.wsfe.queryVoucher(
+        auth,
+        salesPoint,
+        voucherType,
+        number,
+      );
+      if (existing) {
+        this.logger.warn(
+          `CAE recuperado tras duplicado ${voucherType}-${salesPoint}-${number}`,
+        );
+        return { result: existing, number };
+      }
+      const freshNumber =
+        (await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType)) + 1;
+      this.logger.warn(
+        `Número duplicado ${voucherType}-${salesPoint}-${number}, reintentando con ${freshNumber}`,
+      );
+      const result = await this.wsfe.requestCae(auth, buildRequest(freshNumber));
+      return { result, number: freshNumber };
+    }
+  }
+
+  private async replayIdempotent(
+    issuerId: string,
+    key: string,
+  ): Promise<IssuedVoucher | null> {
+    const record = await this.prisma.idempotencyRecord.findUnique({
+      where: { issuerId_key: { issuerId, key } },
+    });
+    if (!record) {
+      return null;
+    }
+    const voucher = await this.prisma.voucher.findUnique({
+      where: { id: record.voucherId },
+      include: { salesPoint: true },
+    });
+    if (!voucher || !voucher.cae) {
+      return null;
+    }
+    return {
+      id: voucher.id,
+      voucherType: voucher.voucherType,
+      salesPoint: voucher.salesPoint.number,
+      number: voucher.number,
+      cae: voucher.cae,
+      caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
+      netAmount: Number(voucher.netAmount),
+      ivaAmount: Number(voucher.ivaAmount),
+      totalAmount: Number(voucher.totalAmount),
+      qrData: voucher.qrData ?? '',
     };
   }
 }

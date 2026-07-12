@@ -1,10 +1,7 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { buildAuthBlock, callSoap, ParsedXml } from '../arca-soap.util';
+import { ArcaRejectionError } from './arca-errors';
 import type {
   AuthContext,
   CaeRequest,
@@ -83,6 +80,36 @@ export class WsfeService {
     );
     const xml = new ParsedXml(res);
     return Number(xml.required('CbteNro'));
+  }
+
+  async queryVoucher(
+    auth: AuthContext,
+    salesPoint: number,
+    voucherType: number,
+    number: number,
+  ): Promise<CaeResult | null> {
+    const soap = this.envelope(
+      '<ar:FECompConsultar>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        '<ar:FeCompConsReq>' +
+        `<ar:CbteTipo>${voucherType}</ar:CbteTipo>` +
+        `<ar:CbteNro>${number}</ar:CbteNro>` +
+        `<ar:PtoVta>${salesPoint}</ar:PtoVta>` +
+        '</ar:FeCompConsReq>' +
+        '</ar:FECompConsultar>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FECompConsultar`,
+      soap,
+    );
+    const xml = new ParsedXml(res);
+    const cae = xml.optional('CodAutorizacion', '');
+    const caeVto = xml.optional('FchVto', '');
+    if (!cae || !caeVto) {
+      return null;
+    }
+    return { cae, caeVto: parseArcaDate(caeVto) };
   }
 
   async requestCae(auth: AuthContext, request: CaeRequest): Promise<CaeResult> {
@@ -177,12 +204,7 @@ export class WsfeService {
     const xml = new ParsedXml(res);
     const result = xml.required('Resultado');
     if (result === 'R') {
-      const errors = xml.errors();
-      throw new BadRequestException(
-        `ARCA rechazó el comprobante: ${
-          errors.length ? errors.join(' | ') : 'motivo desconocido'
-        }`,
-      );
+      throw new ArcaRejectionError(xml.errorCodes(), xml.errors());
     }
     const cae = xml.required('CAE');
     const caeVto = xml.required('CAEFchVto');
