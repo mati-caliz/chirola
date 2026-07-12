@@ -50,10 +50,19 @@ para tener una sola fuente de verdad entre front y back.
 (WSFEv1: CAE, numeración, IVA por alícuota), `comprobantes` (orquesta la emisión + QR +
 persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
 
+### Onboarding de certificados (implementado)
+`certs` genera el par de claves + CSR en el backend y empareja luego el `.crt` de ARCA:
+- `POST /emisores/:id/csr` → genera clave RSA 2048 + CSR con el subject que exige ARCA
+  (`C=AR, O=<razón social>, CN=<alias>, serialNumber=CUIT <cuit>`), guarda la clave privada
+  cifrada y devuelve el CSR en PEM. La clave privada nunca sale del backend.
+- `PUT /emisores/:id/certificado` → empareja el `.crt` descargado de ARCA con la clave ya
+  guardada, validando que la clave pública del cert coincida con la del par generado.
+- `POST /emisores/:id/certificado` → flujo manual (subir clave+cert propios), como antes.
+
 ### Lo próximo para avanzar
-1. **Cerrar Fase 1/2 de verdad:** cargar un cert de **homologación** real y obtener un CAE.
-   Requiere: generar clave+CSR (falta endpoint en `certs`), asociar `wsfe` en ARCA, registrar
-   punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
+1. **Cerrar Fase 1/2 de verdad:** con el onboarding ya listo, falta la parte externa del
+   usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
+   Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
 2. **Notas de crédito/débito (Fase 3):** agregar `CbtesAsoc` al request de WSFEv1.
 3. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
 4. **PDF + QR PNG (Fase 5):** render del QR (lib `qrcode`) y armado del PDF.
