@@ -126,6 +126,20 @@ model ApiClient {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   issuers   ApiClientIssuer[]
+  webhooks  WebhookEndpoint[]
+}
+
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  apiClientId String
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+  url         String
+  secret      String
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([apiClientId])
 }
 
 model ApiClientIssuer {
