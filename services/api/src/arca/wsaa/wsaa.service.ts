@@ -130,7 +130,7 @@ export class WsaaService {
     const envelope = [
       '<soapenv:Envelope',
       ' xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"',
-      ' xmlns:wsaa="http://wsaa.view.sua.dgi.gov.ar/">',
+      ' xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">',
       '<soapenv:Header/>',
       '<soapenv:Body>',
       '<wsaa:loginCms>',
