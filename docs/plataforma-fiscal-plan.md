@@ -134,6 +134,13 @@ Para flujos donde la app no espera sincrónicamente (auto-facturación, resultad
 
 Cada fase deja Chirola desplegable y no rompe la app mobile existente.
 
+> **Estado (2026-07-12):** F0, F1, F2, F3 y F4 **implementados y en `main`** (con tests y migraciones).
+> Falta el cierre operativo de F4 (correr shadow real con tráfico de Gastronova hasta converger) y F5
+> (cutover incremental) y F6 (plataforma general). Notas de HA pendientes para producción multi-réplica:
+> rate limiter y lock de emisión son in-process; el retry scheduler no tiene claim distribuido
+> (`FOR UPDATE SKIP LOCKED`). La red de seguridad cross-instancia (idempotencia + recuperación de
+> duplicados) ya cubre el peor caso (doble CAE).
+
 ### F0 — Endurecer el núcleo fiscal (bloqueante)
 Sin esto no se sirve a nadie externo con seguridad.
 1. `FECompConsultar` en `WsfeService`.
