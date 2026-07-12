@@ -10,6 +10,7 @@ import { IssuersModule } from './issuers/issuers.module';
 import { ClientsModule } from './clients/clients.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 import { PurchaseInvoicesModule } from './purchase-invoices/purchase-invoices.module';
+import { FiscalModule } from './fiscal/fiscal.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from './health/health.controller';
     ClientsModule,
     VouchersModule,
     PurchaseInvoicesModule,
+    FiscalModule,
   ],
   controllers: [HealthController],
 })
