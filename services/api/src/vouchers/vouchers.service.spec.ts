@@ -7,6 +7,10 @@ import type { CertsService } from '../certs/certs.service';
 import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { WsfeService } from '../arca/wsfe/wsfe.service';
 import type { ApiClientService } from '../service-auth/api-client.service';
+import type { WebhookService } from '../webhooks/webhook.service';
+import { WebhookEvent } from '../webhooks/webhook-events';
+import { VoucherQueuedException } from './voucher-queued.exception';
+import { ConfigService } from '@nestjs/config';
 
 interface StoredVoucher {
   id: string;
@@ -40,15 +44,63 @@ function buildInput(overrides: Partial<IssueVoucher> = {}): IssueVoucher {
   } as IssueVoucher;
 }
 
+interface PendingRow {
+  id: string;
+  issuerId: string;
+  idempotencyKey: string | null;
+  payload: unknown;
+  status: string;
+  retryCount: number;
+  nextRetryAt: Date;
+  lastError: string | null;
+}
+
 function buildHarness() {
   const vouchers: StoredVoucher[] = [];
   const idempotency: { issuerId: string; key: string; voucherId: string }[] =
     [];
+  const pending: PendingRow[] = [];
   let sequence = 0;
 
   const prisma = {
     issuer: {
       findUnique: jest.fn(async () => ISSUER),
+    },
+    pendingVoucher: {
+      findUnique: jest.fn(async ({ where }: { where: { issuerId_idempotencyKey: { issuerId: string; idempotencyKey: string } } }) =>
+        pending.find(
+          (row) =>
+            row.issuerId === where.issuerId_idempotencyKey.issuerId &&
+            row.idempotencyKey === where.issuerId_idempotencyKey.idempotencyKey,
+        ) ?? null,
+      ),
+      create: jest.fn(async ({ data }: { data: Omit<PendingRow, 'id' | 'status' | 'retryCount'> }) => {
+        const row: PendingRow = {
+          id: `pending-${pending.length + 1}`,
+          status: 'PENDIENTE',
+          retryCount: 0,
+          ...data,
+          idempotencyKey: data.idempotencyKey ?? null,
+          lastError: data.lastError ?? null,
+        };
+        pending.push(row);
+        return row;
+      }),
+      findMany: jest.fn(async () =>
+        pending.filter(
+          (row) => row.status === 'PENDIENTE' && row.nextRetryAt.getTime() <= Date.now(),
+        ),
+      ),
+      update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<PendingRow> }) => {
+        const row = pending.find((r) => r.id === where.id);
+        if (row) Object.assign(row, data);
+        return row;
+      }),
+      delete: jest.fn(async ({ where }: { where: { id: string } }) => {
+        const index = pending.findIndex((r) => r.id === where.id);
+        if (index >= 0) pending.splice(index, 1);
+        return {};
+      }),
     },
     idempotencyRecord: {
       findUnique: jest.fn(async ({ where }: { where: { issuerId_key: { issuerId: string; key: string } } }) =>
@@ -128,6 +180,15 @@ function buildHarness() {
     assertIssuerGranted: jest.fn(async () => undefined),
   } as unknown as ApiClientService;
 
+  const webhooks = {
+    dispatch: jest.fn(async () => undefined),
+  } as unknown as WebhookService;
+
+  const config = {
+    get: (key: string, def?: number) =>
+      key === 'VOUCHER_RETRY_BASE_MS' ? 0 : def,
+  } as unknown as ConfigService;
+
   const service = new VouchersService(
     prisma,
     certs,
@@ -135,9 +196,11 @@ function buildHarness() {
     wsfe,
     new IssuerLockService(),
     apiClients,
+    webhooks,
+    config,
   );
 
-  return { service, prisma, certs, wsaa, wsfe, vouchers };
+  return { service, prisma, certs, wsaa, wsfe, vouchers, pending, webhooks };
 }
 
 describe('VouchersService — hardening fiscal (F0)', () => {
@@ -188,6 +251,74 @@ describe('VouchersService — hardening fiscal (F0)', () => {
 
     await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
       ArcaRejectionError,
+    );
+  });
+});
+
+describe('VouchersService — resiliencia / retry (F2)', () => {
+  it('error transitorio de ARCA encola el comprobante y responde 503', async () => {
+    const { service, wsfe, pending } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+    expect(pending).toHaveLength(1);
+    expect(pending[0].status).toBe('PENDIENTE');
+  });
+
+  it('el retry scheduler emite el CAE de un comprobante encolado y lo desencola', async () => {
+    const { service, wsfe, pending, vouchers, webhooks } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+    expect(pending).toHaveLength(1);
+
+    await service.retryPendingVouchers();
+
+    expect(pending).toHaveLength(0);
+    expect(vouchers).toHaveLength(1);
+    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(webhooks.dispatch).toHaveBeenCalledWith(
+      'issuer-1',
+      WebhookEvent.VOUCHER_ISSUED,
+      expect.objectContaining({ voucherId: vouchers[0].id }),
+    );
+  });
+
+  it('idempotency: reintentar el POST mientras está encolado devuelve 503, sin duplicar la cola', async () => {
+    const { service, wsfe, pending } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+
+    await expect(
+      service.issue('user-1', buildInput(), 'key-1'),
+    ).rejects.toBeInstanceOf(VoucherQueuedException);
+    await expect(
+      service.issue('user-1', buildInput(), 'key-1'),
+    ).rejects.toBeInstanceOf(VoucherQueuedException);
+
+    expect(pending).toHaveLength(1);
+  });
+
+  it('rechazo permanente durante el retry marca ERROR y notifica voucher.failed', async () => {
+    const { service, wsfe, pending, webhooks } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(
+      new ArcaRejectionError(['10015'], ['(10015) dato inválido']),
+    );
+    await service.retryPendingVouchers();
+
+    expect(pending[0].status).toBe('ERROR');
+    expect(webhooks.dispatch).toHaveBeenCalledWith(
+      'issuer-1',
+      WebhookEvent.VOUCHER_FAILED,
+      expect.objectContaining({ permanent: true }),
     );
   });
 });

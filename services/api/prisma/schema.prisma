@@ -191,6 +191,22 @@ model IdempotencyRecord {
   @@unique([issuerId, key])
 }
 
+model PendingVoucher {
+  id             String   @id @default(cuid())
+  issuerId       String
+  idempotencyKey String?
+  payload        Json
+  status         String   @default("PENDIENTE")
+  retryCount     Int      @default(0)
+  nextRetryAt    DateTime
+  lastError      String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([issuerId, idempotencyKey])
+  @@index([status, nextRetryAt])
+}
+
 model VoucherItem {
   id          String  @id @default(cuid())
   voucherId   String

@@ -4,15 +4,18 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Prisma, type PendingVoucher } from '@prisma/client';
 import {
   defaultRecipientIvaCondition,
+  issueVoucherSchema,
   type IssueVoucher,
 } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { AuthContext, CaeRequest, CaeResult } from '../arca/wsfe/wsfe.types';
+import type { AuthContext, CaeRequest, CaeResult, VoucherAmounts } from '../arca/wsfe/wsfe.types';
 import {
   ArcaRejectionError,
   ARCA_DUPLICATE_NUMBER_CODE,
@@ -22,7 +25,10 @@ import {
   ApiClientService,
   AuthenticatedApiClient,
 } from '../service-auth/api-client.service';
+import { WebhookService } from '../webhooks/webhook.service';
+import { WebhookEvent } from '../webhooks/webhook-events';
 import { IssuerLockService } from './issuer-lock.service';
+import { VoucherQueuedException } from './voucher-queued.exception';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf } from './pdf.util';
@@ -31,6 +37,19 @@ interface CaeWithNumber {
   result: CaeResult;
   number: number;
 }
+
+interface EmissionOutcome {
+  cae: CaeResult;
+  number: number;
+  amounts: VoucherAmounts;
+  date: Date;
+}
+
+type PendingVoucherRow = PendingVoucher;
+
+const DEFAULT_MAX_RETRIES = 8;
+const DEFAULT_RETRY_BASE_MS = 60_000;
+const RETRY_BATCH_SIZE = 25;
 
 export interface IssuedVoucher {
   id: string;
@@ -49,6 +68,9 @@ export interface IssuedVoucher {
 export class VouchersService {
   private readonly logger = new Logger(VouchersService.name);
 
+  private readonly maxRetries: number;
+  private readonly retryBaseMs: number;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly certs: CertsService,
@@ -56,7 +78,15 @@ export class VouchersService {
     private readonly wsfe: WsfeService,
     private readonly issuerLock: IssuerLockService,
     private readonly apiClients: ApiClientService,
-  ) {}
+    private readonly webhooks: WebhookService,
+    config: ConfigService,
+  ) {
+    this.maxRetries = config.get<number>('VOUCHER_MAX_RETRIES', DEFAULT_MAX_RETRIES);
+    this.retryBaseMs = config.get<number>(
+      'VOUCHER_RETRY_BASE_MS',
+      DEFAULT_RETRY_BASE_MS,
+    );
+  }
 
   private async loadVoucher(id: string) {
     const voucher = await this.prisma.voucher.findUnique({
@@ -172,7 +202,7 @@ export class VouchersService {
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
     if (idempotencyKey) {
-      const replay = await this.replayIdempotent(issuer.id, idempotencyKey);
+      const replay = await this.replayOrQueued(issuer.id, idempotencyKey);
       if (replay) {
         return replay;
       }
@@ -180,7 +210,7 @@ export class VouchersService {
 
     return this.issuerLock.runExclusive(issuer.id, async () => {
       if (idempotencyKey) {
-        const replay = await this.replayIdempotent(issuer.id, idempotencyKey);
+        const replay = await this.replayOrQueued(issuer.id, idempotencyKey);
         if (replay) {
           return replay;
         }
@@ -194,6 +224,28 @@ export class VouchersService {
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
+    let outcome: EmissionOutcome;
+    try {
+      outcome = await this.attemptCae(issuer, input);
+    } catch (err) {
+      if (err instanceof ArcaRejectionError) {
+        throw err;
+      }
+      const pending = await this.queuePending(
+        issuer.id,
+        input,
+        idempotencyKey,
+        this.errorMessage(err),
+      );
+      throw new VoucherQueuedException(pending.id);
+    }
+    return this.persistIssuedVoucher(issuer, input, outcome, idempotencyKey);
+  }
+
+  private async attemptCae(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+  ): Promise<EmissionOutcome> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
@@ -233,7 +285,16 @@ export class VouchersService {
       auth,
       buildRequest,
     );
+    return { cae, number, amounts, date };
+  }
 
+  private async persistIssuedVoucher(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+    outcome: EmissionOutcome,
+    idempotencyKey?: string,
+  ): Promise<IssuedVoucher> {
+    const { cae, number, amounts, date } = outcome;
     const qrData = buildQrUrl({
       date,
       issuerCuit: issuer.cuit,
@@ -294,6 +355,16 @@ export class VouchersService {
       `Comprobante ${input.voucherType}-${input.salesPoint}-${number} emitido, CAE ${cae.cae}`,
     );
 
+    void this.webhooks.dispatch(issuer.id, WebhookEvent.VOUCHER_ISSUED, {
+      voucherId: voucher.id,
+      voucherType: input.voucherType,
+      salesPoint: input.salesPoint,
+      number,
+      cae: cae.cae,
+      caeExpiration: cae.caeVto.toISOString(),
+      totalAmount: amounts.totalAmount,
+    });
+
     return {
       id: voucher.id,
       voucherType: input.voucherType,
@@ -347,34 +418,154 @@ export class VouchersService {
     }
   }
 
-  private async replayIdempotent(
+  private async replayOrQueued(
     issuerId: string,
     key: string,
   ): Promise<IssuedVoucher | null> {
     const record = await this.prisma.idempotencyRecord.findUnique({
       where: { issuerId_key: { issuerId, key } },
     });
-    if (!record) {
-      return null;
+    if (record) {
+      const voucher = await this.prisma.voucher.findUnique({
+        where: { id: record.voucherId },
+        include: { salesPoint: true },
+      });
+      if (voucher && voucher.cae) {
+        return {
+          id: voucher.id,
+          voucherType: voucher.voucherType,
+          salesPoint: voucher.salesPoint.number,
+          number: voucher.number,
+          cae: voucher.cae,
+          caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
+          netAmount: Number(voucher.netAmount),
+          ivaAmount: Number(voucher.ivaAmount),
+          totalAmount: Number(voucher.totalAmount),
+          qrData: voucher.qrData ?? '',
+        };
+      }
     }
-    const voucher = await this.prisma.voucher.findUnique({
-      where: { id: record.voucherId },
-      include: { salesPoint: true },
+
+    const pending = await this.prisma.pendingVoucher.findUnique({
+      where: { issuerId_idempotencyKey: { issuerId, idempotencyKey: key } },
     });
-    if (!voucher || !voucher.cae) {
-      return null;
+    if (pending && pending.status === 'PENDIENTE') {
+      throw new VoucherQueuedException(pending.id);
     }
-    return {
-      id: voucher.id,
-      voucherType: voucher.voucherType,
-      salesPoint: voucher.salesPoint.number,
-      number: voucher.number,
-      cae: voucher.cae,
-      caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
-      netAmount: Number(voucher.netAmount),
-      ivaAmount: Number(voucher.ivaAmount),
-      totalAmount: Number(voucher.totalAmount),
-      qrData: voucher.qrData ?? '',
-    };
+    return null;
+  }
+
+  private async queuePending(
+    issuerId: string,
+    input: IssueVoucher,
+    idempotencyKey: string | undefined,
+    lastError: string,
+  ): Promise<PendingVoucherRow> {
+    const payload = JSON.parse(JSON.stringify(input)) as Prisma.InputJsonObject;
+    const nextRetryAt = new Date(Date.now() + this.retryBaseMs);
+    try {
+      return await this.prisma.pendingVoucher.create({
+        data: { issuerId, idempotencyKey, payload, nextRetryAt, lastError },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002' &&
+        idempotencyKey
+      ) {
+        const existing = await this.prisma.pendingVoucher.findUnique({
+          where: { issuerId_idempotencyKey: { issuerId, idempotencyKey } },
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+      throw err;
+    }
+  }
+
+  async retryPendingVouchers(): Promise<void> {
+    const due = await this.prisma.pendingVoucher.findMany({
+      where: { status: 'PENDIENTE', nextRetryAt: { lte: new Date() } },
+      take: RETRY_BATCH_SIZE,
+    });
+    for (const pending of due) {
+      await this.processPending(pending);
+    }
+  }
+
+  private async processPending(pending: PendingVoucherRow): Promise<void> {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: pending.issuerId },
+    });
+    if (!issuer) {
+      await this.failPending(pending, 'Emisor inexistente.', true);
+      return;
+    }
+    const input = issueVoucherSchema.parse(pending.payload);
+
+    await this.issuerLock.runExclusive(issuer.id, async () => {
+      let outcome: EmissionOutcome;
+      try {
+        outcome = await this.attemptCae(issuer, input);
+      } catch (err) {
+        if (err instanceof ArcaRejectionError) {
+          await this.failPending(pending, err.message, true);
+        } else {
+          await this.bumpPending(pending, this.errorMessage(err));
+        }
+        return;
+      }
+      await this.persistIssuedVoucher(
+        issuer,
+        input,
+        outcome,
+        pending.idempotencyKey ?? undefined,
+      );
+      await this.prisma.pendingVoucher.delete({ where: { id: pending.id } });
+    });
+  }
+
+  private async bumpPending(
+    pending: PendingVoucherRow,
+    lastError: string,
+  ): Promise<void> {
+    const retryCount = pending.retryCount + 1;
+    if (retryCount >= this.maxRetries) {
+      await this.failPending(pending, lastError, false);
+      return;
+    }
+    const nextRetryAt = new Date(Date.now() + this.retryBaseMs * 2 ** retryCount);
+    await this.prisma.pendingVoucher.update({
+      where: { id: pending.id },
+      data: { retryCount, nextRetryAt, lastError },
+    });
+    this.logger.warn(
+      `Comprobante encolado ${pending.id} reintentará (intento ${retryCount}) tras ${lastError}`,
+    );
+  }
+
+  private async failPending(
+    pending: PendingVoucherRow,
+    reason: string,
+    permanent: boolean,
+  ): Promise<void> {
+    await this.prisma.pendingVoucher.update({
+      where: { id: pending.id },
+      data: { status: 'ERROR', lastError: reason, retryCount: pending.retryCount + 1 },
+    });
+    this.logger.error(
+      `Comprobante encolado ${pending.id} falló definitivamente: ${reason}`,
+    );
+    void this.webhooks.dispatch(pending.issuerId, WebhookEvent.VOUCHER_FAILED, {
+      pendingVoucherId: pending.id,
+      reason,
+      permanent,
+      exhausted: !permanent,
+    });
+  }
+
+  private errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
   }
 }
