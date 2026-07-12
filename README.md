@@ -37,7 +37,11 @@ pnpm mobile:dev     # Expo dev server
 ## Estado
 
 Ver el roadmap por fases en [`docs/arquitectura.md`](docs/arquitectura.md#roadmap).
-Arrancamos por **Fase 0 (scaffolding)** → **Fase 1 (WSAA homologación)**.
+
+**Backend** con el flujo fiscal completo cableado (auth JWT, vault de certificados,
+WSAA + WSFEv1, emisión de comprobantes con CAE + QR y persistencia auditada), verificado
+localmente. Falta probar la emisión real contra **homologación** (necesita un certificado
+de testing de ARCA) y construir la **app mobile** (`apps/mobile`, aún no existe).
 
 > ⚠️ **Seguridad fiscal:** las claves privadas de los contribuyentes se guardan cifradas y
 > nunca se exponen a la app. No se commitea ningún `.key`, `.crt`, `.p12` ni `.env` (ver `.gitignore`).

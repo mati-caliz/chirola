@@ -35,15 +35,29 @@ para tener una sola fuente de verdad entre front y back.
 
 ## Roadmap
 
-| Fase | Objetivo | Entregable verificable |
-|------|----------|------------------------|
-| **0** | Scaffolding | Monorepo levanta: `pnpm install`, Postgres en Docker, api y mobile arrancan. |
-| **1** | WSAA homologación | Backend obtiene y cachea un TA válido con cert de testing. |
-| **2** | Emitir Factura C | `FECAESolicitar` devuelve CAE en homologación. |
-| **3** | A/B + IVA + NC/ND | Comprobantes discriminando IVA y notas de crédito/débito. |
-| **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. |
-| **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. |
-| **6** | Producción | Onboarding de certs reales y pasaje a endpoints de producción. |
+| Fase | Objetivo | Entregable verificable | Estado |
+|------|----------|------------------------|--------|
+| **0** | Scaffolding | Monorepo levanta: `pnpm install`, Postgres en Docker, api arranca. | ✅ Hecho |
+| **1** | WSAA homologación | Backend obtiene y cachea un TA válido con cert de testing. | 🟡 Código listo, sin probar contra ARCA (falta cert homolog.) |
+| **2** | Emitir Factura C | `FECAESolicitar` devuelve CAE en homologación. | 🟡 Flujo completo cableado y verificado local; falta CAE real |
+| **3** | A/B + IVA + NC/ND | Comprobantes discriminando IVA y notas de crédito/débito. | 🟡 A/B con IVA discriminado implementado; falta NC/ND (`CbtesAsoc`) |
+| **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. | ⬜ Pendiente (`apps/mobile` no existe aún) |
+| **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. | 🟡 URL del QR generada; falta render PNG + PDF |
+| **6** | Producción | Onboarding de certs reales y pasaje a endpoints de producción. | ⬜ Pendiente |
+
+### Backend ya implementado (Fases 1–3 parcial)
+`auth` (JWT + scrypt), `emisores`, `certs` (vault AES-256-GCM), `arca/wsaa`, `arca/wsfe`
+(WSFEv1: CAE, numeración, IVA por alícuota), `comprobantes` (orquesta la emisión + QR +
+persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
+
+### Lo próximo para avanzar
+1. **Cerrar Fase 1/2 de verdad:** cargar un cert de **homologación** real y obtener un CAE.
+   Requiere: generar clave+CSR (falta endpoint en `certs`), asociar `wsfe` en ARCA, registrar
+   punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
+2. **Notas de crédito/débito (Fase 3):** agregar `CbtesAsoc` al request de WSFEv1.
+3. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
+4. **PDF + QR PNG (Fase 5):** render del QR (lib `qrcode`) y armado del PDF.
+5. **Faltantes transversales:** módulo `clientes`, onboarding guiado del cert, refresh token/logout.
 
 ## Decisiones tomadas
 - Mobile: **Expo/React Native**.
