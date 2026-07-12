@@ -124,6 +124,31 @@ export class WsfeService {
     );
   }
 
+  /**
+   * Bloque `<ar:CbtesAsoc>` con los comprobantes originales de una NC/ND.
+   * Vacío si no hay asociados (facturas comunes).
+   */
+  private buildCbtesAsoc(req: CaeRequest): string {
+    const asoc = req.comprobantesAsociados ?? [];
+    if (asoc.length === 0) return '';
+    return (
+      '<ar:CbtesAsoc>' +
+      asoc
+        .map(
+          (c) =>
+            '<ar:CbteAsoc>' +
+            `<ar:Tipo>${c.tipo}</ar:Tipo>` +
+            `<ar:PtoVta>${c.puntoVenta}</ar:PtoVta>` +
+            `<ar:Nro>${c.numero}</ar:Nro>` +
+            (c.cuit ? `<ar:Cuit>${c.cuit}</ar:Cuit>` : '') +
+            (c.fecha ? `<ar:CbteFch>${c.fecha}</ar:CbteFch>` : '') +
+            '</ar:CbteAsoc>',
+        )
+        .join('') +
+      '</ar:CbtesAsoc>'
+    );
+  }
+
   private buildDetalle(req: CaeRequest): string {
     const { importes } = req;
     const ivaArray =
@@ -160,6 +185,7 @@ export class WsfeService {
       `<ar:MonId>${req.moneda}</ar:MonId>` +
       `<ar:MonCotiz>${req.cotizacion}</ar:MonCotiz>` +
       `<ar:CondicionIVAReceptorId>${req.receptor.condicionIvaId}</ar:CondicionIVAReceptorId>` +
+      this.buildCbtesAsoc(req) +
       ivaArray +
       '</ar:FECAEDetRequest>' +
       '</ar:FeDetReq>'

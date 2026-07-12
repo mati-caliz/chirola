@@ -107,6 +107,7 @@ export class ComprobantesService {
       importes,
       moneda: input.moneda,
       cotizacion: input.cotizacion,
+      comprobantesAsociados: input.comprobantesAsociados,
     });
 
     // 5. QR obligatorio de ARCA.
@@ -148,6 +149,7 @@ export class ComprobantesService {
         cae: cae.cae,
         caeVto: cae.caeVto,
         qrData,
+        comprobantesAsoc: input.comprobantesAsociados ?? undefined,
         items: {
           create: input.items.map((it) => ({
             descripcion: it.descripcion,

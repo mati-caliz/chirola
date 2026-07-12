@@ -28,6 +28,24 @@ export function requiereCuitReceptor(tipoCbte: number): boolean {
   return tiposConCuit.includes(tipoCbte);
 }
 
+/** Notas de crédito y débito (todas las clases). Exigen `CbtesAsoc` en WSFEv1. */
+const tiposNotaCreditoDebito: readonly number[] = [
+  TipoComprobante.NOTA_DEBITO_A,
+  TipoComprobante.NOTA_CREDITO_A,
+  TipoComprobante.NOTA_DEBITO_B,
+  TipoComprobante.NOTA_CREDITO_B,
+  TipoComprobante.NOTA_DEBITO_C,
+  TipoComprobante.NOTA_CREDITO_C,
+];
+
+/**
+ * ¿El tipo de comprobante es una nota de crédito/débito? Estas requieren
+ * asociar el/los comprobante(s) original(es) vía `CbtesAsoc`.
+ */
+export function esNotaCreditoDebito(tipoCbte: number): boolean {
+  return tiposNotaCreditoDebito.includes(tipoCbte);
+}
+
 /** Tipos de documento del receptor. */
 export const TipoDocumento = {
   CUIT: 80,
@@ -80,22 +98,53 @@ export const itemSchema = z.object({
   }),
 });
 
-export const emitirComprobanteSchema = z.object({
-  emisorId: z.string().min(1),
+/**
+ * Comprobante original asociado a una nota de crédito/débito (`CbteAsoc`).
+ * `cuit` y `fecha` son opcionales pero recomendados por ARCA.
+ */
+export const comprobanteAsociadoSchema = z.object({
+  tipo: z.number().int().positive(),
   puntoVenta: z.number().int().positive(),
-  tipoCbte: z.number().int().positive(),
-  concepto: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  receptor: z.object({
-    tipoDoc: z.number().int(),
-    numeroDoc: z.string().min(1),
-    razonSocial: z.string().optional(),
-    /** Id de CondicionIvaReceptor. Si se omite, se deriva del tipo de comprobante. */
-    condicionIvaId: z.number().int().optional(),
-  }),
-  items: z.array(itemSchema).min(1),
-  moneda: z.string().default('PES'),
-  cotizacion: z.number().positive().default(1),
+  numero: z.number().int().positive(),
+  /** CUIT del emisor del comprobante asociado (11 dígitos). */
+  cuit: z.string().regex(/^\d{11}$/).optional(),
+  /** Fecha del comprobante asociado en formato yyyyMMdd. */
+  fecha: z.string().regex(/^\d{8}$/).optional(),
 });
 
+export const emitirComprobanteSchema = z
+  .object({
+    emisorId: z.string().min(1),
+    puntoVenta: z.number().int().positive(),
+    tipoCbte: z.number().int().positive(),
+    concepto: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    receptor: z.object({
+      tipoDoc: z.number().int(),
+      numeroDoc: z.string().min(1),
+      razonSocial: z.string().optional(),
+      /** Id de CondicionIvaReceptor. Si se omite, se deriva del tipo de comprobante. */
+      condicionIvaId: z.number().int().optional(),
+    }),
+    items: z.array(itemSchema).min(1),
+    moneda: z.string().default('PES'),
+    cotizacion: z.number().positive().default(1),
+    /** Comprobantes asociados (obligatorio para notas de crédito/débito). */
+    comprobantesAsociados: z.array(comprobanteAsociadoSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      esNotaCreditoDebito(data.tipoCbte) &&
+      !(data.comprobantesAsociados && data.comprobantesAsociados.length > 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['comprobantesAsociados'],
+        message:
+          'Las notas de crédito/débito requieren al menos un comprobante asociado.',
+      });
+    }
+  });
+
 export type Item = z.infer<typeof itemSchema>;
+export type ComprobanteAsociado = z.infer<typeof comprobanteAsociadoSchema>;
 export type EmitirComprobante = z.infer<typeof emitirComprobanteSchema>;

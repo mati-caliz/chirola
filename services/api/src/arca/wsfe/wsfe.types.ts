@@ -1,4 +1,4 @@
-import type { Item } from '@chirola/shared';
+import type { ComprobanteAsociado, Item } from '@chirola/shared';
 
 /** Credenciales de autenticación ya resueltas (CUIT + TA vigente). */
 export interface AuthContext {
@@ -43,6 +43,8 @@ export interface CaeRequest {
   importes: ImportesComprobante;
   moneda: string;
   cotizacion: number;
+  /** Comprobantes asociados (`CbtesAsoc`), obligatorio para notas de crédito/débito. */
+  comprobantesAsociados?: ComprobanteAsociado[];
 }
 
 /** Resultado de un CAE otorgado por ARCA. */

@@ -103,6 +103,8 @@ model Comprobante {
   caeVto        DateTime?
   qrData        String?
   arcaObs       Json?
+  // Comprobantes asociados (CbtesAsoc) — presente en notas de crédito/débito.
+  comprobantesAsoc Json?
 
   items         ItemComprobante[]
   createdAt     DateTime          @default(now())
