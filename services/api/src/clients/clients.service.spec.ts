@@ -3,13 +3,15 @@ import { Prisma } from '@prisma/client';
 import { ClientsService } from './clients.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+type Row = Record<string, unknown>;
+
 function fakePrisma(): PrismaService {
-  const store = new Map<string, any>();
+  const store = new Map<string, Row>();
   let seq = 0;
-  const key = (r: any) => `${r.issuerId}|${r.docType}|${r.docNumber}`;
+  const key = (r: Row) => `${r.issuerId}|${r.docType}|${r.docNumber}`;
   return {
     client: {
-      create: async ({ data }: any) => {
+      create: async ({ data }: { data: Row }) => {
         for (const r of store.values()) {
           if (key(r) === key(data)) {
             throw new Prisma.PrismaClientKnownRequestError('dup', {
@@ -18,25 +20,31 @@ function fakePrisma(): PrismaService {
             });
           }
         }
-        const row = { id: `cli${++seq}`, legalName: null, ivaCondition: null, email: null, ...data };
-        store.set(row.id, row);
+        const row: Row = {
+          id: `cli${++seq}`,
+          legalName: null,
+          ivaCondition: null,
+          email: null,
+          ...data,
+        };
+        store.set(row.id as string, row);
         return row;
       },
-      findMany: async ({ where }: any) =>
+      findMany: async ({ where }: { where: { issuerId: string } }) =>
         [...store.values()].filter((r) => r.issuerId === where.issuerId),
-      findFirst: async ({ where }: any) =>
+      findFirst: async ({ where }: { where: { id: string; issuerId: string } }) =>
         [...store.values()].find(
           (r) => r.id === where.id && r.issuerId === where.issuerId,
         ) ?? null,
-      update: async ({ where, data }: any) => {
-        const row = { ...store.get(where.id) };
+      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
+        const row: Row = { ...store.get(where.id) };
         for (const [k, v] of Object.entries(data)) {
           if (v !== undefined) row[k] = v;
         }
         store.set(where.id, row);
         return row;
       },
-      delete: async ({ where }: any) => {
+      delete: async ({ where }: { where: { id: string } }) => {
         store.delete(where.id);
         return {};
       },

@@ -5,39 +5,55 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashRefreshToken } from './refresh-token.util';
 
+type Row = Record<string, unknown>;
+
 function fakePrisma() {
-  const users = new Map<string, any>();
-  const tokens = new Map<string, any>();
+  const users = new Map<string, Row>();
+  const tokens = new Map<string, Row>();
   let seq = 0;
   const prisma = {
     _users: users,
     _tokens: tokens,
     user: {
-      findUnique: async ({ where }: any) =>
-        [...users.values()].find((u) => u.id === where.id || u.email === where.email) ?? null,
-      create: async ({ data }: any) => {
+      findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
+        [...users.values()].find(
+          (u) => u.id === where.id || u.email === where.email,
+        ) ?? null,
+      create: async ({ data }: { data: Row }) => {
         const u = { id: `u${++seq}`, ...data };
         users.set(u.id, u);
         return u;
       },
     },
     refreshToken: {
-      create: async ({ data }: any) => {
+      create: async ({ data }: { data: Row }) => {
         const t = { id: `t${++seq}`, revokedAt: null, ...data };
         tokens.set(t.id, t);
         return t;
       },
-      findUnique: async ({ where, include }: any) => {
+      findUnique: async ({
+        where,
+        include,
+      }: {
+        where: { tokenHash: string };
+        include?: { user?: boolean };
+      }) => {
         const t = [...tokens.values()].find((x) => x.tokenHash === where.tokenHash) ?? null;
-        if (t && include?.user) return { ...t, user: users.get(t.userId) };
+        if (t && include?.user) return { ...t, user: users.get(t.userId as string) };
         return t;
       },
-      update: async ({ where, data }: any) => {
+      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
         const t = { ...tokens.get(where.id), ...data };
         tokens.set(where.id, t);
         return t;
       },
-      updateMany: async ({ where, data }: any) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { tokenHash: string };
+        data: Row;
+      }) => {
         let count = 0;
         for (const t of tokens.values()) {
           if (t.tokenHash === where.tokenHash && t.revokedAt == null) {
@@ -49,7 +65,7 @@ function fakePrisma() {
       },
     },
   };
-  return prisma as unknown as PrismaService & { _tokens: Map<string, any> };
+  return prisma as unknown as PrismaService & { _tokens: Map<string, Row> };
 }
 
 function service(prisma: PrismaService) {
@@ -93,7 +109,7 @@ describe('AuthService — refresh tokens', () => {
   });
 
   it('rechaza un refresh token vencido', async () => {
-    const prisma = fakePrisma() as any;
+    const prisma = fakePrisma();
     const svc = service(prisma);
     const { refreshToken } = await svc.register({ email: 'a@b.com', password: 'secret123' });
     for (const t of prisma._tokens.values()) {

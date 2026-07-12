@@ -6,20 +6,29 @@ import { CertsService } from './certs.service';
 import { FieldEncryptionService } from '../crypto/field-encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+type Row = Record<string, unknown>;
+
 function fakePrisma(): PrismaService {
-  const store = new Map<string, any>();
+  const store = new Map<string, Row>();
   return {
     certificate: {
-      upsert: async ({ where, create, update }: any) => {
+      upsert: async ({
+        where,
+        create,
+        update,
+      }: {
+        where: { issuerId: string };
+        create: Row;
+        update: Row;
+      }) => {
         const prev = store.get(where.issuerId);
-        const row = prev
-          ? { ...prev, ...update }
-          : { id: 'c1', ...create };
+        const row = prev ? { ...prev, ...update } : { id: 'c1', ...create };
         store.set(where.issuerId, row);
         return row;
       },
-      findUnique: async ({ where }: any) => store.get(where.issuerId) ?? null,
-      update: async ({ where, data }: any) => {
+      findUnique: async ({ where }: { where: { issuerId: string } }) =>
+        store.get(where.issuerId) ?? null,
+      update: async ({ where, data }: { where: { issuerId: string }; data: Row }) => {
         const row = { ...store.get(where.issuerId), ...data };
         store.set(where.issuerId, row);
         return row;
