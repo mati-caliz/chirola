@@ -9,12 +9,26 @@ datasource db {
 
 // Usuario de la app mobile
 model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String // hash
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  emisores      Emisor[]
+  refreshTokens RefreshToken[]
+}
+
+// Refresh token opaco (guardado hasheado). Rotación en cada uso; logout lo revoca.
+model RefreshToken {
   id        String    @id @default(cuid())
-  email     String    @unique
-  password  String // hash
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha256 del token opaco
+  expiresAt DateTime
+  revokedAt DateTime?
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  emisores  Emisor[]
+
+  @@index([userId])
 }
 
 // Contribuyente en cuyo nombre se factura (1 user puede tener varios CUIT)

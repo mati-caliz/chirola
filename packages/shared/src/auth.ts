@@ -10,8 +10,14 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+/** Body de refresh y logout: el refresh token opaco entregado al iniciar sesión. */
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type RefreshInput = z.infer<typeof refreshSchema>;
 
 export interface AuthUser {
   id: string;
@@ -19,6 +25,9 @@ export interface AuthUser {
 }
 
 export interface AuthResponse {
+  /** Access token (JWT, corta duración). */
   token: string;
+  /** Refresh token opaco (larga duración, rota en cada uso). */
+  refreshToken: string;
   user: AuthUser;
 }

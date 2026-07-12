@@ -17,7 +17,7 @@ ARCA expone SOAP, no una API apta para consumir desde un cliente móvil.
 
 ### `services/api` — NestJS + Prisma + PostgreSQL
 Módulos:
-- `auth` — usuarios de la app (registro/login, JWT).
+- `auth` — usuarios de la app (registro/login, JWT + refresh tokens rotativos, logout).
 - `emisores` — datos del contribuyente (CUIT, condición IVA, puntos de venta).
 - `certs` — vault cifrado; generación de CSR; carga del `.crt`.
 - `arca/wsaa` — LTR + firma CMS + cache del TA.
@@ -64,7 +64,15 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
    Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
 2. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
-3. **Faltantes transversales:** onboarding guiado del cert, refresh token/logout.
+3. **Faltantes transversales:** onboarding guiado del cert (UX paso a paso en la app).
+
+### Auth: refresh tokens + logout (implementado)
+- Access token JWT de corta duración (`JWT_ACCESS_TTL`, default `1h`).
+- Refresh token opaco (base64url) guardado **hasheado** (sha256) en `RefreshToken`,
+  con vencimiento (`REFRESH_TOKEN_TTL_DAYS`, default 30 días).
+- `POST /auth/refresh` rota el token: revoca el usado y emite un par nuevo (reuso → 401).
+- `POST /auth/logout` revoca el refresh token (idempotente).
+- `register`/`login` ahora devuelven `{ token, refreshToken, user }`.
 
 ### Módulo `clientes` (implementado)
 ABM de receptores por emisor, con rutas anidadas y ownership vía `EmisoresService`:
