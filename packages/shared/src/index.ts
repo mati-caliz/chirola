@@ -185,3 +185,15 @@ export const issueVoucherSchema = z
 export type Item = z.infer<typeof itemSchema>;
 export type AssociatedVoucher = z.infer<typeof associatedVoucherSchema>;
 export type IssueVoucher = z.infer<typeof issueVoucherSchema>;
+
+export const shadowCompareSchema = z.object({
+  voucher: issueVoucherSchema,
+  expected: z.object({
+    number: z.number().int().nonnegative().optional(),
+    netAmount: z.number(),
+    ivaAmount: z.number(),
+    totalAmount: z.number(),
+  }),
+});
+
+export type ShadowCompareInput = z.infer<typeof shadowCompareSchema>;

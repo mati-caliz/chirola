@@ -64,6 +64,16 @@ export interface IssuedVoucher {
   qrData: string;
 }
 
+export interface EmissionPlan {
+  salesPoint: number;
+  voucherType: number;
+  number: number;
+  netAmount: number;
+  ivaAmount: number;
+  totalAmount: number;
+  rates: { id: number; taxableBase: number; amount: number }[];
+}
+
 @Injectable()
 export class VouchersService {
   private readonly logger = new Logger(VouchersService.name);
@@ -218,6 +228,52 @@ export class VouchersService {
   ): Promise<VoucherAmounts> {
     await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
     return calculateAmounts(input.voucherType, input.items);
+  }
+
+  async computeEmissionPlanForApiClient(
+    apiClient: AuthenticatedApiClient,
+    input: IssueVoucher,
+  ): Promise<EmissionPlan> {
+    await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: input.issuerId },
+    });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    return this.computeEmissionPlan(issuer, input);
+  }
+
+  private async computeEmissionPlan(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+  ): Promise<EmissionPlan> {
+    const credentials = await this.certs.getCredentials(issuer.id);
+    const accessTicket = await this.wsaa.getAccessTicket(
+      issuer.id,
+      credentials,
+      'wsfe',
+    );
+    const auth: AuthContext = {
+      cuit: issuer.cuit,
+      token: accessTicket.token,
+      sign: accessTicket.sign,
+    };
+    const last = await this.wsfe.getLastAuthorized(
+      auth,
+      input.salesPoint,
+      input.voucherType,
+    );
+    const amounts = calculateAmounts(input.voucherType, input.items);
+    return {
+      salesPoint: input.salesPoint,
+      voucherType: input.voucherType,
+      number: last + 1,
+      netAmount: amounts.netAmount,
+      ivaAmount: amounts.ivaAmount,
+      totalAmount: amounts.totalAmount,
+      rates: amounts.rates,
+    };
   }
 
   private async issueAuthorized(

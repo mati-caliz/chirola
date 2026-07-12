@@ -40,6 +40,14 @@ export class V1VouchersController {
     return this.vouchers.previewForApiClient(apiClient, body);
   }
 
+  @Post('dry-run')
+  dryRun(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
+  ) {
+    return this.vouchers.computeEmissionPlanForApiClient(apiClient, body);
+  }
+
   @Get(':id')
   get(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,

@@ -180,6 +180,21 @@ model ApiClientIssuer {
   @@index([issuerId])
 }
 
+model ShadowComparison {
+  id          String   @id @default(cuid())
+  apiClientId String
+  issuerId    String
+  salesPoint  Int
+  voucherType Int
+  matched     Boolean
+  differences Json
+  expected    Json
+  computed    Json
+  createdAt   DateTime @default(now())
+
+  @@index([issuerId, createdAt])
+}
+
 model ServiceAuditLog {
   id          String   @id @default(cuid())
   apiClientId String

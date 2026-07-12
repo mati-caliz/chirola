@@ -13,5 +13,6 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
   imports: [ArcaModule, CertsModule, ServiceAuthModule, WebhooksModule],
   controllers: [VouchersController, V1VouchersController],
   providers: [VouchersService, IssuerLockService, VoucherRetryScheduler],
+  exports: [VouchersService],
 })
 export class VouchersModule {}
