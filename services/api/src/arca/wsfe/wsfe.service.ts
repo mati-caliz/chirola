@@ -13,14 +13,14 @@ import type {
 
 const WSFEV1_NS = 'http://ar.gov.afip.dif.FEV1/';
 
-function fechaArca(d: Date): string {
+function toArcaDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}${m}${day}`;
 }
 
-function parseFechaArca(s: string): Date {
+function parseArcaDate(s: string): Date {
   const y = Number(s.slice(0, 4));
   const m = Number(s.slice(4, 6));
   const d = Number(s.slice(6, 8));
@@ -64,16 +64,16 @@ export class WsfeService {
     return res.includes('OK');
   }
 
-  async getUltimoAutorizado(
+  async getLastAuthorized(
     auth: AuthContext,
-    puntoVenta: number,
-    tipoCbte: number,
+    salesPoint: number,
+    voucherType: number,
   ): Promise<number> {
     const soap = this.envelope(
       '<ar:FECompUltimoAutorizado>' +
         buildAuthBlock(auth.cuit, auth.token, auth.sign) +
-        `<ar:PtoVta>${puntoVenta}</ar:PtoVta>` +
-        `<ar:CbteTipo>${tipoCbte}</ar:CbteTipo>` +
+        `<ar:PtoVta>${salesPoint}</ar:PtoVta>` +
+        `<ar:CbteTipo>${voucherType}</ar:CbteTipo>` +
         '</ar:FECompUltimoAutorizado>',
     );
     const res = await callSoap(
@@ -85,13 +85,13 @@ export class WsfeService {
     return Number(xml.required('CbteNro'));
   }
 
-  async solicitarCae(auth: AuthContext, req: CaeRequest): Promise<CaeResult> {
+  async requestCae(auth: AuthContext, request: CaeRequest): Promise<CaeResult> {
     const soap = this.envelope(
       '<ar:FECAESolicitar>' +
         buildAuthBlock(auth.cuit, auth.token, auth.sign) +
         '<ar:FeCAEReq>' +
-        this.buildCabecera(req) +
-        this.buildDetalle(req) +
+        this.buildHeader(request) +
+        this.buildDetail(request) +
         '</ar:FeCAEReq>' +
         '</ar:FECAESolicitar>',
     );
@@ -99,30 +99,30 @@ export class WsfeService {
     return this.parseCaeResponse(res);
   }
 
-  private buildCabecera(req: CaeRequest): string {
+  private buildHeader(request: CaeRequest): string {
     return (
       '<ar:FeCabReq>' +
       '<ar:CantReg>1</ar:CantReg>' +
-      `<ar:PtoVta>${req.puntoVenta}</ar:PtoVta>` +
-      `<ar:CbteTipo>${req.tipoCbte}</ar:CbteTipo>` +
+      `<ar:PtoVta>${request.salesPoint}</ar:PtoVta>` +
+      `<ar:CbteTipo>${request.voucherType}</ar:CbteTipo>` +
       '</ar:FeCabReq>'
     );
   }
 
-  private buildCbtesAsoc(req: CaeRequest): string {
-    const asoc = req.comprobantesAsociados ?? [];
-    if (asoc.length === 0) return '';
+  private buildAssociatedVouchers(request: CaeRequest): string {
+    const associated = request.associatedVouchers ?? [];
+    if (associated.length === 0) return '';
     return (
       '<ar:CbtesAsoc>' +
-      asoc
+      associated
         .map(
-          (c) =>
+          (voucher) =>
             '<ar:CbteAsoc>' +
-            `<ar:Tipo>${c.tipo}</ar:Tipo>` +
-            `<ar:PtoVta>${c.puntoVenta}</ar:PtoVta>` +
-            `<ar:Nro>${c.numero}</ar:Nro>` +
-            (c.cuit ? `<ar:Cuit>${c.cuit}</ar:Cuit>` : '') +
-            (c.fecha ? `<ar:CbteFch>${c.fecha}</ar:CbteFch>` : '') +
+            `<ar:Tipo>${voucher.type}</ar:Tipo>` +
+            `<ar:PtoVta>${voucher.salesPoint}</ar:PtoVta>` +
+            `<ar:Nro>${voucher.number}</ar:Nro>` +
+            (voucher.cuit ? `<ar:Cuit>${voucher.cuit}</ar:Cuit>` : '') +
+            (voucher.date ? `<ar:CbteFch>${voucher.date}</ar:CbteFch>` : '') +
             '</ar:CbteAsoc>',
         )
         .join('') +
@@ -130,18 +130,18 @@ export class WsfeService {
     );
   }
 
-  private buildDetalle(req: CaeRequest): string {
-    const { importes } = req;
+  private buildDetail(request: CaeRequest): string {
+    const { amounts } = request;
     const ivaArray =
-      importes.alicuotas.length > 0
+      amounts.rates.length > 0
         ? '<ar:Iva>' +
-          importes.alicuotas
+          amounts.rates
             .map(
-              (a) =>
+              (rate) =>
                 '<ar:AlicIva>' +
-                `<ar:Id>${a.id}</ar:Id>` +
-                `<ar:BaseImp>${num(a.baseImp)}</ar:BaseImp>` +
-                `<ar:Importe>${num(a.importe)}</ar:Importe>` +
+                `<ar:Id>${rate.id}</ar:Id>` +
+                `<ar:BaseImp>${num(rate.taxableBase)}</ar:BaseImp>` +
+                `<ar:Importe>${num(rate.amount)}</ar:Importe>` +
                 '</ar:AlicIva>',
             )
             .join('') +
@@ -151,22 +151,22 @@ export class WsfeService {
     return (
       '<ar:FeDetReq>' +
       '<ar:FECAEDetRequest>' +
-      `<ar:Concepto>${req.concepto}</ar:Concepto>` +
-      `<ar:DocTipo>${req.receptor.tipoDoc}</ar:DocTipo>` +
-      `<ar:DocNro>${req.receptor.numeroDoc.replace(/-/g, '')}</ar:DocNro>` +
-      `<ar:CbteDesde>${req.numero}</ar:CbteDesde>` +
-      `<ar:CbteHasta>${req.numero}</ar:CbteHasta>` +
-      `<ar:CbteFch>${fechaArca(req.fecha)}</ar:CbteFch>` +
-      `<ar:ImpTotal>${num(importes.impTotal)}</ar:ImpTotal>` +
+      `<ar:Concepto>${request.concept}</ar:Concepto>` +
+      `<ar:DocTipo>${request.recipient.docType}</ar:DocTipo>` +
+      `<ar:DocNro>${request.recipient.docNumber.replace(/-/g, '')}</ar:DocNro>` +
+      `<ar:CbteDesde>${request.number}</ar:CbteDesde>` +
+      `<ar:CbteHasta>${request.number}</ar:CbteHasta>` +
+      `<ar:CbteFch>${toArcaDate(request.date)}</ar:CbteFch>` +
+      `<ar:ImpTotal>${num(amounts.totalAmount)}</ar:ImpTotal>` +
       '<ar:ImpTotConc>0</ar:ImpTotConc>' +
-      `<ar:ImpNeto>${num(importes.impNeto)}</ar:ImpNeto>` +
+      `<ar:ImpNeto>${num(amounts.netAmount)}</ar:ImpNeto>` +
       '<ar:ImpOpEx>0</ar:ImpOpEx>' +
-      `<ar:ImpIVA>${num(importes.impIva)}</ar:ImpIVA>` +
+      `<ar:ImpIVA>${num(amounts.ivaAmount)}</ar:ImpIVA>` +
       '<ar:ImpTrib>0</ar:ImpTrib>' +
-      `<ar:MonId>${req.moneda}</ar:MonId>` +
-      `<ar:MonCotiz>${req.cotizacion}</ar:MonCotiz>` +
-      `<ar:CondicionIVAReceptorId>${req.receptor.condicionIvaId}</ar:CondicionIVAReceptorId>` +
-      this.buildCbtesAsoc(req) +
+      `<ar:MonId>${request.currency}</ar:MonId>` +
+      `<ar:MonCotiz>${request.exchangeRate}</ar:MonCotiz>` +
+      `<ar:CondicionIVAReceptorId>${request.recipient.ivaConditionId}</ar:CondicionIVAReceptorId>` +
+      this.buildAssociatedVouchers(request) +
       ivaArray +
       '</ar:FECAEDetRequest>' +
       '</ar:FeDetReq>'
@@ -175,18 +175,18 @@ export class WsfeService {
 
   private parseCaeResponse(res: string): CaeResult {
     const xml = new ParsedXml(res);
-    const resultado = xml.required('Resultado');
-    if (resultado === 'R') {
-      const errores = xml.errors();
+    const result = xml.required('Resultado');
+    if (result === 'R') {
+      const errors = xml.errors();
       throw new BadRequestException(
         `ARCA rechazó el comprobante: ${
-          errores.length ? errores.join(' | ') : 'motivo desconocido'
+          errors.length ? errors.join(' | ') : 'motivo desconocido'
         }`,
       );
     }
     const cae = xml.required('CAE');
     const caeVto = xml.required('CAEFchVto');
     this.logger.log(`CAE otorgado: ${cae} (vence ${caeVto})`);
-    return { cae, caeVto: parseFechaArca(caeVto) };
+    return { cae, caeVto: parseArcaDate(caeVto) };
   }
 }

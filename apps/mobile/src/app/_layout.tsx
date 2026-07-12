@@ -61,7 +61,7 @@ function RootNavigator() {
     if (!user && !inAuth) {
       router.replace('/(auth)/login');
     } else if (user && inAuth) {
-      router.replace('/(app)/emisores');
+      router.replace('/(app)/issuers');
     }
   }, [user, loading, segments, router]);
 

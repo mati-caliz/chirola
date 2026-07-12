@@ -1,0 +1,28 @@
+import { z } from 'zod';
+
+export const createIssuerSchema = z.object({
+  cuit: z.string().regex(/^\d{11}$/, 'El CUIT debe tener 11 dígitos'),
+  legalName: z.string().min(1),
+  ivaCondition: z.enum(['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO']),
+  environment: z.enum(['homologacion', 'produccion']).default('homologacion'),
+});
+
+export const uploadCertificateSchema = z.object({
+  privateKeyPem: z.string().min(1),
+  certPem: z.string().min(1),
+  alias: z.string().optional(),
+});
+
+export const generateCsrSchema = z.object({
+
+  alias: z.string().min(1).optional(),
+});
+
+export const matchCertificateSchema = z.object({
+  certPem: z.string().min(1),
+});
+
+export type CreateIssuer = z.infer<typeof createIssuerSchema>;
+export type UploadCertificate = z.infer<typeof uploadCertificateSchema>;
+export type GenerateCsr = z.infer<typeof generateCsrSchema>;
+export type MatchCertificate = z.infer<typeof matchCertificateSchema>;

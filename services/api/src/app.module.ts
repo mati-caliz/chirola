@@ -5,9 +5,9 @@ import { CryptoModule } from './crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
 import { ArcaModule } from './arca/arca.module';
 import { CertsModule } from './certs/certs.module';
-import { EmisoresModule } from './emisores/emisores.module';
-import { ClientesModule } from './clientes/clientes.module';
-import { ComprobantesModule } from './comprobantes/comprobantes.module';
+import { IssuersModule } from './issuers/issuers.module';
+import { ClientsModule } from './clients/clients.module';
+import { VouchersModule } from './vouchers/vouchers.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -18,9 +18,9 @@ import { HealthController } from './health/health.controller';
     AuthModule,
     ArcaModule,
     CertsModule,
-    EmisoresModule,
-    ClientesModule,
-    ComprobantesModule,
+    IssuersModule,
+    ClientsModule,
+    VouchersModule,
   ],
   controllers: [HealthController],
 })

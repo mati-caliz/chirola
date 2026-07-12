@@ -1,38 +1,38 @@
-import { TipoComprobante } from '@chirola/shared';
-import { calcularImportes } from './iva-calculator';
+import { VoucherType } from '@chirola/shared';
+import { calculateAmounts } from './iva-calculator';
 
-describe('calcularImportes', () => {
+describe('calculateAmounts', () => {
   it('Factura C: no discrimina IVA (Neto = Total, IVA = 0)', () => {
-    const r = calcularImportes(TipoComprobante.FACTURA_C, [
-      { descripcion: 'Cafe', cantidad: 2, precioUnit: 1500, alicuotaIva: 21 },
+    const r = calculateAmounts(VoucherType.FACTURA_C, [
+      { description: 'Cafe', quantity: 2, unitPrice: 1500, ivaRate: 21 },
     ]);
-    expect(r.impTotal).toBe(3000);
-    expect(r.impNeto).toBe(3000);
-    expect(r.impIva).toBe(0);
-    expect(r.alicuotas).toHaveLength(0);
+    expect(r.totalAmount).toBe(3000);
+    expect(r.netAmount).toBe(3000);
+    expect(r.ivaAmount).toBe(0);
+    expect(r.rates).toHaveLength(0);
   });
 
   it('Factura A: discrimina IVA 21% desde el bruto y cuadra', () => {
-    const r = calcularImportes(TipoComprobante.FACTURA_A, [
-      { descripcion: 'Servicio', cantidad: 1, precioUnit: 1210, alicuotaIva: 21 },
+    const r = calculateAmounts(VoucherType.FACTURA_A, [
+      { description: 'Servicio', quantity: 1, unitPrice: 1210, ivaRate: 21 },
     ]);
-    expect(r.impTotal).toBe(1210);
-    expect(r.impNeto).toBe(1000);
-    expect(r.impIva).toBe(210);
-    expect(r.alicuotas).toEqual([{ id: 5, baseImp: 1000, importe: 210 }]);
+    expect(r.totalAmount).toBe(1210);
+    expect(r.netAmount).toBe(1000);
+    expect(r.ivaAmount).toBe(210);
+    expect(r.rates).toEqual([{ id: 5, taxableBase: 1000, amount: 210 }]);
 
-    expect(r.impNeto + r.impIva).toBeCloseTo(r.impTotal, 2);
+    expect(r.netAmount + r.ivaAmount).toBeCloseTo(r.totalAmount, 2);
   });
 
   it('Factura A con múltiples alícuotas: agrupa y cuadra', () => {
-    const r = calcularImportes(TipoComprobante.FACTURA_A, [
-      { descripcion: 'Item 21', cantidad: 1, precioUnit: 1210, alicuotaIva: 21 },
-      { descripcion: 'Item 10.5', cantidad: 1, precioUnit: 1105, alicuotaIva: 10.5 },
+    const r = calculateAmounts(VoucherType.FACTURA_A, [
+      { description: 'Item 21', quantity: 1, unitPrice: 1210, ivaRate: 21 },
+      { description: 'Item 10.5', quantity: 1, unitPrice: 1105, ivaRate: 10.5 },
     ]);
-    expect(r.impTotal).toBe(2315);
-    expect(r.alicuotas).toHaveLength(2);
-    expect(r.impNeto + r.impIva).toBeCloseTo(r.impTotal, 2);
-    const ids = r.alicuotas.map((a) => a.id).sort();
+    expect(r.totalAmount).toBe(2315);
+    expect(r.rates).toHaveLength(2);
+    expect(r.netAmount + r.ivaAmount).toBeCloseTo(r.totalAmount, 2);
+    const ids = r.rates.map((a) => a.id).sort();
     expect(ids).toEqual([4, 5]);
   });
 });

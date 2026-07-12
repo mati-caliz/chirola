@@ -1,16 +1,16 @@
-export function formatMoneda(valor: number, moneda = 'PES'): string {
-  const code = moneda === 'PES' ? 'ARS' : moneda;
+export function formatCurrency(value: number, currency = 'PES'): string {
+  const code = currency === 'PES' ? 'ARS' : currency;
   try {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: code,
-    }).format(valor);
+    }).format(value);
   } catch {
-    return `$ ${valor.toFixed(2)}`;
+    return `$ ${value.toFixed(2)}`;
   }
 }
 
-export function formatFecha(iso: string | Date): string {
+export function formatDate(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
   if (Number.isNaN(d.getTime())) return '—';
   return new Intl.DateTimeFormat('es-AR', {
@@ -20,6 +20,6 @@ export function formatFecha(iso: string | Date): string {
   }).format(d);
 }
 
-export function formatNumeroCbte(puntoVenta: number, numero: number): string {
-  return `${String(puntoVenta).padStart(4, '0')}-${String(numero).padStart(8, '0')}`;
+export function formatVoucherNumber(salesPoint: number, number: number): string {
+  return `${String(salesPoint).padStart(4, '0')}-${String(number).padStart(8, '0')}`;
 }

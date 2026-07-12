@@ -1,109 +1,109 @@
 import type {
-  ActualizarCliente,
-  CrearCliente,
-  CrearEmisor,
-  EmitirComprobante,
+  UpdateClient,
+  CreateClient,
+  CreateIssuer,
+  IssueVoucher,
 } from '@chirola/shared';
 import { apiFetch } from './api';
 
-export interface Emisor {
+export interface Issuer {
   id: string;
   cuit: string;
-  razonSocial: string;
-  condicionIva: string;
-  ambiente: string;
+  legalName: string;
+  ivaCondition: string;
+  environment: string;
   createdAt: string;
   updatedAt: string;
-  certificado: { alias: string | null; validoHasta: string | null } | null;
+  certificate: { alias: string | null; validUntil: string | null } | null;
 }
 
-export interface Cliente {
+export interface Client {
   id: string;
-  emisorId: string;
-  tipoDoc: number;
-  numeroDoc: string;
-  razonSocial: string | null;
-  condicionIva: string | null;
+  issuerId: string;
+  docType: number;
+  docNumber: string;
+  legalName: string | null;
+  ivaCondition: string | null;
   email: string | null;
 }
 
-export interface ComprobanteEmitido {
+export interface IssuedVoucher {
   id: string;
-  tipoCbte: number;
-  puntoVenta: number;
-  numero: number;
+  voucherType: number;
+  salesPoint: number;
+  number: number;
   cae: string;
-  caeVto: string;
-  impNeto: number;
-  impIva: number;
-  impTotal: number;
+  caeExpiration: string;
+  netAmount: number;
+  ivaAmount: number;
+  totalAmount: number;
   qrData: string;
 }
 
-export interface ItemComprobante {
+export interface VoucherItem {
   id: string;
-  descripcion: string;
-  cantidad: string;
-  precioUnit: string;
-  alicuotaIva: string;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  ivaRate: string;
   subtotal: string;
 }
 
-export interface ComprobanteDetalle {
+export interface VoucherDetail {
   id: string;
-  tipoCbte: number;
-  numero: number;
-  fechaCbte: string;
-  concepto: number;
-  impNeto: string;
-  impIva: string;
-  impTotal: string;
-  moneda: string;
-  estado: string;
+  voucherType: number;
+  number: number;
+  voucherDate: string;
+  concept: number;
+  netAmount: string;
+  ivaAmount: string;
+  totalAmount: string;
+  currency: string;
+  status: string;
   cae: string | null;
-  caeVto: string | null;
+  caeExpiration: string | null;
   qrData: string | null;
-  items: ItemComprobante[];
-  puntoVenta: { numero: number };
-  emisor: { razonSocial: string; cuit: string };
-  cliente: Cliente | null;
+  items: VoucherItem[];
+  salesPoint: { number: number };
+  issuer: { legalName: string; cuit: string };
+  client: Client | null;
 }
 
-export const listarEmisores = () => apiFetch<Emisor[]>('/emisores');
+export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
 
-export const crearEmisor = (body: CrearEmisor) =>
-  apiFetch<Emisor>('/emisores', { method: 'POST', body });
+export const createIssuer = (body: CreateIssuer) =>
+  apiFetch<Issuer>('/issuers', { method: 'POST', body });
 
-export const generarCsr = (emisorId: string, alias?: string) =>
-  apiFetch<{ csrPem: string }>(`/emisores/${emisorId}/csr`, {
+export const generateCsr = (issuerId: string, alias?: string) =>
+  apiFetch<{ csrPem: string }>(`/issuers/${issuerId}/csr`, {
     method: 'POST',
     body: alias ? { alias } : {},
   });
 
-export const emparejarCert = (emisorId: string, certPem: string) =>
-  apiFetch<{ ok: true }>(`/emisores/${emisorId}/certificado`, {
+export const matchCertificate = (issuerId: string, certPem: string) =>
+  apiFetch<{ ok: true }>(`/issuers/${issuerId}/certificate`, {
     method: 'PUT',
     body: { certPem },
   });
 
-export const listarClientes = (emisorId: string) =>
-  apiFetch<Cliente[]>(`/emisores/${emisorId}/clientes`);
+export const listClients = (issuerId: string) =>
+  apiFetch<Client[]>(`/issuers/${issuerId}/clients`);
 
-export const crearCliente = (emisorId: string, body: CrearCliente) =>
-  apiFetch<Cliente>(`/emisores/${emisorId}/clientes`, { method: 'POST', body });
+export const createClient = (issuerId: string, body: CreateClient) =>
+  apiFetch<Client>(`/issuers/${issuerId}/clients`, { method: 'POST', body });
 
-export const actualizarCliente = (
-  emisorId: string,
+export const updateClient = (
+  issuerId: string,
   id: string,
-  body: ActualizarCliente,
+  body: UpdateClient,
 ) =>
-  apiFetch<Cliente>(`/emisores/${emisorId}/clientes/${id}`, {
+  apiFetch<Client>(`/issuers/${issuerId}/clients/${id}`, {
     method: 'PATCH',
     body,
   });
 
-export const emitirComprobante = (body: EmitirComprobante) =>
-  apiFetch<ComprobanteEmitido>('/comprobantes', { method: 'POST', body });
+export const issueVoucher = (body: IssueVoucher) =>
+  apiFetch<IssuedVoucher>('/vouchers', { method: 'POST', body });
 
-export const obtenerComprobante = (id: string) =>
-  apiFetch<ComprobanteDetalle>(`/comprobantes/${id}`);
+export const getVoucher = (id: string) =>
+  apiFetch<VoucherDetail>(`/vouchers/${id}`);

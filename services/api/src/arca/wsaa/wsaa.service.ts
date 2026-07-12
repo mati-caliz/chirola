@@ -3,15 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { XMLParser } from 'fast-xml-parser';
 import {
-  CredencialesCert,
-  ServicioArca,
-  TicketAcceso,
+  CertificateCredentials,
+  ArcaService,
+  AccessTicket,
 } from './wsaa.types';
 
 @Injectable()
 export class WsaaService {
   private readonly logger = new Logger(WsaaService.name);
-  private readonly cache = new Map<string, TicketAcceso>();
+  private readonly cache = new Map<string, AccessTicket>();
   private readonly parser = new XMLParser({ ignoreAttributes: false });
 
   constructor(private readonly config: ConfigService) {}
@@ -29,37 +29,37 @@ export class WsaaService {
         );
   }
 
-  async getTicketAcceso(
+  async getAccessTicket(
     cuit: string,
-    creds: CredencialesCert,
-    servicio: ServicioArca = 'wsfe',
-  ): Promise<TicketAcceso> {
-    const key = `${cuit}:${servicio}`;
+    creds: CertificateCredentials,
+    service: ArcaService = 'wsfe',
+  ): Promise<AccessTicket> {
+    const key = `${cuit}:${service}`;
     const cached = this.cache.get(key);
 
     if (cached && cached.expiration.getTime() - Date.now() > 10 * 60_000) {
       return cached;
     }
 
-    const ta = await this.login(creds, servicio);
-    this.cache.set(key, ta);
+    const accessTicket = await this.login(creds, service);
+    this.cache.set(key, accessTicket);
     this.logger.log(
-      `TA nuevo para ${key}, vence ${ta.expiration.toISOString()}`,
+      `TA nuevo para ${key}, vence ${accessTicket.expiration.toISOString()}`,
     );
-    return ta;
+    return accessTicket;
   }
 
   private async login(
-    creds: CredencialesCert,
-    servicio: ServicioArca,
-  ): Promise<TicketAcceso> {
-    const ltr = this.buildLoginTicketRequest(servicio);
+    creds: CertificateCredentials,
+    service: ArcaService,
+  ): Promise<AccessTicket> {
+    const ltr = this.buildLoginTicketRequest(service);
     const cms = this.signCms(ltr, creds);
     const responseXml = await this.callLoginCms(cms);
     return this.parseLoginResponse(responseXml);
   }
 
-  private buildLoginTicketRequest(servicio: ServicioArca): string {
+  private buildLoginTicketRequest(service: ArcaService): string {
     const now = Date.now();
     const uniqueId = Math.floor(now / 1000);
     const gen = new Date(now - 10 * 60_000);
@@ -72,12 +72,12 @@ export class WsaaService {
       `<generationTime>${gen.toISOString()}</generationTime>`,
       `<expirationTime>${exp.toISOString()}</expirationTime>`,
       '</header>',
-      `<service>${servicio}</service>`,
+      `<service>${service}</service>`,
       '</loginTicketRequest>',
     ].join('');
   }
 
-  private signCms(ltr: string, creds: CredencialesCert): string {
+  private signCms(ltr: string, creds: CertificateCredentials): string {
     try {
       const cert = forge.pki.certificateFromPem(creds.certPem);
       const privateKey = forge.pki.privateKeyFromPem(creds.privateKeyPem);
@@ -140,7 +140,7 @@ export class WsaaService {
     return text;
   }
 
-  private parseLoginResponse(soapXml: string): TicketAcceso {
+  private parseLoginResponse(soapXml: string): AccessTicket {
     const soap = this.parser.parse(soapXml) as Record<string, unknown>;
     const loginReturn = this.deepFind(soap, 'loginCmsReturn');
     if (typeof loginReturn !== 'string') {

@@ -1,52 +1,52 @@
 import {
-  alicuotaIvaAfipId,
-  requiereCuitReceptor,
+  ivaRateAfipId,
+  requiresRecipientCuit,
   type Item,
 } from '@chirola/shared';
-import type { AlicuotaIvaArca, ImportesComprobante } from './wsfe.types';
+import type { ArcaIvaRate, VoucherAmounts } from './wsfe.types';
 
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-export function calcularImportes(
-  tipoCbte: number,
+export function calculateAmounts(
+  voucherType: number,
   items: Item[],
-): ImportesComprobante {
-  const impTotal = round2(
-    items.reduce((acc, it) => acc + it.cantidad * it.precioUnit, 0),
+): VoucherAmounts {
+  const totalAmount = round2(
+    items.reduce((acc, it) => acc + it.quantity * it.unitPrice, 0),
   );
 
-  if (!requiereCuitReceptor(tipoCbte)) {
-    return { impNeto: impTotal, impIva: 0, impTotal, alicuotas: [] };
+  if (!requiresRecipientCuit(voucherType)) {
+    return { netAmount: totalAmount, ivaAmount: 0, totalAmount, rates: [] };
   }
 
-  const brutoPorAlicuota = new Map<number, number>();
+  const grossByRate = new Map<number, number>();
   for (const it of items) {
-    const bruto = it.cantidad * it.precioUnit;
-    brutoPorAlicuota.set(
-      it.alicuotaIva,
-      (brutoPorAlicuota.get(it.alicuotaIva) ?? 0) + bruto,
+    const gross = it.quantity * it.unitPrice;
+    grossByRate.set(
+      it.ivaRate,
+      (grossByRate.get(it.ivaRate) ?? 0) + gross,
     );
   }
 
-  const alicuotas: AlicuotaIvaArca[] = [];
-  let impNeto = 0;
-  let impIva = 0;
+  const rates: ArcaIvaRate[] = [];
+  let netAmount = 0;
+  let ivaAmount = 0;
 
-  for (const [alicuota, brutoRaw] of brutoPorAlicuota) {
-    const bruto = round2(brutoRaw);
-    const baseImp = round2(bruto / (1 + alicuota / 100));
-    const importe = round2(bruto - baseImp);
-    impNeto = round2(impNeto + baseImp);
-    impIva = round2(impIva + importe);
+  for (const [rate, rawGross] of grossByRate) {
+    const gross = round2(rawGross);
+    const taxableBase = round2(gross / (1 + rate / 100));
+    const amount = round2(gross - taxableBase);
+    netAmount = round2(netAmount + taxableBase);
+    ivaAmount = round2(ivaAmount + amount);
 
-    const id = alicuotaIvaAfipId[alicuota];
+    const id = ivaRateAfipId[rate];
     if (id === undefined) {
-      throw new Error(`Alícuota de IVA no mapeada a Id de ARCA: ${alicuota}`);
+      throw new Error(`Alícuota de IVA no mapeada a Id de ARCA: ${rate}`);
     }
-    alicuotas.push({ id, baseImp, importe });
+    rates.push({ id, taxableBase, amount });
   }
 
-  return { impNeto, impIva, impTotal, alicuotas };
+  return { netAmount, ivaAmount, totalAmount, rates };
 }

@@ -6,7 +6,7 @@ import {
 import * as forge from 'node-forge';
 import { PrismaService } from '../prisma/prisma.service';
 import { FieldEncryptionService } from '../crypto/field-encryption.service';
-import type { CredencialesCert } from '../arca/wsaa/wsaa.types';
+import type { CertificateCredentials } from '../arca/wsaa/wsaa.types';
 
 @Injectable()
 export class CertsService {
@@ -15,32 +15,32 @@ export class CertsService {
     private readonly encryption: FieldEncryptionService,
   ) {}
 
-  async guardarCertificado(
-    emisorId: string,
+  async saveCertificate(
+    issuerId: string,
     privateKeyPem: string,
     certPem: string,
     alias?: string,
   ): Promise<void> {
-    let validoHasta: Date | undefined;
+    let validUntil: Date | undefined;
     try {
       const cert = forge.pki.certificateFromPem(certPem);
-      validoHasta = cert.validity.notAfter;
+      validUntil = cert.validity.notAfter;
     } catch {
       throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
     }
 
     const privateKeyEnc = this.encryption.encrypt(privateKeyPem);
-    await this.prisma.certificado.upsert({
-      where: { emisorId },
-      create: { emisorId, privateKeyEnc, certPem, alias, validoHasta },
-      update: { privateKeyEnc, certPem, alias, validoHasta },
+    await this.prisma.certificate.upsert({
+      where: { issuerId },
+      create: { issuerId, privateKeyEnc, certPem, alias, validUntil },
+      update: { privateKeyEnc, certPem, alias, validUntil },
     });
   }
 
-  async generarCsr(
-    emisorId: string,
+  async generateCsr(
+    issuerId: string,
     cuit: string,
-    razonSocial: string,
+    legalName: string,
     alias?: string,
   ): Promise<{ csrPem: string }> {
     const keys = forge.pki.rsa.generateKeyPair({ bits: 2048 });
@@ -48,8 +48,8 @@ export class CertsService {
     csr.publicKey = keys.publicKey;
     csr.setSubject([
       { shortName: 'C', value: 'AR' },
-      { shortName: 'O', value: razonSocial },
-      { shortName: 'CN', value: alias ?? razonSocial },
+      { shortName: 'O', value: legalName },
+      { shortName: 'CN', value: alias ?? legalName },
       { name: 'serialNumber', value: `CUIT ${cuit}` },
     ]);
     csr.sign(keys.privateKey, forge.md.sha256.create());
@@ -59,44 +59,44 @@ export class CertsService {
 
     const privateKeyEnc = this.encryption.encrypt(privateKeyPem);
 
-    await this.prisma.certificado.upsert({
-      where: { emisorId },
-      create: { emisorId, privateKeyEnc, certPem: null, alias },
-      update: { privateKeyEnc, certPem: null, alias, validoHasta: null },
+    await this.prisma.certificate.upsert({
+      where: { issuerId },
+      create: { issuerId, privateKeyEnc, certPem: null, alias },
+      update: { privateKeyEnc, certPem: null, alias, validUntil: null },
     });
 
     return { csrPem };
   }
 
-  async emparejarCert(emisorId: string, certPem: string): Promise<void> {
-    const existente = await this.prisma.certificado.findUnique({
-      where: { emisorId },
+  async matchCertificate(issuerId: string, certPem: string): Promise<void> {
+    const existing = await this.prisma.certificate.findUnique({
+      where: { issuerId },
     });
-    if (!existente) {
+    if (!existing) {
       throw new NotFoundException(
         'No hay una clave privada generada para este emisor. Generá primero el CSR.',
       );
     }
 
-    let validoHasta: Date;
+    let validUntil: Date;
     let cert: forge.pki.Certificate;
     try {
       cert = forge.pki.certificateFromPem(certPem);
-      validoHasta = cert.validity.notAfter;
+      validUntil = cert.validity.notAfter;
     } catch {
       throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
     }
 
-    const privateKeyPem = this.encryption.decrypt(existente.privateKeyEnc);
+    const privateKeyPem = this.encryption.decrypt(existing.privateKeyEnc);
     if (!this.certMatchesKey(cert, privateKeyPem)) {
       throw new BadRequestException(
         'El certificado no corresponde a la clave privada generada para este emisor.',
       );
     }
 
-    await this.prisma.certificado.update({
-      where: { emisorId },
-      data: { certPem, validoHasta },
+    await this.prisma.certificate.update({
+      where: { issuerId },
+      data: { certPem, validUntil },
     });
   }
 
@@ -116,9 +116,9 @@ export class CertsService {
     }
   }
 
-  async getCredenciales(emisorId: string): Promise<CredencialesCert> {
-    const cert = await this.prisma.certificado.findUnique({
-      where: { emisorId },
+  async getCredentials(issuerId: string): Promise<CertificateCredentials> {
+    const cert = await this.prisma.certificate.findUnique({
+      where: { issuerId },
     });
     if (!cert || !cert.certPem) {
       throw new NotFoundException(

@@ -9,34 +9,34 @@ function service(): WsfeService {
   return new WsfeService(config);
 }
 
-function baseReq(overrides: Partial<CaeRequest> = {}): CaeRequest {
+function baseRequest(overrides: Partial<CaeRequest> = {}): CaeRequest {
   return {
-    puntoVenta: 1,
-    tipoCbte: 8,
-    concepto: 1,
-    numero: 5,
-    fecha: new Date(2026, 6, 12),
-    receptor: { tipoDoc: 80, numeroDoc: '20111111112', condicionIvaId: 1 },
-    importes: { impNeto: 100, impIva: 0, impTotal: 100, alicuotas: [] },
-    moneda: 'PES',
-    cotizacion: 1,
+    salesPoint: 1,
+    voucherType: 8,
+    concept: 1,
+    number: 5,
+    date: new Date(2026, 6, 12),
+    recipient: { docType: 80, docNumber: '20111111112', ivaConditionId: 1 },
+    amounts: { netAmount: 100, ivaAmount: 0, totalAmount: 100, rates: [] },
+    currency: 'PES',
+    exchangeRate: 1,
     ...overrides,
   };
 }
 
 describe('WsfeService — CbtesAsoc (NC/ND)', () => {
-  const detalle = (req: CaeRequest): string =>
-    (service() as unknown as { buildDetalle(r: CaeRequest): string }).buildDetalle(req);
+  const detail = (request: CaeRequest): string =>
+    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
 
   it('no incluye CbtesAsoc cuando no hay asociados', () => {
-    expect(detalle(baseReq())).not.toContain('CbtesAsoc');
+    expect(detail(baseRequest())).not.toContain('CbtesAsoc');
   });
 
   it('arma CbteAsoc con tipo/ptoVta/nro y los opcionales cuit/fecha', () => {
-    const xml = detalle(
-      baseReq({
-        comprobantesAsociados: [
-          { tipo: 6, puntoVenta: 1, numero: 42, cuit: '20111111112', fecha: '20260701' },
+    const xml = detail(
+      baseRequest({
+        associatedVouchers: [
+          { type: 6, salesPoint: 1, number: 42, cuit: '20111111112', date: '20260701' },
         ],
       }),
     );
@@ -52,8 +52,8 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
   });
 
   it('omite cuit y fecha cuando no se pasan', () => {
-    const xml = detalle(
-      baseReq({ comprobantesAsociados: [{ tipo: 6, puntoVenta: 1, numero: 42 }] }),
+    const xml = detail(
+      baseRequest({ associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }] }),
     );
 
     expect(xml).toContain(
@@ -66,15 +66,15 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
   });
 
   it('coloca CbtesAsoc después de CondicionIVAReceptorId y antes de Iva (orden XSD)', () => {
-    const xml = detalle(
-      baseReq({
-        importes: {
-          impNeto: 100,
-          impIva: 21,
-          impTotal: 121,
-          alicuotas: [{ id: 5, baseImp: 100, importe: 21 }],
+    const xml = detail(
+      baseRequest({
+        amounts: {
+          netAmount: 100,
+          ivaAmount: 21,
+          totalAmount: 121,
+          rates: [{ id: 5, taxableBase: 100, amount: 21 }],
         },
-        comprobantesAsociados: [{ tipo: 1, puntoVenta: 1, numero: 7 }],
+        associatedVouchers: [{ type: 1, salesPoint: 1, number: 7 }],
       }),
     );
     const posCond = xml.indexOf('CondicionIVAReceptorId');
@@ -85,11 +85,11 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
   });
 
   it('soporta múltiples comprobantes asociados', () => {
-    const xml = detalle(
-      baseReq({
-        comprobantesAsociados: [
-          { tipo: 6, puntoVenta: 1, numero: 1 },
-          { tipo: 6, puntoVenta: 1, numero: 2 },
+    const xml = detail(
+      baseRequest({
+        associatedVouchers: [
+          { type: 6, salesPoint: 1, number: 1 },
+          { type: 6, salesPoint: 1, number: 2 },
         ],
       }),
     );

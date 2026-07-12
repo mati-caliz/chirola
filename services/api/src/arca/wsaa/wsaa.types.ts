@@ -1,5 +1,5 @@
 
-export interface TicketAcceso {
+export interface AccessTicket {
   token: string;
   sign: string;
 
@@ -7,11 +7,11 @@ export interface TicketAcceso {
   generation: Date;
 }
 
-export interface CredencialesCert {
+export interface CertificateCredentials {
 
   certPem: string;
 
   privateKeyPem: string;
 }
 
-export type ServicioArca = 'wsfe' | 'ws_sr_padron_a13' | 'ws_sr_constancia_inscripcion';
+export type ArcaService = 'wsfe' | 'ws_sr_padron_a13' | 'ws_sr_constancia_inscripcion';

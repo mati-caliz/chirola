@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export * from './auth';
-export * from './emisor';
-export * from './cliente';
+export * from './issuer';
+export * from './client';
 
-export const TipoComprobante = {
+export const VoucherType = {
   FACTURA_A: 1,
   NOTA_DEBITO_A: 2,
   NOTA_CREDITO_A: 3,
@@ -16,30 +16,30 @@ export const TipoComprobante = {
   NOTA_CREDITO_C: 13,
 } as const;
 
-const tiposConCuit: readonly number[] = [
-  TipoComprobante.FACTURA_A,
-  TipoComprobante.NOTA_DEBITO_A,
-  TipoComprobante.NOTA_CREDITO_A,
+const typesRequiringCuit: readonly number[] = [
+  VoucherType.FACTURA_A,
+  VoucherType.NOTA_DEBITO_A,
+  VoucherType.NOTA_CREDITO_A,
 ];
 
-export function requiereCuitReceptor(tipoCbte: number): boolean {
-  return tiposConCuit.includes(tipoCbte);
+export function requiresRecipientCuit(voucherType: number): boolean {
+  return typesRequiringCuit.includes(voucherType);
 }
 
-const tiposNotaCreditoDebito: readonly number[] = [
-  TipoComprobante.NOTA_DEBITO_A,
-  TipoComprobante.NOTA_CREDITO_A,
-  TipoComprobante.NOTA_DEBITO_B,
-  TipoComprobante.NOTA_CREDITO_B,
-  TipoComprobante.NOTA_DEBITO_C,
-  TipoComprobante.NOTA_CREDITO_C,
+const creditDebitNoteTypes: readonly number[] = [
+  VoucherType.NOTA_DEBITO_A,
+  VoucherType.NOTA_CREDITO_A,
+  VoucherType.NOTA_DEBITO_B,
+  VoucherType.NOTA_CREDITO_B,
+  VoucherType.NOTA_DEBITO_C,
+  VoucherType.NOTA_CREDITO_C,
 ];
 
-export function esNotaCreditoDebito(tipoCbte: number): boolean {
-  return tiposNotaCreditoDebito.includes(tipoCbte);
+export function isCreditDebitNote(voucherType: number): boolean {
+  return creditDebitNoteTypes.includes(voucherType);
 }
 
-export const nombreTipoComprobante: Record<number, string> = {
+export const voucherTypeName: Record<number, string> = {
   1: 'Factura A',
   2: 'Nota de Débito A',
   3: 'Nota de Crédito A',
@@ -51,27 +51,27 @@ export const nombreTipoComprobante: Record<number, string> = {
   13: 'Nota de Crédito C',
 };
 
-export function letraComprobante(tipoCbte: number): string {
-  const nombre = nombreTipoComprobante[tipoCbte] ?? '';
-  const m = nombre.match(/ ([ABC])$/);
-  return m ? m[1] : '';
+export function voucherLetter(voucherType: number): string {
+  const name = voucherTypeName[voucherType] ?? '';
+  const match = name.match(/ ([ABC])$/);
+  return match ? match[1] : '';
 }
 
-export const TipoDocumento = {
+export const DocumentType = {
   CUIT: 80,
   CUIL: 86,
   DNI: 96,
   CONSUMIDOR_FINAL: 99,
 } as const;
 
-export const nombreTipoDocumento: Record<number, string> = {
+export const documentTypeName: Record<number, string> = {
   80: 'CUIT',
   86: 'CUIL',
   96: 'DNI',
   99: 'Consumidor Final',
 };
 
-export const CondicionIvaReceptor = {
+export const RecipientIvaCondition = {
   RESPONSABLE_INSCRIPTO: 1,
   SUJETO_EXENTO: 4,
   CONSUMIDOR_FINAL: 5,
@@ -79,15 +79,15 @@ export const CondicionIvaReceptor = {
   MONOTRIBUTISTA_SOCIAL: 13,
 } as const;
 
-export function condicionIvaReceptorPorDefecto(tipoCbte: number): number {
-  return requiereCuitReceptor(tipoCbte)
-    ? CondicionIvaReceptor.RESPONSABLE_INSCRIPTO
-    : CondicionIvaReceptor.CONSUMIDOR_FINAL;
+export function defaultRecipientIvaCondition(voucherType: number): number {
+  return requiresRecipientCuit(voucherType)
+    ? RecipientIvaCondition.RESPONSABLE_INSCRIPTO
+    : RecipientIvaCondition.CONSUMIDOR_FINAL;
 }
 
-export const alicuotasIva = [0, 2.5, 5, 10.5, 21, 27] as const;
+export const ivaRates = [0, 2.5, 5, 10.5, 21, 27] as const;
 
-export const alicuotaIvaAfipId: Record<number, number> = {
+export const ivaRateAfipId: Record<number, number> = {
   0: 3,
   2.5: 9,
   5: 8,
@@ -97,51 +97,51 @@ export const alicuotaIvaAfipId: Record<number, number> = {
 };
 
 export const itemSchema = z.object({
-  descripcion: z.string().min(1),
-  cantidad: z.number().positive(),
-  precioUnit: z.number().nonnegative(),
-  alicuotaIva: z.number().refine((v) => (alicuotasIva as readonly number[]).includes(v), {
+  description: z.string().min(1),
+  quantity: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  ivaRate: z.number().refine((v) => (ivaRates as readonly number[]).includes(v), {
     message: 'Alícuota de IVA no soportada',
   }),
 });
 
-export const comprobanteAsociadoSchema = z.object({
-  tipo: z.number().int().positive(),
-  puntoVenta: z.number().int().positive(),
-  numero: z.number().int().positive(),
+export const associatedVoucherSchema = z.object({
+  type: z.number().int().positive(),
+  salesPoint: z.number().int().positive(),
+  number: z.number().int().positive(),
 
   cuit: z.string().regex(/^\d{11}$/).optional(),
 
-  fecha: z.string().regex(/^\d{8}$/).optional(),
+  date: z.string().regex(/^\d{8}$/).optional(),
 });
 
-export const emitirComprobanteSchema = z
+export const issueVoucherSchema = z
   .object({
-    emisorId: z.string().min(1),
-    puntoVenta: z.number().int().positive(),
-    tipoCbte: z.number().int().positive(),
-    concepto: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-    receptor: z.object({
-      tipoDoc: z.number().int(),
-      numeroDoc: z.string().min(1),
-      razonSocial: z.string().optional(),
+    issuerId: z.string().min(1),
+    salesPoint: z.number().int().positive(),
+    voucherType: z.number().int().positive(),
+    concept: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    recipient: z.object({
+      docType: z.number().int(),
+      docNumber: z.string().min(1),
+      legalName: z.string().optional(),
 
-      condicionIvaId: z.number().int().optional(),
+      ivaConditionId: z.number().int().optional(),
     }),
     items: z.array(itemSchema).min(1),
-    moneda: z.string().default('PES'),
-    cotizacion: z.number().positive().default(1),
+    currency: z.string().default('PES'),
+    exchangeRate: z.number().positive().default(1),
 
-    comprobantesAsociados: z.array(comprobanteAsociadoSchema).optional(),
+    associatedVouchers: z.array(associatedVoucherSchema).optional(),
   })
   .superRefine((data, ctx) => {
     if (
-      esNotaCreditoDebito(data.tipoCbte) &&
-      !(data.comprobantesAsociados && data.comprobantesAsociados.length > 0)
+      isCreditDebitNote(data.voucherType) &&
+      !(data.associatedVouchers && data.associatedVouchers.length > 0)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['comprobantesAsociados'],
+        path: ['associatedVouchers'],
         message:
           'Las notas de crédito/débito requieren al menos un comprobante asociado.',
       });
@@ -149,5 +149,5 @@ export const emitirComprobanteSchema = z
   });
 
 export type Item = z.infer<typeof itemSchema>;
-export type ComprobanteAsociado = z.infer<typeof comprobanteAsociadoSchema>;
-export type EmitirComprobante = z.infer<typeof emitirComprobanteSchema>;
+export type AssociatedVoucher = z.infer<typeof associatedVoucherSchema>;
+export type IssueVoucher = z.infer<typeof issueVoucherSchema>;

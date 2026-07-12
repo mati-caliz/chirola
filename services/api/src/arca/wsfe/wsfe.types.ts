@@ -1,4 +1,4 @@
-import type { ComprobanteAsociado, Item } from '@chirola/shared';
+import type { AssociatedVoucher, Item } from '@chirola/shared';
 
 export interface AuthContext {
   cuit: string;
@@ -6,41 +6,41 @@ export interface AuthContext {
   sign: string;
 }
 
-export interface AlicuotaIvaArca {
+export interface ArcaIvaRate {
 
   id: number;
 
-  baseImp: number;
+  taxableBase: number;
 
-  importe: number;
+  amount: number;
 }
 
-export interface ImportesComprobante {
-  impNeto: number;
-  impIva: number;
-  impTotal: number;
+export interface VoucherAmounts {
+  netAmount: number;
+  ivaAmount: number;
+  totalAmount: number;
 
-  alicuotas: AlicuotaIvaArca[];
+  rates: ArcaIvaRate[];
 }
 
 export interface CaeRequest {
-  puntoVenta: number;
-  tipoCbte: number;
+  salesPoint: number;
+  voucherType: number;
 
-  concepto: number;
-  numero: number;
-  fecha: Date;
-  receptor: {
-    tipoDoc: number;
-    numeroDoc: string;
+  concept: number;
+  number: number;
+  date: Date;
+  recipient: {
+    docType: number;
+    docNumber: string;
 
-    condicionIvaId: number;
+    ivaConditionId: number;
   };
-  importes: ImportesComprobante;
-  moneda: string;
-  cotizacion: number;
+  amounts: VoucherAmounts;
+  currency: string;
+  exchangeRate: number;
 
-  comprobantesAsociados?: ComprobanteAsociado[];
+  associatedVouchers?: AssociatedVoucher[];
 }
 
 export interface CaeResult {
@@ -48,7 +48,7 @@ export interface CaeResult {
   caeVto: Date;
 }
 
-export interface CalculoComprobanteInput {
-  tipoCbte: number;
+export interface VoucherCalculationInput {
+  voucherType: number;
   items: Item[];
 }
