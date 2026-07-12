@@ -23,7 +23,7 @@ Módulos:
 - `arca/wsaa` — LTR + firma CMS + cache del TA.
 - `arca/wsfe` — cliente SOAP de WSFEv1 (emisión, numeración, params).
 - `comprobantes` — dominio de facturación, persistencia, numeración, PDF + QR.
-- `clientes` — receptores.
+- `clientes` — ABM de receptores por emisor (rutas anidadas `/emisores/:emisorId/clientes`).
 
 ### `packages/shared` — TypeScript + Zod
 Tipos y validaciones compartidas (payloads de emisión, enums de tipos de comprobante/IVA/doc)
@@ -64,7 +64,13 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
    Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
 2. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
-3. **Faltantes transversales:** módulo `clientes`, onboarding guiado del cert, refresh token/logout.
+3. **Faltantes transversales:** onboarding guiado del cert, refresh token/logout.
+
+### Módulo `clientes` (implementado)
+ABM de receptores por emisor, con rutas anidadas y ownership vía `EmisoresService`:
+`POST/GET /emisores/:emisorId/clientes`, `GET/PATCH/DELETE /emisores/:emisorId/clientes/:id`.
+Unique `(emisor, tipoDoc, numeroDoc)` → 409 en duplicados; validación de CUIT/CUIL (11 dígitos)
+en `@chirola/shared`. Aislamiento entre usuarios verificado (otro user → 403).
 
 ### PDF + QR PNG (Fase 5, implementado)
 - `comprobantes/qr-image.util.ts` — `renderQrPng` (lib `qrcode`) sobre la URL del QR;

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export * from './auth';
 export * from './emisor';
+export * from './cliente';
 
 /** Tipos de comprobante ARCA más usados. */
 export const TipoComprobante = {

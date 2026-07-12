@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { ArcaModule } from './arca/arca.module';
 import { CertsModule } from './certs/certs.module';
 import { EmisoresModule } from './emisores/emisores.module';
+import { ClientesModule } from './clientes/clientes.module';
 import { ComprobantesModule } from './comprobantes/comprobantes.module';
 import { HealthController } from './health/health.controller';
 
@@ -18,6 +19,7 @@ import { HealthController } from './health/health.controller';
     ArcaModule,
     CertsModule,
     EmisoresModule,
+    ClientesModule,
     ComprobantesModule,
   ],
   controllers: [HealthController],
