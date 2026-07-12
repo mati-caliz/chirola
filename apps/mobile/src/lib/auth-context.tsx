@@ -20,7 +20,6 @@ import {
 
 interface AuthState {
   user: AuthUser | null;
-  /** Aún leyendo SecureStore al arrancar. */
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
@@ -39,7 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  // Si el refresh falla en cualquier request, se pierde la sesión → volver a login.
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null));
     return () => setUnauthorizedHandler(null);

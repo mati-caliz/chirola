@@ -6,7 +6,6 @@ import { CertsService } from './certs.service';
 import { FieldEncryptionService } from '../crypto/field-encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** Prisma en memoria: sólo el modelo `certificado` (upsert/findUnique/update). */
 function fakePrisma(): PrismaService {
   const store = new Map<string, any>();
   return {
@@ -38,7 +37,6 @@ function encryptionService(): FieldEncryptionService {
   return new FieldEncryptionService(config);
 }
 
-/** Simula a ARCA: firma un cert a partir de la clave pública del CSR. */
 function certFromCsr(csrPem: string): string {
   const csr = forge.pki.certificationRequestFromPem(csrPem);
   const ca = forge.pki.rsa.generateKeyPair({ bits: 2048 });
@@ -100,7 +98,6 @@ describe('CertsService — CSR / onboarding', () => {
   it('rechaza un .crt que no corresponde a la clave generada', async () => {
     const service = svc();
     await service.generarCsr(EMISOR, CUIT, 'Acme SA');
-    // CSR/cert de OTRA clave distinta a la guardada.
     const otro = await svc().generarCsr('otro', CUIT, 'Otra SA');
     const certAjeno = certFromCsr(otro.csrPem);
     await expect(service.emparejarCert(EMISOR, certAjeno)).rejects.toBeInstanceOf(

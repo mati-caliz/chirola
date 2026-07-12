@@ -7,10 +7,6 @@ import type { ActualizarCliente, CrearCliente } from '@chirola/shared';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-/**
- * ABM de clientes/receptores de un emisor. El ownership (que el emisor sea del
- * usuario) lo resuelve el controller vía EmisoresService antes de llamar acá.
- */
 @Injectable()
 export class ClientesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,7 +44,7 @@ export class ClientesService {
   }
 
   async actualizar(emisorId: string, id: string, input: ActualizarCliente) {
-    await this.obtener(emisorId, id); // valida existencia + pertenencia al emisor
+    await this.obtener(emisorId, id);
     try {
       return await this.prisma.cliente.update({
         where: { id },
@@ -71,7 +67,6 @@ export class ClientesService {
     return { ok: true };
   }
 
-  /** Traduce el unique constraint (emisor, tipoDoc, numeroDoc) a un 409 claro. */
   private mapError(e: unknown): unknown {
     if (
       e instanceof Prisma.PrismaClientKnownRequestError &&

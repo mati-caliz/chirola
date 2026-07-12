@@ -6,8 +6,6 @@ import type {
 } from '@chirola/shared';
 import { apiFetch } from './api';
 
-// --- Formas de respuesta del backend (Decimals/fechas viajan como string por JSON) ---
-
 export interface Emisor {
   id: string;
   cuit: string;
@@ -29,7 +27,6 @@ export interface Cliente {
   email: string | null;
 }
 
-/** Respuesta de `POST /comprobantes`. */
 export interface ComprobanteEmitido {
   id: string;
   tipoCbte: number;
@@ -52,7 +49,6 @@ export interface ItemComprobante {
   subtotal: string;
 }
 
-/** Respuesta de `GET /comprobantes/:id` (incluye relaciones). */
 export interface ComprobanteDetalle {
   id: string;
   tipoCbte: number;
@@ -73,8 +69,6 @@ export interface ComprobanteDetalle {
   cliente: Cliente | null;
 }
 
-// --- Emisores ---
-
 export const listarEmisores = () => apiFetch<Emisor[]>('/emisores');
 
 export const crearEmisor = (body: CrearEmisor) =>
@@ -92,8 +86,6 @@ export const emparejarCert = (emisorId: string, certPem: string) =>
     body: { certPem },
   });
 
-// --- Clientes (anidados por emisor) ---
-
 export const listarClientes = (emisorId: string) =>
   apiFetch<Cliente[]>(`/emisores/${emisorId}/clientes`);
 
@@ -109,8 +101,6 @@ export const actualizarCliente = (
     method: 'PATCH',
     body,
   });
-
-// --- Comprobantes ---
 
 export const emitirComprobante = (body: EmitirComprobante) =>
   apiFetch<ComprobanteEmitido>('/comprobantes', { method: 'POST', body });

@@ -23,7 +23,6 @@ import { ComprobantesService } from './comprobantes.service';
 export class ComprobantesController {
   constructor(private readonly comprobantes: ComprobantesService) {}
 
-  /** Emite un comprobante contra ARCA y devuelve el CAE + QR. */
   @Post()
   emitir(
     @CurrentUser() user: JwtPayload,
@@ -38,10 +37,6 @@ export class ComprobantesController {
     return this.comprobantes.obtener(user.sub, id);
   }
 
-  /**
-   * QR de ARCA del comprobante como PNG. El Content-Type se fija recién al tener
-   * el buffer, para que los errores (404) sigan devolviendo JSON.
-   */
   @Get(':id/qr.png')
   async qr(
     @CurrentUser() user: JwtPayload,
@@ -54,7 +49,6 @@ export class ComprobantesController {
     res.end(png);
   }
 
-  /** PDF del comprobante con el QR embebido. */
   @Get(':id/pdf')
   async pdf(
     @CurrentUser() user: JwtPayload,

@@ -8,17 +8,6 @@ import {
   TicketAcceso,
 } from './wsaa.types';
 
-/**
- * Cliente self-host de WSAA (Web Service de Autenticación y Autorización de ARCA).
- *
- * Flujo:
- *  1. Arma el Login Ticket Request (LTR) en XML.
- *  2. Lo firma como CMS/PKCS#7 con el cert + clave privada del contribuyente.
- *  3. Llama a loginCms y obtiene el Ticket de Acceso (token + sign, ~12h).
- *
- * REGLA DE ORO: se cachea el TA por (cuit, servicio) hasta su vencimiento.
- * Pedir un TA nuevo teniendo uno vigente hace que ARCA bloquee temporalmente.
- */
 @Injectable()
 export class WsaaService {
   private readonly logger = new Logger(WsaaService.name);
@@ -40,10 +29,6 @@ export class WsaaService {
         );
   }
 
-  /**
-   * Devuelve un TA vigente para (cuit, servicio), reusando el cache si sigue vivo.
-   * @param cuit CUIT del contribuyente (para la clave de cache).
-   */
   async getTicketAcceso(
     cuit: string,
     creds: CredencialesCert,
@@ -51,7 +36,7 @@ export class WsaaService {
   ): Promise<TicketAcceso> {
     const key = `${cuit}:${servicio}`;
     const cached = this.cache.get(key);
-    // Margen de 10 min para no usar un TA a punto de vencer.
+
     if (cached && cached.expiration.getTime() - Date.now() > 10 * 60_000) {
       return cached;
     }
@@ -64,7 +49,6 @@ export class WsaaService {
     return ta;
   }
 
-  /** Ejecuta el login completo contra WSAA (sin cache). */
   private async login(
     creds: CredencialesCert,
     servicio: ServicioArca,
@@ -75,12 +59,11 @@ export class WsaaService {
     return this.parseLoginResponse(responseXml);
   }
 
-  /** Arma el XML del Login Ticket Request. */
   private buildLoginTicketRequest(servicio: ServicioArca): string {
     const now = Date.now();
     const uniqueId = Math.floor(now / 1000);
-    const gen = new Date(now - 10 * 60_000); // -10 min
-    const exp = new Date(now + 10 * 60_000); // +10 min
+    const gen = new Date(now - 10 * 60_000);
+    const exp = new Date(now + 10 * 60_000);
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<loginTicketRequest version="1.0">',
@@ -94,7 +77,6 @@ export class WsaaService {
     ].join('');
   }
 
-  /** Firma el LTR como CMS/PKCS#7 (DER en base64), como exige WSAA. */
   private signCms(ltr: string, creds: CredencialesCert): string {
     try {
       const cert = forge.pki.certificateFromPem(creds.certPem);
@@ -125,7 +107,6 @@ export class WsaaService {
     }
   }
 
-  /** POST del SOAP loginCms al endpoint de WSAA. */
   private async callLoginCms(cmsBase64: string): Promise<string> {
     const envelope = [
       '<soapenv:Envelope',
@@ -159,19 +140,17 @@ export class WsaaService {
     return text;
   }
 
-  /** Extrae token, sign y vencimiento de la respuesta de loginCms. */
   private parseLoginResponse(soapXml: string): TicketAcceso {
     const soap = this.parser.parse(soapXml) as Record<string, unknown>;
     const loginReturn = this.deepFind(soap, 'loginCmsReturn');
     if (typeof loginReturn !== 'string') {
-      // Puede venir un soap:Fault
+
       const fault = this.deepFind(soap, 'faultstring');
       throw new InternalServerErrorException(
         `WSAA no devolvió un TA${fault ? `: ${String(fault)}` : ''}.`,
       );
     }
 
-    // loginCmsReturn es un XML (loginTicketResponse) embebido.
     const inner = this.parser.parse(loginReturn) as Record<string, unknown>;
     const token = this.deepFind(inner, 'token');
     const sign = this.deepFind(inner, 'sign');
@@ -192,7 +171,6 @@ export class WsaaService {
     };
   }
 
-  /** Busca recursivamente la primera aparición de una clave en un objeto parseado. */
   private deepFind(obj: unknown, key: string): unknown {
     if (obj == null || typeof obj !== 'object') return undefined;
     if (key in (obj as Record<string, unknown>)) {

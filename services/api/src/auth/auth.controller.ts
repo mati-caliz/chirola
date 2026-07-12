@@ -26,14 +26,12 @@ export class AuthController {
     return this.auth.login(body);
   }
 
-  /** Canjea el refresh token por un par nuevo (rota el usado). */
   @Post('refresh')
   @UsePipes(new ZodValidationPipe(refreshSchema))
   refresh(@Body() body: RefreshInput) {
     return this.auth.refresh(body.refreshToken);
   }
 
-  /** Revoca el refresh token (logout). */
   @Post('logout')
   @HttpCode(200)
   @UsePipes(new ZodValidationPipe(refreshSchema))

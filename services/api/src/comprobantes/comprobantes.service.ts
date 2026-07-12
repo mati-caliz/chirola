@@ -30,11 +30,6 @@ export interface ComprobanteEmitido {
   qrData: string;
 }
 
-/**
- * Orquesta la emisión de un comprobante de punta a punta:
- * emisor → credenciales del vault → TA (WSAA) → numeración → CAE (WSFEv1) →
- * QR → persistencia. Cada emisión queda auditada en la tabla Comprobante.
- */
 @Injectable()
 export class ComprobantesService {
   private readonly logger = new Logger(ComprobantesService.name);
@@ -60,7 +55,6 @@ export class ComprobantesService {
     return comprobante;
   }
 
-  /** PNG del QR de ARCA de un comprobante propio. */
   async renderQrPng(userId: string, id: string): Promise<Buffer> {
     const comprobante = await this.obtener(userId, id);
     if (!comprobante.qrData) {
@@ -69,7 +63,6 @@ export class ComprobantesService {
     return renderQrPng(comprobante.qrData);
   }
 
-  /** PDF del comprobante propio, con el QR de ARCA embebido. */
   async renderPdf(userId: string, id: string): Promise<Buffer> {
     const c = await this.obtener(userId, id);
     if (!c.qrData || !c.cae) {
@@ -127,12 +120,10 @@ export class ComprobantesService {
       throw new ForbiddenException('El emisor no pertenece al usuario.');
     }
 
-    // 1. Credenciales + Ticket de Acceso (cacheado por CUIT).
     const creds = await this.certs.getCredenciales(emisor.id);
     const ta = await this.wsaa.getTicketAcceso(emisor.cuit, creds, 'wsfe');
     const auth = { cuit: emisor.cuit, token: ta.token, sign: ta.sign };
 
-    // 2. Numeración correlativa: siguiente al último autorizado por ARCA.
     const ultimo = await this.wsfe.getUltimoAutorizado(
       auth,
       input.puntoVenta,
@@ -140,14 +131,12 @@ export class ComprobantesService {
     );
     const numero = ultimo + 1;
 
-    // 3. Importes cuadrados desde los ítems.
     const importes = calcularImportes(input.tipoCbte, input.items);
     const fecha = new Date();
     const condicionIvaId =
       input.receptor.condicionIvaId ??
       condicionIvaReceptorPorDefecto(input.tipoCbte);
 
-    // 4. Solicitar el CAE.
     const cae = await this.wsfe.solicitarCae(auth, {
       puntoVenta: input.puntoVenta,
       tipoCbte: input.tipoCbte,
@@ -165,7 +154,6 @@ export class ComprobantesService {
       comprobantesAsociados: input.comprobantesAsociados,
     });
 
-    // 5. QR obligatorio de ARCA.
     const qrData = buildQrUrl({
       fecha,
       cuitEmisor: emisor.cuit,
@@ -180,7 +168,6 @@ export class ComprobantesService {
       cae: cae.cae,
     });
 
-    // 6. Persistir (auditoría) — punto de venta se asegura por (emisor, numero).
     const puntoVenta = await this.prisma.puntoVenta.upsert({
       where: { emisorId_numero: { emisorId: emisor.id, numero: input.puntoVenta } },
       create: { emisorId: emisor.id, numero: input.puntoVenta },

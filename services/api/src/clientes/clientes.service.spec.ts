@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 import { ClientesService } from './clientes.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** Prisma en memoria para el modelo `cliente`, con unique (emisor,tipoDoc,numeroDoc). */
 function fakePrisma(): PrismaService {
   const store = new Map<string, any>();
   let seq = 0;

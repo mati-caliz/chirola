@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-/** Tipos de documento válidos para un receptor. */
 const tiposDocReceptor = [80, 86, 96, 99] as const;
-/** Documentos que exigen 11 dígitos (CUIT/CUIL). */
+
 const docsOnce = [80, 86];
 
 const baseCliente = {
@@ -18,7 +17,6 @@ const baseCliente = {
   email: z.string().email().optional(),
 };
 
-/** Valida que CUIT/CUIL tengan 11 dígitos. */
 function validarNumeroDoc(
   data: { tipoDoc: number; numeroDoc?: string },
   ctx: z.RefinementCtx,
@@ -40,7 +38,6 @@ export const crearClienteSchema = z
   .object(baseCliente)
   .superRefine(validarNumeroDoc);
 
-/** Todos los campos opcionales; valida CUIT/CUIL si se cambia el número. */
 export const actualizarClienteSchema = z
   .object({
     tipoDoc: baseCliente.tipoDoc.optional(),

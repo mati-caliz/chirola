@@ -34,7 +34,6 @@ export interface ComprobantePdfData {
   caeVto: Date;
   items: ItemPdf[];
   comprobantesAsociados: ComprobanteAsociadoPdf[];
-  /** PNG del QR de ARCA ya renderizado. */
   qrPng: Buffer;
 }
 
@@ -47,7 +46,6 @@ const fecha = (d: Date): string =>
 const comprobanteId = (tipo: number, pv: number, nro: number): string =>
   `${nombreTipoComprobante[tipo] ?? `Tipo ${tipo}`} ${String(pv).padStart(5, '0')}-${String(nro).padStart(8, '0')}`;
 
-/** Renderiza el comprobante como PDF A4 con el QR obligatorio de ARCA. */
 export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
@@ -60,7 +58,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
     const right = doc.page.width - doc.page.margins.right;
     const width = right - left;
 
-    // Encabezado: letra grande + identificación del comprobante.
     const letra = letraComprobante(data.tipoCbte) || 'X';
     doc.rect(left + width / 2 - 25, 40, 50, 50).stroke();
     doc.fontSize(28).text(letra, left + width / 2 - 25, 52, { width: 50, align: 'center' });
@@ -84,7 +81,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
 
     doc.moveTo(left, 110).lineTo(right, 110).stroke();
 
-    // Receptor.
     let y = 122;
     doc.fontSize(10).text('Receptor', left, y);
     y += 15;
@@ -96,7 +92,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
     }
     y += 25;
 
-    // Tabla de ítems.
     const cols = { desc: left, cant: left + 250, precio: left + 320, iva: left + 410, sub: right - 90 };
     doc.fontSize(9).fillColor('#000');
     doc.text('Descripción', cols.desc, y);
@@ -122,7 +117,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
     doc.moveTo(left, y).lineTo(right, y).stroke();
     y += 10;
 
-    // Totales.
     const totalLabel = (label: string, value: string, bold = false) => {
       doc.fontSize(bold ? 11 : 9).text(label, right - 260, y, { width: 170, align: 'right' });
       doc.text(value, right - 90, y, { width: 90, align: 'right' });
@@ -132,7 +126,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
     totalLabel('IVA:', `$ ${money(data.impIva)}`);
     totalLabel('Total:', `$ ${money(data.impTotal)}`, true);
 
-    // Comprobantes asociados (NC/ND).
     if (data.comprobantesAsociados.length > 0) {
       y += 8;
       doc.fontSize(9).text('Comprobantes asociados:', left, y);
@@ -143,7 +136,6 @@ export function renderComprobantePdf(data: ComprobantePdfData): Promise<Buffer> 
       }
     }
 
-    // Pie: QR + CAE.
     const qrY = doc.page.height - 180;
     doc.image(data.qrPng, left, qrY, { width: 120, height: 120 });
     doc.fontSize(10).text('CAE', left + 140, qrY + 20);

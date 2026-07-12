@@ -12,7 +12,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET', 'dev-secret'),
-        // Access token de corta duración; la sesión se sostiene con el refresh token.
+
         signOptions: { expiresIn: config.get<string>('JWT_ACCESS_TTL', '1h') },
       }),
     }),

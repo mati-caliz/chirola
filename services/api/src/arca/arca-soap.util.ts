@@ -4,7 +4,6 @@ import { XMLParser } from 'fast-xml-parser';
 const logger = new Logger('ArcaSoap');
 const parser = new XMLParser({ ignoreAttributes: false });
 
-/** Escapa un valor para insertarlo como texto dentro de un nodo XML. */
 export function escapeXml(value: string | null | undefined): string {
   if (value == null) return '';
   return value
@@ -15,7 +14,6 @@ export function escapeXml(value: string | null | undefined): string {
     .replace(/'/g, '&apos;');
 }
 
-/** Bloque `<ar:Auth>` (token + sign + cuit) que WSFEv1 exige en cada request. */
 export function buildAuthBlock(cuit: string, token: string, sign: string): string {
   return (
     '<ar:Auth>' +
@@ -26,7 +24,6 @@ export function buildAuthBlock(cuit: string, token: string, sign: string): strin
   );
 }
 
-/** POST de un envelope SOAP a un endpoint de ARCA y devuelve el body crudo. */
 export async function callSoap(
   url: string,
   soapAction: string,
@@ -51,7 +48,6 @@ export async function callSoap(
   return text;
 }
 
-/** Parsea un XML de ARCA y expone helpers de extracción por tag. */
 export class ParsedXml {
   private readonly root: Record<string, unknown>;
 
@@ -59,7 +55,6 @@ export class ParsedXml {
     this.root = parser.parse(xml) as Record<string, unknown>;
   }
 
-  /** Primera aparición del tag (recursiva). Lanza si no existe. */
   required(tag: string): string {
     const value = this.find(tag);
     if (value == null) {
@@ -70,13 +65,11 @@ export class ParsedXml {
     return String(value);
   }
 
-  /** Primera aparición del tag o el default provisto. */
   optional(tag: string, fallback: string): string {
     const value = this.find(tag);
     return value == null ? fallback : String(value);
   }
 
-  /** Lista de errores `<Err><Code/><Msg/></Err>` que devuelve WSFEv1. */
   errors(): string[] {
     const errRoot = this.find('Errors');
     if (errRoot == null || typeof errRoot !== 'object') return [];
@@ -94,7 +87,6 @@ export class ParsedXml {
     return out;
   }
 
-  /** Búsqueda recursiva de la primera clave con ese nombre. */
   private find(tag: string, obj: unknown = this.root): unknown {
     if (obj == null || typeof obj !== 'object') return undefined;
     const rec = obj as Record<string, unknown>;

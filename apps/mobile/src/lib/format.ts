@@ -1,4 +1,3 @@
-/** Formatea un importe en pesos argentinos. */
 export function formatMoneda(valor: number, moneda = 'PES'): string {
   const code = moneda === 'PES' ? 'ARS' : moneda;
   try {
@@ -11,7 +10,6 @@ export function formatMoneda(valor: number, moneda = 'PES'): string {
   }
 }
 
-/** Formatea una fecha ISO a dd/MM/yyyy. */
 export function formatFecha(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
   if (Number.isNaN(d.getTime())) return '—';
@@ -22,7 +20,6 @@ export function formatFecha(iso: string | Date): string {
   }).format(d);
 }
 
-/** Número de comprobante con ceros a la izquierda: 0001-00000042. */
 export function formatNumeroCbte(puntoVenta: number, numero: number): string {
   return `${String(puntoVenta).padStart(4, '0')}-${String(numero).padStart(8, '0')}`;
 }

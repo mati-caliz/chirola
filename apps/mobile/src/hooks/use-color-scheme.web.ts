@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
-/**
- * To support static rendering, this value needs to be re-calculated on the client side for web
- */
-export function useColorScheme() {
-  const [hasHydrated, setHasHydrated] = useState(false);
+const emptySubscribe = () => () => {};
 
-  useEffect(() => {
-    // Marca de hidratación en web (static rendering); correr una sola vez es intencional.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasHydrated(true);
-  }, []);
+export function useColorScheme() {
+  const hasHydrated = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
   const colorScheme = useRNColorScheme();
 

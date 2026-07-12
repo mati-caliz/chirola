@@ -50,7 +50,6 @@ function ThemedRoot() {
   );
 }
 
-/** Redirige según la sesión: sin token → login; con token en zona auth → app. */
 function RootNavigator() {
   const { user, loading } = useAuth();
   const segments = useSegments();

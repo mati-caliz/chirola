@@ -1,7 +1,6 @@
 import { BadRequestException, PipeTransform } from '@nestjs/common';
 import type { ZodSchema } from 'zod';
 
-/** Valida el payload contra un schema de Zod (fuente de verdad compartida). */
 export class ZodValidationPipe<T> implements PipeTransform {
   constructor(private readonly schema: ZodSchema<T>) {}
 

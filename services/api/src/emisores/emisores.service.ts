@@ -25,7 +25,6 @@ export class EmisoresService {
     });
   }
 
-  /** Devuelve el emisor sólo si pertenece al usuario; si no, 404/403. */
   async obtenerDeUsuario(id: string, userId: string) {
     const emisor = await this.prisma.emisor.findUnique({ where: { id } });
     if (!emisor) throw new NotFoundException('Emisor inexistente.');

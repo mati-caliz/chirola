@@ -20,7 +20,7 @@ describe('calcularImportes', () => {
     expect(r.impNeto).toBe(1000);
     expect(r.impIva).toBe(210);
     expect(r.alicuotas).toEqual([{ id: 5, baseImp: 1000, importe: 210 }]);
-    // Regla de oro de ARCA
+
     expect(r.impNeto + r.impIva).toBeCloseTo(r.impTotal, 2);
   });
 

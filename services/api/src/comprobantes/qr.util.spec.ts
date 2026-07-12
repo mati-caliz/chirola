@@ -3,7 +3,7 @@ import { buildQrUrl } from './qr.util';
 describe('buildQrUrl', () => {
   it('genera la URL de ARCA con el payload correcto en base64', () => {
     const url = buildQrUrl({
-      fecha: new Date(2026, 6, 12), // 2026-07-12
+      fecha: new Date(2026, 6, 12),
       cuitEmisor: '20111111112',
       puntoVenta: 1,
       tipoCbte: 11,

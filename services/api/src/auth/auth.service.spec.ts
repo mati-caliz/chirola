@@ -5,7 +5,6 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashRefreshToken } from './refresh-token.util';
 
-/** Prisma en memoria: user (lookup) + refreshToken (CRUD mínimo). */
 function fakePrisma() {
   const users = new Map<string, any>();
   const tokens = new Map<string, any>();
@@ -79,9 +78,7 @@ describe('AuthService — refresh tokens', () => {
     const rotated = await svc.refresh(refreshToken);
     expect(rotated.refreshToken).not.toBe(refreshToken);
 
-    // El token viejo ya no sirve (fue revocado).
     await expect(svc.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
-    // El nuevo sí.
     await expect(svc.refresh(rotated.refreshToken)).resolves.toHaveProperty('refreshToken');
   });
 
@@ -92,7 +89,6 @@ describe('AuthService — refresh tokens', () => {
 
     await expect(svc.logout(refreshToken)).resolves.toEqual({ ok: true });
     await expect(svc.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
-    // Segundo logout no falla.
     await expect(svc.logout(refreshToken)).resolves.toEqual({ ok: true });
   });
 
@@ -100,7 +96,6 @@ describe('AuthService — refresh tokens', () => {
     const prisma = fakePrisma() as any;
     const svc = service(prisma);
     const { refreshToken } = await svc.register({ email: 'a@b.com', password: 'secret123' });
-    // Forzar vencimiento del token guardado.
     for (const t of prisma._tokens.values()) {
       if (t.tokenHash === hashRefreshToken(refreshToken)) {
         t.expiresAt = new Date(Date.now() - 1000);

@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -10,7 +10,6 @@ async function bootstrap() {
   );
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  // eslint-disable-next-line no-console
-  console.log(`Chirola API escuchando en http://localhost:${port}/api`);
+  new Logger('Bootstrap').log(`Chirola API escuchando en http://localhost:${port}/api`);
 }
 void bootstrap();

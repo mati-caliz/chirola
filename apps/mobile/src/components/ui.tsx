@@ -15,7 +15,6 @@ import { useTheme } from '@/hooks/use-theme';
 
 const BRAND = '#208AEF';
 
-/** Contenedor de pantalla con safe area y scroll. */
 export function Screen({
   children,
   scroll = true,
@@ -136,7 +135,6 @@ export function ErrorText({ children }: { children: ReactNode }) {
   return <Text style={styles.error}>{children}</Text>;
 }
 
-/** Estado centrado (cargando / vacío / error). */
 export function Centered({ children }: { children: ReactNode }) {
   return <View style={styles.centered}>{children}</View>;
 }
@@ -149,7 +147,6 @@ export function Loading() {
   );
 }
 
-/** Chip de estado de color (para CAE / vencimiento de cert, etc.). */
 export function Badge({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 'warn' | 'neutral' }) {
   const bg = tone === 'ok' ? '#DFF5E1' : tone === 'warn' ? '#FDECEC' : '#E6EDF5';
   const fg = tone === 'ok' ? '#137333' : tone === 'warn' ? '#B3261E' : '#274060';
@@ -160,7 +157,6 @@ export function Badge({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 
   );
 }
 
-/** Selector de una opción entre varias (chips). */
 export function OptionGroup<T extends string | number>({
   label,
   value,

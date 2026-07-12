@@ -11,7 +11,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from './password.util';
 import { generarRefreshToken, hashRefreshToken } from './refresh-token.util';
 
-/** Hash señuelo para igualar el timing cuando el email no existe. */
 const DUMMY_HASH = hashPassword('dummy-para-timing');
 
 export interface JwtPayload {
@@ -23,7 +22,6 @@ export interface JwtPayload {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  /** Vida del refresh token en días (configurable). */
   private readonly refreshTtlDays: number;
 
   constructor(
@@ -53,7 +51,7 @@ export class AuthService {
       where: { email: input.email },
     });
     if (!user) {
-      // Comparación señuelo para no filtrar si el email existe (timing).
+
       verifyPassword(input.password, DUMMY_HASH);
       throw new UnauthorizedException('Credenciales inválidas.');
     }
@@ -63,10 +61,6 @@ export class AuthService {
     return this.emitirTokens(user.id, user.email);
   }
 
-  /**
-   * Canjea un refresh token válido por un par nuevo (rotación): revoca el token
-   * usado y emite uno nuevo. Si el token no existe, está revocado o vencido → 401.
-   */
   async refresh(rawToken: string): Promise<AuthResponse> {
     const tokenHash = hashRefreshToken(rawToken);
     const stored = await this.prisma.refreshToken.findUnique({
@@ -83,7 +77,6 @@ export class AuthService {
     return this.emitirTokens(stored.user.id, stored.user.email);
   }
 
-  /** Revoca un refresh token (logout). Idempotente: siempre responde ok. */
   async logout(rawToken: string): Promise<{ ok: true }> {
     const tokenHash = hashRefreshToken(rawToken);
     await this.prisma.refreshToken.updateMany({
@@ -93,7 +86,6 @@ export class AuthService {
     return { ok: true };
   }
 
-  /** Emite un access token (JWT) + un refresh token opaco persistido (hasheado). */
   private async emitirTokens(id: string, email: string): Promise<AuthResponse> {
     const payload: JwtPayload = { sub: id, email };
     const refreshToken = generarRefreshToken();

@@ -13,7 +13,6 @@ import type {
 
 const WSFEV1_NS = 'http://ar.gov.afip.dif.FEV1/';
 
-/** Formatea una fecha como `yyyyMMdd`, como espera WSFEv1. */
 function fechaArca(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -21,7 +20,6 @@ function fechaArca(d: Date): string {
   return `${y}${m}${day}`;
 }
 
-/** Parsea `yyyyMMdd` a Date (medianoche local). */
 function parseFechaArca(s: string): Date {
   const y = Number(s.slice(0, 4));
   const m = Number(s.slice(4, 6));
@@ -31,13 +29,6 @@ function parseFechaArca(s: string): Date {
 
 const num = (n: number): string => n.toFixed(2);
 
-/**
- * Cliente self-host de WSFEv1 (Facturación Electrónica de ARCA).
- *
- * Portado de la implementación probada en producción de gastronova. Arma los
- * envelopes SOAP a mano (ARCA no expone una API apta para consumir de otra
- * forma cómoda) y delega auth/parseo en utilitarios compartidos.
- */
 @Injectable()
 export class WsfeService {
   private readonly logger = new Logger(WsfeService.name);
@@ -67,14 +58,12 @@ export class WsfeService {
     );
   }
 
-  /** Verifica conectividad y estado del servicio (FEDummy). */
   async ping(): Promise<boolean> {
     const soap = this.envelope('<ar:FEDummy/>');
     const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}FEDummy`, soap);
     return res.includes('OK');
   }
 
-  /** Último número autorizado para (punto de venta, tipo de comprobante). */
   async getUltimoAutorizado(
     auth: AuthContext,
     puntoVenta: number,
@@ -96,10 +85,6 @@ export class WsfeService {
     return Number(xml.required('CbteNro'));
   }
 
-  /**
-   * Solicita el CAE de un comprobante (FECAESolicitar).
-   * El número debe ser el siguiente correlativo (ver getUltimoAutorizado + 1).
-   */
   async solicitarCae(auth: AuthContext, req: CaeRequest): Promise<CaeResult> {
     const soap = this.envelope(
       '<ar:FECAESolicitar>' +
@@ -124,10 +109,6 @@ export class WsfeService {
     );
   }
 
-  /**
-   * Bloque `<ar:CbtesAsoc>` con los comprobantes originales de una NC/ND.
-   * Vacío si no hay asociados (facturas comunes).
-   */
   private buildCbtesAsoc(req: CaeRequest): string {
     const asoc = req.comprobantesAsociados ?? [];
     if (asoc.length === 0) return '';

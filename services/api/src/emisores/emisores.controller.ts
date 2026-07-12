@@ -45,10 +45,6 @@ export class EmisoresController {
     return this.emisores.listar(user.sub);
   }
 
-  /**
-   * Genera un par de claves + CSR para el emisor y guarda la clave privada
-   * cifrada. Devuelve el CSR para subir a ARCA (paso 1 del onboarding).
-   */
   @Post(':id/csr')
   async generarCsr(
     @CurrentUser() user: JwtPayload,
@@ -64,10 +60,6 @@ export class EmisoresController {
     );
   }
 
-  /**
-   * Empareja el `.crt` descargado de ARCA con la clave privada ya generada
-   * (paso 4 del onboarding). No recibe la clave privada.
-   */
   @Put(':id/certificado')
   async emparejarCertificado(
     @CurrentUser() user: JwtPayload,
@@ -79,10 +71,6 @@ export class EmisoresController {
     return { ok: true };
   }
 
-  /**
-   * Carga (o reemplaza) el certificado ARCA de un emisor propio trayendo la
-   * clave privada desde afuera (flujo manual, para quien ya tiene su par).
-   */
   @Post(':id/certificado')
   async cargarCertificado(
     @CurrentUser() user: JwtPayload,

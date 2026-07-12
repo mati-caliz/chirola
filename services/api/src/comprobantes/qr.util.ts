@@ -1,8 +1,4 @@
-/**
- * Genera la URL del QR obligatorio de ARCA (RG 5152 / RG 4892).
- * Codifica en base64 un JSON con los datos del comprobante y lo antepone al
- * endpoint público de verificación de ARCA.
- */
+
 export interface DatosQr {
   fecha: Date;
   cuitEmisor: string;
@@ -19,7 +15,6 @@ export interface DatosQr {
 
 const BASE_URL = 'https://www.afip.gob.ar/fe/qr/?p=';
 
-/** Fecha en formato `yyyy-MM-dd` que exige el payload del QR. */
 function fechaIso(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');

@@ -10,12 +10,6 @@ import {
   randomBytes,
 } from 'node:crypto';
 
-/**
- * Cifrado de campos sensibles at-rest (claves privadas de certificados ARCA).
- *
- * AES-256-GCM. Formato en disco: base64(iv[12] || ciphertext || authTag[16]),
- * compatible con la implementación de gastronova.
- */
 @Injectable()
 export class FieldEncryptionService {
   private static readonly IV_LENGTH = 12;

@@ -4,7 +4,6 @@ export * from './auth';
 export * from './emisor';
 export * from './cliente';
 
-/** Tipos de comprobante ARCA más usados. */
 export const TipoComprobante = {
   FACTURA_A: 1,
   NOTA_DEBITO_A: 2,
@@ -17,19 +16,16 @@ export const TipoComprobante = {
   NOTA_CREDITO_C: 13,
 } as const;
 
-/** Tipos de comprobante que requieren CUIT del receptor (clase A). */
 const tiposConCuit: readonly number[] = [
   TipoComprobante.FACTURA_A,
   TipoComprobante.NOTA_DEBITO_A,
   TipoComprobante.NOTA_CREDITO_A,
 ];
 
-/** ¿El tipo de comprobante exige identificar al receptor con CUIT? */
 export function requiereCuitReceptor(tipoCbte: number): boolean {
   return tiposConCuit.includes(tipoCbte);
 }
 
-/** Notas de crédito y débito (todas las clases). Exigen `CbtesAsoc` en WSFEv1. */
 const tiposNotaCreditoDebito: readonly number[] = [
   TipoComprobante.NOTA_DEBITO_A,
   TipoComprobante.NOTA_CREDITO_A,
@@ -39,15 +35,10 @@ const tiposNotaCreditoDebito: readonly number[] = [
   TipoComprobante.NOTA_CREDITO_C,
 ];
 
-/**
- * ¿El tipo de comprobante es una nota de crédito/débito? Estas requieren
- * asociar el/los comprobante(s) original(es) vía `CbtesAsoc`.
- */
 export function esNotaCreditoDebito(tipoCbte: number): boolean {
   return tiposNotaCreditoDebito.includes(tipoCbte);
 }
 
-/** Nombre legible del tipo de comprobante (para PDF / UI). */
 export const nombreTipoComprobante: Record<number, string> = {
   1: 'Factura A',
   2: 'Nota de Débito A',
@@ -60,14 +51,12 @@ export const nombreTipoComprobante: Record<number, string> = {
   13: 'Nota de Crédito C',
 };
 
-/** Letra del comprobante (A/B/C) según el tipo. */
 export function letraComprobante(tipoCbte: number): string {
   const nombre = nombreTipoComprobante[tipoCbte] ?? '';
   const m = nombre.match(/ ([ABC])$/);
   return m ? m[1] : '';
 }
 
-/** Tipos de documento del receptor. */
 export const TipoDocumento = {
   CUIT: 80,
   CUIL: 86,
@@ -75,7 +64,6 @@ export const TipoDocumento = {
   CONSUMIDOR_FINAL: 99,
 } as const;
 
-/** Nombre legible del tipo de documento del receptor. */
 export const nombreTipoDocumento: Record<number, string> = {
   80: 'CUIT',
   86: 'CUIL',
@@ -83,10 +71,6 @@ export const nombreTipoDocumento: Record<number, string> = {
   99: 'Consumidor Final',
 };
 
-/**
- * Condición del receptor frente al IVA (`CondicionIVAReceptorId`, obligatorio
- * en WSFEv1 desde RG 5616). El id es el que espera ARCA.
- */
 export const CondicionIvaReceptor = {
   RESPONSABLE_INSCRIPTO: 1,
   SUJETO_EXENTO: 4,
@@ -95,22 +79,16 @@ export const CondicionIvaReceptor = {
   MONOTRIBUTISTA_SOCIAL: 13,
 } as const;
 
-/** Condición IVA por defecto del receptor según el tipo de comprobante. */
 export function condicionIvaReceptorPorDefecto(tipoCbte: number): number {
   return requiereCuitReceptor(tipoCbte)
     ? CondicionIvaReceptor.RESPONSABLE_INSCRIPTO
     : CondicionIvaReceptor.CONSUMIDOR_FINAL;
 }
 
-/** Alícuotas de IVA soportadas (porcentaje). */
 export const alicuotasIva = [0, 2.5, 5, 10.5, 21, 27] as const;
 
-/**
- * Mapea la alícuota (porcentaje) al `Id` de la tabla FEParamGetTiposIva de ARCA.
- * Fuente: tabla oficial de alícuotas de IVA de WSFEv1.
- */
 export const alicuotaIvaAfipId: Record<number, number> = {
-  0: 3, // 0%
+  0: 3,
   2.5: 9,
   5: 8,
   10.5: 4,
@@ -127,17 +105,13 @@ export const itemSchema = z.object({
   }),
 });
 
-/**
- * Comprobante original asociado a una nota de crédito/débito (`CbteAsoc`).
- * `cuit` y `fecha` son opcionales pero recomendados por ARCA.
- */
 export const comprobanteAsociadoSchema = z.object({
   tipo: z.number().int().positive(),
   puntoVenta: z.number().int().positive(),
   numero: z.number().int().positive(),
-  /** CUIT del emisor del comprobante asociado (11 dígitos). */
+
   cuit: z.string().regex(/^\d{11}$/).optional(),
-  /** Fecha del comprobante asociado en formato yyyyMMdd. */
+
   fecha: z.string().regex(/^\d{8}$/).optional(),
 });
 
@@ -151,13 +125,13 @@ export const emitirComprobanteSchema = z
       tipoDoc: z.number().int(),
       numeroDoc: z.string().min(1),
       razonSocial: z.string().optional(),
-      /** Id de CondicionIvaReceptor. Si se omite, se deriva del tipo de comprobante. */
+
       condicionIvaId: z.number().int().optional(),
     }),
     items: z.array(itemSchema).min(1),
     moneda: z.string().default('PES'),
     cotizacion: z.number().positive().default(1),
-    /** Comprobantes asociados (obligatorio para notas de crédito/débito). */
+
     comprobantesAsociados: z.array(comprobanteAsociadoSchema).optional(),
   })
   .superRefine((data, ctx) => {

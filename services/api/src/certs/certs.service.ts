@@ -8,10 +8,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FieldEncryptionService } from '../crypto/field-encryption.service';
 import type { CredencialesCert } from '../arca/wsaa/wsaa.types';
 
-/**
- * Vault de certificados ARCA. La clave privada se guarda cifrada (AES-256-GCM)
- * y nunca se expone; el `.crt` es público y se guarda en claro.
- */
 @Injectable()
 export class CertsService {
   constructor(
@@ -19,11 +15,6 @@ export class CertsService {
     private readonly encryption: FieldEncryptionService,
   ) {}
 
-  /**
-   * Guarda (o reemplaza) el material del certificado de un emisor.
-   * @param privateKeyPem clave privada en PEM (se cifra at-rest).
-   * @param certPem certificado .crt en PEM.
-   */
   async guardarCertificado(
     emisorId: string,
     privateKeyPem: string,
@@ -46,15 +37,6 @@ export class CertsService {
     });
   }
 
-  /**
-   * Genera un par de claves RSA + un CSR (PKCS#10) para el emisor y guarda la
-   * clave privada cifrada (con `certPem` en null hasta que ARCA devuelva el .crt).
-   * Devuelve el CSR en PEM para que el usuario lo suba a "Administración de
-   * Certificados Digitales" de ARCA. La clave privada nunca sale del backend.
-   *
-   * El subject sigue la convención que exige ARCA:
-   *   C=AR, O=<razón social>, CN=<alias>, serialNumber=CUIT <cuit>
-   */
   async generarCsr(
     emisorId: string,
     cuit: string,
@@ -76,8 +58,7 @@ export class CertsService {
     const csrPem = forge.pki.certificationRequestToPem(csr);
 
     const privateKeyEnc = this.encryption.encrypt(privateKeyPem);
-    // Reemplaza cualquier material previo: al pedir un CSR nuevo, el .crt viejo
-    // deja de ser válido para la nueva clave.
+
     await this.prisma.certificado.upsert({
       where: { emisorId },
       create: { emisorId, privateKeyEnc, certPem: null, alias },
@@ -87,11 +68,6 @@ export class CertsService {
     return { csrPem };
   }
 
-  /**
-   * Empareja el `.crt` descargado de ARCA con la clave privada ya guardada por
-   * `generarCsr`. Valida que la clave pública del cert coincida con la del par
-   * generado (evita subir un .crt de otro CUIT/clave).
-   */
   async emparejarCert(emisorId: string, certPem: string): Promise<void> {
     const existente = await this.prisma.certificado.findUnique({
       where: { emisorId },
@@ -124,7 +100,6 @@ export class CertsService {
     });
   }
 
-  /** ¿La clave pública del cert coincide con la de la clave privada guardada? */
   private certMatchesKey(
     cert: forge.pki.Certificate,
     privateKeyPem: string,
@@ -141,7 +116,6 @@ export class CertsService {
     }
   }
 
-  /** Devuelve las credenciales descifradas para firmar contra ARCA. */
   async getCredenciales(emisorId: string): Promise<CredencialesCert> {
     const cert = await this.prisma.certificado.findUnique({
       where: { emisorId },

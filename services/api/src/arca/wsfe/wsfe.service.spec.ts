@@ -9,11 +9,10 @@ function service(): WsfeService {
   return new WsfeService(config);
 }
 
-/** CaeRequest base (Factura B sin asociados). */
 function baseReq(overrides: Partial<CaeRequest> = {}): CaeRequest {
   return {
     puntoVenta: 1,
-    tipoCbte: 8, // NC B
+    tipoCbte: 8,
     concepto: 1,
     numero: 5,
     fecha: new Date(2026, 6, 12),
@@ -56,7 +55,7 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
     const xml = detalle(
       baseReq({ comprobantesAsociados: [{ tipo: 6, puntoVenta: 1, numero: 42 }] }),
     );
-    // El CbteAsoc cierra justo después de Nro (sin Cuit ni CbteFch propios).
+
     expect(xml).toContain(
       '<ar:CbtesAsoc><ar:CbteAsoc>' +
         '<ar:Tipo>6</ar:Tipo>' +

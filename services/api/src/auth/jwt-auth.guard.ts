@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { JwtPayload } from './auth.service';
 
-/** Exige un `Authorization: Bearer <jwt>` válido y adjunta el usuario al request. */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly jwt: JwtService) {}

@@ -21,7 +21,6 @@ import type { JwtPayload } from '../auth/auth.service';
 import { EmisoresService } from '../emisores/emisores.service';
 import { ClientesService } from './clientes.service';
 
-/** ABM de clientes de un emisor propio. */
 @Controller('emisores/:emisorId/clientes')
 @UseGuards(JwtAuthGuard)
 export class ClientesController {
@@ -30,7 +29,6 @@ export class ClientesController {
     private readonly emisores: EmisoresService,
   ) {}
 
-  /** Verifica que el emisor exista y sea del usuario del token. */
   private async assertEmisor(emisorId: string, user: JwtPayload) {
     await this.emisores.obtenerDeUsuario(emisorId, user.sub);
   }
