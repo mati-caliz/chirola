@@ -42,7 +42,7 @@ para tener una sola fuente de verdad entre front y back.
 | **2** | Emitir Factura C | `FECAESolicitar` devuelve CAE en homologación. | 🟡 Flujo completo cableado y verificado local; falta CAE real |
 | **3** | A/B + IVA + NC/ND | Comprobantes discriminando IVA y notas de crédito/débito. | ✅ A/B con IVA discriminado + NC/ND con `CbtesAsoc` |
 | **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. | ⬜ Pendiente (`apps/mobile` no existe aún) |
-| **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. | 🟡 URL del QR generada; falta render PNG + PDF |
+| **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. | ✅ QR PNG (`qrcode`) + PDF (`pdfkit`) con QR embebido |
 | **6** | Producción | Onboarding de certs reales y pasaje a endpoints de producción. | ⬜ Pendiente |
 
 ### Backend ya implementado (Fases 1–3 parcial)
@@ -64,8 +64,17 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
    Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
 2. **App mobile (Fase 4):** scaffolding Expo + pantallas login → emisores → cert → emisión → CAE/QR.
-3. **PDF + QR PNG (Fase 5):** render del QR (lib `qrcode`) y armado del PDF.
-4. **Faltantes transversales:** módulo `clientes`, onboarding guiado del cert, refresh token/logout.
+3. **Faltantes transversales:** módulo `clientes`, onboarding guiado del cert, refresh token/logout.
+
+### PDF + QR PNG (Fase 5, implementado)
+- `comprobantes/qr-image.util.ts` — `renderQrPng` (lib `qrcode`) sobre la URL del QR;
+  `receptorDesdeQr` decodifica el receptor del payload canónico de AFIP.
+- `comprobantes/pdf.util.ts` — `renderComprobantePdf` (lib `pdfkit`): A4 con letra A/B/C,
+  emisor, receptor, tabla de ítems (formato es-AR), totales, comprobantes asociados, CAE +
+  vencimiento y el QR embebido.
+- Endpoints: `GET /comprobantes/:id/qr.png` (image/png) y `GET /comprobantes/:id/pdf`
+  (application/pdf). El Content-Type se fija recién con el buffer listo para que los errores
+  sigan devolviendo JSON.
 
 ### Notas de crédito/débito (Fase 3, implementado)
 Las NC/ND (tipos 2/3/7/8/12/13) aceptan `comprobantesAsociados` en el payload de emisión y

@@ -46,6 +46,26 @@ export function esNotaCreditoDebito(tipoCbte: number): boolean {
   return tiposNotaCreditoDebito.includes(tipoCbte);
 }
 
+/** Nombre legible del tipo de comprobante (para PDF / UI). */
+export const nombreTipoComprobante: Record<number, string> = {
+  1: 'Factura A',
+  2: 'Nota de Débito A',
+  3: 'Nota de Crédito A',
+  6: 'Factura B',
+  7: 'Nota de Débito B',
+  8: 'Nota de Crédito B',
+  11: 'Factura C',
+  12: 'Nota de Débito C',
+  13: 'Nota de Crédito C',
+};
+
+/** Letra del comprobante (A/B/C) según el tipo. */
+export function letraComprobante(tipoCbte: number): string {
+  const nombre = nombreTipoComprobante[tipoCbte] ?? '';
+  const m = nombre.match(/ ([ABC])$/);
+  return m ? m[1] : '';
+}
+
 /** Tipos de documento del receptor. */
 export const TipoDocumento = {
   CUIT: 80,
@@ -53,6 +73,14 @@ export const TipoDocumento = {
   DNI: 96,
   CONSUMIDOR_FINAL: 99,
 } as const;
+
+/** Nombre legible del tipo de documento del receptor. */
+export const nombreTipoDocumento: Record<number, string> = {
+  80: 'CUIT',
+  86: 'CUIL',
+  96: 'DNI',
+  99: 'Consumidor Final',
+};
 
 /**
  * Condición del receptor frente al IVA (`CondicionIVAReceptorId`, obligatorio

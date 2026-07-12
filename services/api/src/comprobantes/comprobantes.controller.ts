@@ -4,8 +4,10 @@ import {
   Get,
   Param,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   emitirComprobanteSchema,
   type EmitirComprobante,
@@ -34,5 +36,37 @@ export class ComprobantesController {
   @Get(':id')
   obtener(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.comprobantes.obtener(user.sub, id);
+  }
+
+  /**
+   * QR de ARCA del comprobante como PNG. El Content-Type se fija recién al tener
+   * el buffer, para que los errores (404) sigan devolviendo JSON.
+   */
+  @Get(':id/qr.png')
+  async qr(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const png = await this.comprobantes.renderQrPng(user.sub, id);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.end(png);
+  }
+
+  /** PDF del comprobante con el QR embebido. */
+  @Get(':id/pdf')
+  async pdf(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.comprobantes.renderPdf(user.sub, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="comprobante-${id}.pdf"`,
+    );
+    res.end(pdf);
   }
 }
