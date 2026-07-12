@@ -18,6 +18,10 @@ import {
   ARCA_DUPLICATE_NUMBER_CODE,
 } from '../arca/wsfe/arca-errors';
 import { calculateAmounts } from '../arca/wsfe/iva-calculator';
+import {
+  ApiClientService,
+  AuthenticatedApiClient,
+} from '../service-auth/api-client.service';
 import { IssuerLockService } from './issuer-lock.service';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
@@ -51,9 +55,10 @@ export class VouchersService {
     private readonly wsaa: WsaaService,
     private readonly wsfe: WsfeService,
     private readonly issuerLock: IssuerLockService,
+    private readonly apiClients: ApiClientService,
   ) {}
 
-  async get(userId: string, id: string) {
+  private async loadVoucher(id: string) {
     const voucher = await this.prisma.voucher.findUnique({
       where: { id },
       include: { items: true, client: true, salesPoint: true, issuer: true },
@@ -61,9 +66,20 @@ export class VouchersService {
     if (!voucher) {
       throw new NotFoundException('Comprobante inexistente.');
     }
+    return voucher;
+  }
+
+  async get(userId: string, id: string) {
+    const voucher = await this.loadVoucher(id);
     if (voucher.issuer.userId !== userId) {
       throw new ForbiddenException('El comprobante no pertenece al usuario.');
     }
+    return voucher;
+  }
+
+  async getForApiClient(apiClient: AuthenticatedApiClient, id: string) {
+    const voucher = await this.loadVoucher(id);
+    await this.apiClients.assertIssuerGranted(apiClient.id, voucher.issuerId);
     return voucher;
   }
 
@@ -132,7 +148,29 @@ export class VouchersService {
     if (issuer.userId !== userId) {
       throw new ForbiddenException('El emisor no pertenece al usuario.');
     }
+    return this.issueAuthorized(issuer, input, idempotencyKey);
+  }
 
+  async issueForApiClient(
+    apiClient: AuthenticatedApiClient,
+    input: IssueVoucher,
+    idempotencyKey?: string,
+  ): Promise<IssuedVoucher> {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: input.issuerId },
+    });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    await this.apiClients.assertIssuerGranted(apiClient.id, issuer.id);
+    return this.issueAuthorized(issuer, input, idempotencyKey);
+  }
+
+  private async issueAuthorized(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+    idempotencyKey?: string,
+  ): Promise<IssuedVoucher> {
     if (idempotencyKey) {
       const replay = await this.replayIdempotent(issuer.id, idempotencyKey);
       if (replay) {

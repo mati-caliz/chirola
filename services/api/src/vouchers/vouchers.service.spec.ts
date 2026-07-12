@@ -6,6 +6,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { CertsService } from '../certs/certs.service';
 import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { WsfeService } from '../arca/wsfe/wsfe.service';
+import type { ApiClientService } from '../service-auth/api-client.service';
 
 interface StoredVoucher {
   id: string;
@@ -123,12 +124,17 @@ function buildHarness() {
     queryVoucher: jest.fn(async () => null),
   } as unknown as WsfeService;
 
+  const apiClients = {
+    assertIssuerGranted: jest.fn(async () => undefined),
+  } as unknown as ApiClientService;
+
   const service = new VouchersService(
     prisma,
     certs,
     wsaa,
     wsfe,
     new IssuerLockService(),
+    apiClients,
   );
 
   return { service, prisma, certs, wsaa, wsfe, vouchers };
