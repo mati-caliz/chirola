@@ -14,13 +14,12 @@ web-build/
 !.env.example
 
 # Certificados y claves (NUNCA commitear datos fiscales)
+# Nota: NO ignorar el módulo fuente services/api/src/certs/ — sólo material real.
 *.key
 *.crt
 *.pem
 *.p12
 *.pfx
-certs/
-!certs/.gitkeep
 
 # Expo / React Native
 .expo/
