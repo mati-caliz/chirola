@@ -34,7 +34,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

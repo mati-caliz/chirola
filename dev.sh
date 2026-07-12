@@ -4,6 +4,20 @@ set -e
 
 echo "🚀 Iniciando Chirola en modo desarrollo..."
 
+free_port() {
+    local port="$1"
+    local pids
+    pids=$(lsof -ti "tcp:${port}" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo "🧹 Liberando puerto ${port} (proceso previo: ${pids})..."
+        kill -9 $pids 2>/dev/null || true
+    fi
+}
+
+echo "🧹 Cerrando ejecuciones previas..."
+free_port 3000
+free_port 8081
+
 if ! docker ps &> /dev/null; then
     echo "❌ Docker no está corriendo. Por favor inicia Docker primero."
     exit 1
@@ -13,7 +27,10 @@ echo "📦 Iniciando PostgreSQL..."
 docker compose up -d db
 
 echo "⏳ Esperando a que PostgreSQL esté listo..."
-timeout 30 bash -c 'until docker compose exec db pg_isready -U chirola > /dev/null 2>&1; do sleep 1; done'
+timeout 30 bash -c 'until (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; do sleep 1; done' || {
+    echo "❌ PostgreSQL no respondió a tiempo"
+    exit 1
+}
 echo "✅ PostgreSQL listo"
 
 echo "🔧 Iniciando Backend..."
@@ -25,6 +42,8 @@ cleanup() {
     echo ""
     echo "🛑 Deteniendo backend..."
     kill "$BACKEND_PID" 2>/dev/null || true
+    free_port 3000
+    free_port 8081
 }
 trap cleanup EXIT
 
