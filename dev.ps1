@@ -125,6 +125,9 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+Write-Host "Creando usuario demo (demo@demo.com / demo)..."
+pnpm --filter @chirola/api run seed:demo
+
 $backendOutLog = Join-Path $env:TEMP 'chirola-backend.log'
 $backendErrLog = Join-Path $env:TEMP 'chirola-backend.err.log'
 

@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "api-client:create": "ts-node scripts/create-api-client.ts",
-    "webhook:register": "ts-node scripts/register-webhook.ts"
+    "webhook:register": "ts-node scripts/register-webhook.ts",
+    "seed:demo": "ts-node scripts/seed-demo.ts"
   },
   "jest": {
     "moduleFileExtensions": [
