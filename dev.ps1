@@ -32,21 +32,49 @@ function Wait-Port {
     }
 }
 
+function Test-DockerRunning {
+    try {
+        docker info 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Ensure-Docker {
+    if (Test-DockerRunning) { return }
+
+    Write-Host "Docker no esta corriendo. Iniciando Docker Desktop..."
+    $candidates = @(
+        (Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Docker\Docker\Docker Desktop.exe'),
+        (Join-Path $env:LocalAppData 'Docker\Docker Desktop.exe')
+    )
+    $dockerExe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $dockerExe) {
+        Write-Host "No encontre Docker Desktop. Abrilo manualmente, espera a 'Engine running' y volve a correr .\dev.ps1"
+        exit 1
+    }
+    Start-Process $dockerExe | Out-Null
+
+    Write-Host "Esperando a que Docker este listo (puede tardar hasta 2 min la primera vez)..."
+    for ($i = 0; $i -lt 40; $i++) {
+        Start-Sleep -Seconds 3
+        if (Test-DockerRunning) {
+            Write-Host "Docker listo"
+            return
+        }
+        Write-Host "  Todavia esperando Docker... ($($i + 1)/40)"
+    }
+    Write-Host "Docker no respondio a tiempo. Abrilo manualmente y volve a correr .\dev.ps1"
+    exit 1
+}
+
 Write-Host "Cerrando ejecuciones previas..."
 Free-Port 3000
 Free-Port 8081
 
-$dockerRunning = $false
-try {
-    docker ps 2>$null | Out-Null
-    $dockerRunning = ($LASTEXITCODE -eq 0)
-} catch {
-    $dockerRunning = $false
-}
-if (-not $dockerRunning) {
-    Write-Host "Docker no esta corriendo. Abri Docker Desktop, espera a que diga 'Engine running' y volve a correr .\dev.ps1"
-    exit 1
-}
+Ensure-Docker
 
 Write-Host "Iniciando PostgreSQL..."
 docker compose up -d db
