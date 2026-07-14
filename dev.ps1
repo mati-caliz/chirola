@@ -1,6 +1,5 @@
 #Requires -Version 5.1
 Set-Location $PSScriptRoot
-$ErrorActionPreference = 'Stop'
 
 Write-Host "Iniciando Chirola en modo desarrollo..."
 
@@ -37,9 +36,15 @@ Write-Host "Cerrando ejecuciones previas..."
 Free-Port 3000
 Free-Port 8081
 
-$null = docker ps 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Docker no esta corriendo. Por favor inicia Docker Desktop primero."
+$dockerRunning = $false
+try {
+    docker ps 2>$null | Out-Null
+    $dockerRunning = ($LASTEXITCODE -eq 0)
+} catch {
+    $dockerRunning = $false
+}
+if (-not $dockerRunning) {
+    Write-Host "Docker no esta corriendo. Abri Docker Desktop, espera a que diga 'Engine running' y volve a correr .\dev.ps1"
     exit 1
 }
 
