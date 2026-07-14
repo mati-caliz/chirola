@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, FileBadge, LogOut, Settings, ShieldCheck, Store, Users } from 'lucide-react-native';
+import { Building2, FileBadge, LogOut, Settings, ShieldCheck, Store, UserCircle, Users } from 'lucide-react-native';
 import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -88,6 +88,13 @@ export default function MasScreen() {
         <View>
           <SectionLabel>Cuenta</SectionLabel>
           <Card pad={4}>
+            <ListItem
+              title="Perfil"
+              leading={<UserCircle color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
+              chevron
+              onPress={() => router.push('/(app)/profile')}
+            />
+            <Divider inset={16} />
             <ListItem
               title="Configuración"
               leading={<Settings color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
