@@ -8,9 +8,11 @@
 > destinos con emisor activo global (AsyncStorage). Decisiones §7: Emitir = modal; AsyncStorage;
 > backend en paralelo. **Hecho además:** toggle de dark mode manual (Sistema/Claro/Oscuro con
 > `ThemeModeProvider`, pantalla de Configuración) y ABM de puntos de venta (endpoints DB + sync
-> desde ARCA `FEParamGetPtosVenta` + edición de descripción + selector al emitir). **Pendiente
-> (features nuevas de roadmap):** centro de notificaciones, biometría, perfil, recuperar
-> contraseña, autocompletado por padrón.
+> desde ARCA `FEParamGetPtosVenta` + edición de descripción + selector al emitir), centro de
+> novedades (vencimientos + aviso de certificado con campana e indicador en el dashboard, sobre
+> `/fiscal/alerts`), bloqueo con biometría (expo-local-authentication + gate + toggle) y pantalla
+> de perfil. **Pendiente (requieren infra/decisiones):** recuperar contraseña (falta envío de
+> mail) y autocompletado por padrón (falta el servicio de constancia de inscripción de ARCA).
 
 Objetivo: que **toda la app mobile se vea y se comporte como el "Chirola Design System"** que se
 diseñó en Claude Design, sin quedarnos en el look improvisado de hoy.
