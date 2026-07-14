@@ -1,5 +1,8 @@
 # Plan de migración — Chirola Design System → app RN/Expo
 
+> **Estado:** Fase 1 (fundaciones §2) y Fase 2 (librería de componentes §3) implementadas y
+> verificadas (tsc + lint + bundle Metro). Próximo: navegación (§4). Ver §8.
+
 Objetivo: que **toda la app mobile se vea y se comporte como el "Chirola Design System"** que se
 diseñó en Claude Design, sin quedarnos en el look improvisado de hoy.
 
