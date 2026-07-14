@@ -11,9 +11,9 @@ import {
   type ShadowSet,
   type ThemeColors,
 } from '@/theme/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeMode, type ColorScheme } from '@/theme/theme-mode';
 
-export type ColorScheme = 'light' | 'dark';
+export type { ColorScheme };
 
 export type Theme = {
   scheme: ColorScheme;
@@ -49,6 +49,6 @@ const darkTheme: Theme = {
 };
 
 export function useTheme(): Theme {
-  const scheme = useColorScheme();
+  const { scheme } = useThemeMode();
   return scheme === 'dark' ? darkTheme : lightTheme;
 }

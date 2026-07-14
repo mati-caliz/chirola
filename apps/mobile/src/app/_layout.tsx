@@ -21,13 +21,13 @@ import {
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { queryClient } from '@/lib/query';
+import { ThemeModeProvider, useThemeMode } from '@/theme/theme-mode';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,18 +35,20 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ThemedRoot />
-          </AuthProvider>
-        </QueryClientProvider>
+        <ThemeModeProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <ThemedRoot />
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeModeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
 function ThemedRoot() {
-  const colorScheme = useColorScheme();
+  const { scheme } = useThemeMode();
   const { loading } = useAuth();
   const [fontsLoaded] = useFonts({
     Onest_400Regular,
@@ -67,8 +69,8 @@ function ThemedRoot() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style="auto" />
+    <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <RootNavigator />
     </ThemeProvider>
   );
