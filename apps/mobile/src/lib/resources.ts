@@ -115,6 +115,14 @@ export const getIvaPosition = (issuerId: string, year: number, month: number) =>
 export const getVencimientos = (issuerId: string) =>
   apiFetch<Vencimiento[]>(`/fiscal/vencimientos?issuerId=${issuerId}`);
 
+export interface FiscalAlerts {
+  vencimientos: Vencimiento[];
+  certificate: { validUntil: string; daysToExpiry: number } | null;
+}
+
+export const getFiscalAlerts = (issuerId: string) =>
+  apiFetch<FiscalAlerts>(`/fiscal/alerts?issuerId=${issuerId}`);
+
 export interface SalesPoint {
   id: string;
   number: number;

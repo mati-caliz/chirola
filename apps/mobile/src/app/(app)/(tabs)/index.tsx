@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, Plus } from 'lucide-react-native';
+import { Bell, ChevronDown, Plus } from 'lucide-react-native';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Banner,
@@ -10,12 +11,13 @@ import {
   Card,
   Divider,
   EmptyState,
+  IconButton,
   ListItem,
   Loading,
   StatusBadge,
 } from '@/components/ds';
 import { useActiveIssuer } from '@/lib/active-issuer';
-import { type Issuer } from '@/lib/resources';
+import { getFiscalAlerts, type Issuer } from '@/lib/resources';
 import { formatDate } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -34,6 +36,13 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { issuers, activeIssuer, activeIssuerId, isLoading, selectIssuer } = useActiveIssuer();
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  const { data: alerts } = useQuery({
+    queryKey: ['fiscal-alerts', activeIssuerId],
+    queryFn: () => getFiscalAlerts(activeIssuerId as string),
+    enabled: Boolean(activeIssuerId),
+  });
+  const hasAlerts = Boolean(alerts && (alerts.certificate || alerts.vencimientos.length > 0));
 
   if (isLoading) return <Loading />;
 
@@ -67,8 +76,31 @@ export default function DashboardScreen() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Wordmark />
-          <Pressable
-            onPress={() => setPickerOpen(true)}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View>
+              <IconButton
+                label="Novedades"
+                icon={(p) => <Bell {...p} strokeWidth={2} />}
+                onPress={() => router.push('/(app)/notifications')}
+              />
+              {hasAlerts ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 9,
+                    height: 9,
+                    borderRadius: 5,
+                    backgroundColor: theme.colors.actionDanger,
+                    borderWidth: 1.5,
+                    borderColor: theme.colors.bgApp,
+                  }}
+                />
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => setPickerOpen(true)}
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
@@ -88,7 +120,8 @@ export default function DashboardScreen() {
               {activeIssuer.legalName}
             </Text>
             <ChevronDown size={16} color={theme.colors.textSecondary} strokeWidth={2} />
-          </Pressable>
+            </Pressable>
+          </View>
         </View>
 
         {cert.kind === 'missing' ? (

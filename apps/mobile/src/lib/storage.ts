@@ -6,6 +6,7 @@ export const preferenceKeys = {
   activeIssuerId: 'activeIssuerId',
   colorSchemeOverride: 'colorSchemeOverride',
   onboardingSeen: 'onboardingSeen',
+  biometricLock: 'biometricLock',
 } as const;
 
 export type PreferenceKey = (typeof preferenceKeys)[keyof typeof preferenceKeys];
