@@ -3,6 +3,13 @@ Set-Location $PSScriptRoot
 
 Write-Host "Iniciando Chirola en modo desarrollo..."
 
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessId" -ErrorAction SilentlyContinue
+    foreach ($child in $children) { Stop-ProcessTree -ProcessId $child.ProcessId }
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
 function Free-Port {
     param([int]$Port)
     $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -70,11 +77,36 @@ function Ensure-Docker {
     exit 1
 }
 
+function New-RandomBase64 {
+    param([int]$Bytes)
+    $buffer = New-Object 'System.Byte[]' $Bytes
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($buffer)
+    return [Convert]::ToBase64String($buffer)
+}
+
+function Ensure-ApiEnv {
+    $apiEnv = Join-Path $PSScriptRoot 'services\api\.env'
+    if (Test-Path $apiEnv) { return }
+    $example = Join-Path $PSScriptRoot 'services\api\.env.example'
+    if (-not (Test-Path $example)) {
+        Write-Host "Falta services\api\.env.example; no puedo generar el .env del backend."
+        exit 1
+    }
+    Write-Host "Generando services\api\.env con secretos random..."
+    $certKey = New-RandomBase64 32
+    $jwtSecret = New-RandomBase64 32
+    $content = Get-Content $example -Raw
+    $content = $content -replace 'CERT_ENCRYPTION_KEY=""', ('CERT_ENCRYPTION_KEY="' + $certKey + '"')
+    $content = $content -replace 'JWT_SECRET="cambiar-en-produccion"', ('JWT_SECRET="' + $jwtSecret + '"')
+    [System.IO.File]::WriteAllText($apiEnv, $content, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 Write-Host "Cerrando ejecuciones previas..."
 Free-Port 3000
 Free-Port 8081
 
 Ensure-Docker
+Ensure-ApiEnv
 
 Write-Host "Iniciando PostgreSQL..."
 docker compose up -d db
@@ -85,6 +117,13 @@ if (-not (Wait-Port -ComputerName '127.0.0.1' -Port 5432 -TimeoutSeconds 30)) {
     exit 1
 }
 Write-Host "PostgreSQL listo"
+
+Write-Host "Aplicando migraciones de la base..."
+pnpm --filter @chirola/api exec prisma migrate deploy
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Fallaron las migraciones de Prisma."
+    exit 1
+}
 
 $backendOutLog = Join-Path $env:TEMP 'chirola-backend.log'
 $backendErrLog = Join-Path $env:TEMP 'chirola-backend.err.log'
@@ -123,7 +162,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Deteniendo backend..."
-    Stop-Process -Id $backend.Id -Force -ErrorAction SilentlyContinue
+    Stop-ProcessTree -ProcessId $backend.Id
     Free-Port 3000
     Free-Port 8081
 }
