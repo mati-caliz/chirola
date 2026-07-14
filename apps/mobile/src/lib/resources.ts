@@ -69,6 +69,21 @@ export interface VoucherDetail {
   client: Client | null;
 }
 
+export interface VoucherSummary {
+  id: string;
+  voucherType: number;
+  number: number;
+  voucherDate: string;
+  status: string;
+  cae: string | null;
+  totalAmount: string;
+  salesPoint: { number: number };
+  client: { legalName: string | null; docNumber: string } | null;
+}
+
+export const listVouchers = (issuerId: string) =>
+  apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
+
 export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
 
 export const createIssuer = (body: CreateIssuer) =>

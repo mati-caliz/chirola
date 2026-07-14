@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { VouchersService } from './vouchers.service';
 import { VouchersController } from './vouchers.controller';
+import { IssuerVouchersController } from './issuer-vouchers.controller';
 import { V1VouchersController } from './v1-vouchers.controller';
 import { IssuerLockService } from './issuer-lock.service';
 import { VoucherRetryScheduler } from './voucher-retry.scheduler';
@@ -11,7 +12,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
   imports: [ArcaModule, CertsModule, ServiceAuthModule, WebhooksModule],
-  controllers: [VouchersController, V1VouchersController],
+  controllers: [VouchersController, IssuerVouchersController, V1VouchersController],
   providers: [VouchersService, IssuerLockService, VoucherRetryScheduler],
   exports: [VouchersService],
 })

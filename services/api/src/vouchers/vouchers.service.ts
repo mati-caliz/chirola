@@ -117,6 +117,31 @@ export class VouchersService {
     return voucher;
   }
 
+  async listByIssuer(userId: string, issuerId: string) {
+    const issuer = await this.prisma.issuer.findUnique({ where: { id: issuerId } });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    if (issuer.userId !== userId) {
+      throw new ForbiddenException('El emisor no pertenece al usuario.');
+    }
+    return this.prisma.voucher.findMany({
+      where: { issuerId },
+      orderBy: [{ voucherDate: 'desc' }, { number: 'desc' }],
+      select: {
+        id: true,
+        voucherType: true,
+        number: true,
+        voucherDate: true,
+        status: true,
+        cae: true,
+        totalAmount: true,
+        salesPoint: { select: { number: true } },
+        client: { select: { legalName: true, docNumber: true } },
+      },
+    });
+  }
+
   async getForApiClient(apiClient: AuthenticatedApiClient, id: string) {
     const voucher = await this.loadVoucher(id);
     await this.apiClients.assertIssuerGranted(apiClient.id, voucher.issuerId);
