@@ -6,9 +6,11 @@
 > `GET /issuers/:id/vouchers`), Fiscal (IVA + vencimientos), Login/Registro (wordmark), alta de
 > emisor y de cliente, lista de clientes, detalle de emisor. La navegación es un tab bar de 5
 > destinos con emisor activo global (AsyncStorage). Decisiones §7: Emitir = modal; AsyncStorage;
-> backend en paralelo. **Pendiente (features nuevas de roadmap, no rediseño):** ABM de puntos de
-> venta (1.2), centro de notificaciones, configuración (biometría, toggle de dark mode), perfil,
-> recuperar contraseña, autocompletado por padrón.
+> backend en paralelo. **Hecho además:** toggle de dark mode manual (Sistema/Claro/Oscuro con
+> `ThemeModeProvider`, pantalla de Configuración) y ABM de puntos de venta (endpoints DB + sync
+> desde ARCA `FEParamGetPtosVenta` + edición de descripción + selector al emitir). **Pendiente
+> (features nuevas de roadmap):** centro de notificaciones, biometría, perfil, recuperar
+> contraseña, autocompletado por padrón.
 
 Objetivo: que **toda la app mobile se vea y se comporte como el "Chirola Design System"** que se
 diseñó en Claude Design, sin quedarnos en el look improvisado de hoy.
