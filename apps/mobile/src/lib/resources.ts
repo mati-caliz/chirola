@@ -115,6 +115,24 @@ export const getIvaPosition = (issuerId: string, year: number, month: number) =>
 export const getVencimientos = (issuerId: string) =>
   apiFetch<Vencimiento[]>(`/fiscal/vencimientos?issuerId=${issuerId}`);
 
+export interface SalesPoint {
+  id: string;
+  number: number;
+  description: string | null;
+}
+
+export const listSalesPoints = (issuerId: string) =>
+  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points`);
+
+export const syncSalesPoints = (issuerId: string) =>
+  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points/sync`, { method: 'POST' });
+
+export const updateSalesPoint = (issuerId: string, number: number, description: string) =>
+  apiFetch<SalesPoint>(`/issuers/${issuerId}/sales-points/${number}`, {
+    method: 'PATCH',
+    body: { description },
+  });
+
 export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
 
 export const createIssuer = (body: CreateIssuer) =>

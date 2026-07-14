@@ -1,4 +1,4 @@
-import { FileText, ShieldCheck, Users } from 'lucide-react-native';
+import { FileText, ShieldCheck, Store, Users } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -98,6 +98,13 @@ export default function IssuerDetailScreen() {
             leading={rowIcon(Users)}
             chevron
             onPress={() => router.push(`/(app)/issuers/${issuer.id}/clients`)}
+          />
+          <Divider inset={16} />
+          <ListItem
+            title="Puntos de venta"
+            leading={rowIcon(Store)}
+            chevron
+            onPress={() => router.push(`/(app)/issuers/${issuer.id}/sales-points`)}
           />
           <Divider inset={16} />
           <ListItem

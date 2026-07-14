@@ -22,7 +22,12 @@ export const matchCertificateSchema = z.object({
   certPem: z.string().min(1),
 });
 
+export const updateSalesPointSchema = z.object({
+  description: z.string().trim().max(60),
+});
+
 export type CreateIssuer = z.infer<typeof createIssuerSchema>;
 export type UploadCertificate = z.infer<typeof uploadCertificateSchema>;
 export type GenerateCsr = z.infer<typeof generateCsrSchema>;
 export type MatchCertificate = z.infer<typeof matchCertificateSchema>;
+export type UpdateSalesPoint = z.infer<typeof updateSalesPointSchema>;

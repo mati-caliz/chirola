@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, FileBadge, LogOut, Settings, ShieldCheck, Users } from 'lucide-react-native';
+import { Building2, FileBadge, LogOut, Settings, ShieldCheck, Store, Users } from 'lucide-react-native';
 import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,6 +65,13 @@ export default function MasScreen() {
                   leading={<Users color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
                   chevron
                   onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/clients`)}
+                />
+                <Divider inset={16} />
+                <ListItem
+                  title="Puntos de venta"
+                  leading={<Store color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
+                  chevron
+                  onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/sales-points`)}
                 />
                 <Divider inset={16} />
                 <ListItem

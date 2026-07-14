@@ -12,7 +12,7 @@ import {
 import { X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Amount, Banner, BottomSheet, Button, Card, Chip, Input, ListItem, Segmented, Select } from '@/components/ds';
-import { issueVoucher, listClients, type Client } from '@/lib/resources';
+import { issueVoucher, listClients, listSalesPoints, type Client } from '@/lib/resources';
 import { formatCurrency } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -56,11 +56,16 @@ export default function NewVoucherScreen() {
   const [legalName, setLegalName] = useState('');
   const [items, setItems] = useState<ItemForm[]>([newItem()]);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'tipo' | 'confirm' | null>(null);
+  const [sheet, setSheet] = useState<'tipo' | 'pdv' | 'confirm' | null>(null);
 
   const { data: clients } = useQuery({
     queryKey: ['clients', issuerId],
     queryFn: () => listClients(issuerId),
+  });
+
+  const { data: salesPoints } = useQuery({
+    queryKey: ['sales-points', issuerId],
+    queryFn: () => listSalesPoints(issuerId),
   });
 
   const mutation = useMutation({
@@ -93,6 +98,11 @@ export default function NewVoucherScreen() {
   }, [items]);
 
   const selectedType = voucherTypes.find((type) => type.value === voucherType);
+  const hasSalesPoints = Boolean(salesPoints && salesPoints.length > 0);
+  const selectedSalesPoint = salesPoints?.find((point) => String(point.number) === salesPoint);
+  const salesPointLabel = selectedSalesPoint
+    ? `${String(selectedSalesPoint.number).padStart(4, '0')}${selectedSalesPoint.description ? ` — ${selectedSalesPoint.description}` : ''}`
+    : undefined;
   const requiresCuit = requiresRecipientCuit(voucherType);
   const clientLabel = legalName.trim() || (docType === DocumentType.CONSUMIDOR_FINAL ? 'Consumidor final' : docNumber);
 
@@ -183,7 +193,18 @@ export default function NewVoucherScreen() {
           hint={selectedType?.hint}
           onPress={() => setSheet('tipo')}
         />
-        <Input label="Punto de venta" value={salesPoint} onChangeText={setSalesPoint} keyboardType="number-pad" mono />
+        {hasSalesPoints ? (
+          <Select label="Punto de venta" value={salesPointLabel} onPress={() => setSheet('pdv')} />
+        ) : (
+          <Input
+            label="Punto de venta"
+            value={salesPoint}
+            onChangeText={setSalesPoint}
+            keyboardType="number-pad"
+            mono
+            hint="Sincronizá tus puntos de venta desde el emisor para elegirlos de una lista."
+          />
+        )}
 
         <Card>
           <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption, color: theme.colors.textPrimary, marginBottom: 8 }}>
@@ -278,6 +299,20 @@ export default function NewVoucherScreen() {
             subtitle={type.hint}
             onPress={() => {
               setVoucherType(type.value);
+              setSheet(null);
+            }}
+          />
+        ))}
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'pdv'} title="Punto de venta" onClose={() => setSheet(null)}>
+        {(salesPoints ?? []).map((point) => (
+          <ListItem
+            key={point.id}
+            title={`Punto de venta ${String(point.number).padStart(4, '0')}`}
+            subtitle={point.description ?? undefined}
+            onPress={() => {
+              setSalesPoint(String(point.number));
               setSheet(null);
             }}
           />

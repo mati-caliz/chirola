@@ -34,12 +34,6 @@ export class IssuersController {
     private readonly params: ArcaParamsService,
   ) {}
 
-  @Get(':id/sales-points')
-  async salesPoints(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.params.getSalesPoints(issuer);
-  }
-
   @Get(':id/fiscal-condition')
   async fiscalCondition(
     @CurrentUser() user: JwtPayload,
