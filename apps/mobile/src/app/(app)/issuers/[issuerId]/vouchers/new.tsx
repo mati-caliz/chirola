@@ -253,7 +253,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
       <Subtitle>{label}</Subtitle>
-      <Text style={{ color: c.text, fontWeight: bold ? '700' : '500', fontSize: bold ? 17 : 15 }}>
+      <Text style={{ color: c.colors.textPrimary, fontWeight: bold ? '700' : '500', fontSize: bold ? 17 : 15 }}>
         {value}
       </Text>
     </View>

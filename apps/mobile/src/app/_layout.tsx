@@ -5,6 +5,19 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from '@react-navigation/native';
+import {
+  Onest_400Regular,
+  Onest_500Medium,
+  Onest_600SemiBold,
+  Onest_700Bold,
+  Onest_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/onest';
+import {
+  SplineSansMono_400Regular,
+  SplineSansMono_500Medium,
+  SplineSansMono_600SemiBold,
+} from '@expo-google-fonts/spline-sans-mono';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -35,10 +48,23 @@ export default function RootLayout() {
 function ThemedRoot() {
   const colorScheme = useColorScheme();
   const { loading } = useAuth();
+  const [fontsLoaded] = useFonts({
+    Onest_400Regular,
+    Onest_500Medium,
+    Onest_600SemiBold,
+    Onest_700Bold,
+    Onest_800ExtraBold,
+    SplineSansMono_400Regular,
+    SplineSansMono_500Medium,
+    SplineSansMono_600SemiBold,
+  });
+  const ready = !loading && fontsLoaded;
 
   useEffect(() => {
-    if (!loading) SplashScreen.hideAsync();
-  }, [loading]);
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

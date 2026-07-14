@@ -10,10 +10,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, type Theme } from '@/hooks/use-theme';
+import { palette } from '@/theme/tokens';
 
-const BRAND = '#208AEF';
+export const brandColor = palette.brand700;
 
 export function Screen({
   children,
@@ -22,69 +22,157 @@ export function Screen({
   children: ReactNode;
   scroll?: boolean;
 }) {
-  const c = useTheme();
+  const theme = useTheme();
+  const { spacing } = theme;
+  const content = { padding: spacing.screenPad, gap: spacing.stackGap };
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.grow, content]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
   ) : (
-    <View style={styles.flexContent}>{children}</View>
+    <View style={[styles.flex, content]}>{children}</View>
   );
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: c.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.bgApp }]} edges={['bottom']}>
       {body}
     </SafeAreaView>
   );
 }
 
 export function Title({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.title, { color: c.text }]}>{children}</Text>;
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        color: theme.colors.textPrimary,
+        fontFamily: theme.font.extrabold,
+        fontSize: theme.fontSize.title,
+        lineHeight: theme.fontSize.title * theme.lineHeight.tight,
+      }}
+    >
+      {children}
+    </Text>
+  );
 }
 
 export function Subtitle({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.subtitle, { color: c.textSecondary }]}>{children}</Text>;
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        color: theme.colors.textSecondary,
+        fontFamily: theme.font.regular,
+        fontSize: theme.fontSize.callout,
+        lineHeight: theme.fontSize.callout * theme.lineHeight.body,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+export function Overline({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        color: theme.colors.textTertiary,
+        fontFamily: theme.font.semibold,
+        fontSize: theme.fontSize.micro,
+        letterSpacing: 0.66,
+        textTransform: 'uppercase',
+      }}
+    >
+      {children}
+    </Text>
+  );
 }
 
 export function Card({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
-  const c = useTheme();
-  const inner = <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>{children}</View>;
+  const theme = useTheme();
+  const cardStyle = {
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+    borderWidth: theme.scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: theme.colors.borderSubtle,
+    ...theme.shadow.card,
+  };
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
-        {inner}
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          cardStyle,
+          pressed ? { backgroundColor: theme.colors.bgSunken, transform: [{ scale: 0.99 }] } : null,
+        ]}
+      >
+        {children}
       </Pressable>
     );
   }
-  return inner;
+  return <View style={cardStyle}>{children}</View>;
 }
 
 export function Label({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.label, { color: c.textSecondary }]}>{children}</Text>;
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        color: theme.colors.textSecondary,
+        fontFamily: theme.font.semibold,
+        fontSize: theme.fontSize.caption,
+        marginBottom: theme.spacing.xs,
+      }}
+    >
+      {children}
+    </Text>
+  );
 }
 
 export function BodyText({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={{ color: c.text }}>{children}</Text>;
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        color: theme.colors.textPrimary,
+        fontFamily: theme.font.regular,
+        fontSize: theme.fontSize.body,
+        lineHeight: theme.fontSize.body * theme.lineHeight.body,
+      }}
+    >
+      {children}
+    </Text>
+  );
 }
 
 export const TextField = forwardRef<TextInput, TextInputProps & { label?: string }>(
   function TextField({ label, style, ...props }, ref) {
-    const c = useTheme();
+    const theme = useTheme();
     return (
-      <View style={styles.field}>
+      <View style={{ gap: theme.spacing.xs }}>
         {label ? <Label>{label}</Label> : null}
         <TextInput
           ref={ref}
-          placeholderTextColor={c.textSecondary}
+          placeholderTextColor={theme.colors.textTertiary}
           style={[
-            styles.input,
-            { backgroundColor: c.backgroundElement, color: c.text, borderColor: c.backgroundSelected },
+            {
+              borderWidth: 1.5,
+              borderColor: theme.colors.borderDefault,
+              borderRadius: theme.radius.md,
+              paddingHorizontal: theme.spacing.lg,
+              paddingVertical: theme.spacing.md,
+              fontSize: theme.fontSize.body,
+              fontFamily: theme.font.regular,
+              backgroundColor: theme.colors.surfaceCard,
+              color: theme.colors.textPrimary,
+              minHeight: theme.spacing.hitTarget,
+            },
             style,
           ]}
           {...props}
@@ -93,6 +181,22 @@ export const TextField = forwardRef<TextInput, TextInputProps & { label?: string
     );
   },
 );
+
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+
+function buttonColors(theme: Theme, variant: ButtonVariant) {
+  const { colors } = theme;
+  switch (variant) {
+    case 'secondary':
+      return { bg: colors.actionSecondary, press: colors.actionSecondaryPress, fg: colors.actionSecondaryText };
+    case 'ghost':
+      return { bg: 'transparent', press: colors.bgSunken, fg: colors.textBrand };
+    case 'danger':
+      return { bg: colors.actionDanger, press: colors.actionDangerPress, fg: colors.textInverse };
+    default:
+      return { bg: colors.actionPrimary, press: colors.actionPrimaryPress, fg: colors.actionPrimaryText };
+  }
+}
 
 export function Button({
   title,
@@ -105,54 +209,74 @@ export function Button({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: ButtonVariant;
 }) {
-  const c = useTheme();
+  const theme = useTheme();
   const isDisabled = disabled || loading;
-  const bg =
-    variant === 'primary' ? BRAND : variant === 'danger' ? '#E5484D' : c.backgroundSelected;
-  const fg = variant === 'secondary' ? c.text : '#ffffff';
+  const { bg, press, fg } = buttonColors(theme, variant);
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
+        {
+          backgroundColor: pressed ? press : bg,
+          borderRadius: theme.radius.pill,
+          opacity: isDisabled ? 0.45 : 1,
+          transform: pressed && !isDisabled ? [{ scale: 0.97 }] : [{ scale: 1 }],
+        },
       ]}
     >
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+        <Text style={{ color: fg, fontFamily: theme.font.semibold, fontSize: theme.fontSize.subhead }}>
+          {title}
+        </Text>
       )}
     </Pressable>
   );
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
+  const theme = useTheme();
   if (!children) return null;
-  return <Text style={styles.error}>{children}</Text>;
-}
-
-export function Centered({ children }: { children: ReactNode }) {
-  return <View style={styles.centered}>{children}</View>;
-}
-
-export function Loading() {
   return (
-    <Centered>
-      <ActivityIndicator color={BRAND} size="large" />
-    </Centered>
+    <Text style={{ color: theme.colors.errFg, fontFamily: theme.font.regular, fontSize: theme.fontSize.caption }}>
+      {children}
+    </Text>
   );
 }
 
-export function Badge({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 'warn' | 'neutral' }) {
-  const bg = tone === 'ok' ? '#DFF5E1' : tone === 'warn' ? '#FDECEC' : '#E6EDF5';
-  const fg = tone === 'ok' ? '#137333' : tone === 'warn' ? '#B3261E' : '#274060';
+export function Centered({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  return <View style={[styles.centered, { padding: theme.spacing.xxl, gap: theme.spacing.lg }]}>{children}</View>;
+}
+
+export function Loading() {
+  const theme = useTheme();
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Text style={[styles.badgeText, { color: fg }]}>{text}</Text>
+    <View style={[styles.flex, styles.center, { backgroundColor: theme.colors.bgApp }]}>
+      <ActivityIndicator color={theme.colors.actionPrimary} size="large" />
+    </View>
+  );
+}
+
+type BadgeTone = 'ok' | 'warn' | 'neutral';
+
+export function Badge({ text, tone = 'neutral' }: { text: string; tone?: BadgeTone }) {
+  const theme = useTheme();
+  const { colors } = theme;
+  const map = {
+    ok: { bg: colors.statusAprobadoBg, fg: colors.statusAprobadoFg },
+    warn: { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg },
+    neutral: { bg: colors.statusPendienteBg, fg: colors.statusPendienteFg },
+  } as const;
+  const { bg, fg } = map[tone];
+  return (
+    <View style={[styles.badge, { backgroundColor: bg, borderRadius: theme.radius.pill }]}>
+      <Text style={{ color: fg, fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption }}>{text}</Text>
     </View>
   );
 }
@@ -168,9 +292,10 @@ export function OptionGroup<T extends string | number>({
   options: { label: string; value: T }[];
   onChange: (v: T) => void;
 }) {
-  const c = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   return (
-    <View style={styles.field}>
+    <View style={{ gap: theme.spacing.xs }}>
       {label ? <Label>{label}</Label> : null}
       <View style={styles.optionRow}>
         {options.map((opt) => {
@@ -179,15 +304,23 @@ export function OptionGroup<T extends string | number>({
             <Pressable
               key={String(opt.value)}
               onPress={() => onChange(opt.value)}
-              style={[
+              style={({ pressed }) => [
                 styles.option,
                 {
-                  backgroundColor: selected ? BRAND : c.backgroundElement,
-                  borderColor: selected ? BRAND : c.backgroundSelected,
+                  borderRadius: theme.radius.pill,
+                  backgroundColor: selected ? colors.actionPrimary : colors.surfaceCard,
+                  borderColor: selected ? colors.actionPrimary : colors.borderDefault,
+                  opacity: pressed ? 0.85 : 1,
                 },
               ]}
             >
-              <Text style={{ color: selected ? '#fff' : c.text, fontWeight: '600', fontSize: 14 }}>
+              <Text
+                style={{
+                  color: selected ? colors.actionPrimaryText : colors.textPrimary,
+                  fontFamily: theme.font.semibold,
+                  fontSize: theme.fontSize.callout,
+                }}
+              >
                 {opt.label}
               </Text>
             </Pressable>
@@ -198,37 +331,19 @@ export function OptionGroup<T extends string | number>({
   );
 }
 
-export const brandColor = BRAND;
-
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  scrollContent: { padding: Spacing.three, gap: Spacing.three },
-  flexContent: { flex: 1, padding: Spacing.three, gap: Spacing.three },
-  title: { fontSize: 26, fontWeight: '700' },
-  subtitle: { fontSize: 15 },
-  card: { borderRadius: 12, padding: Spacing.three, gap: Spacing.two },
-  pressed: { opacity: 0.7 },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.one },
-  field: { gap: Spacing.one },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    fontSize: 16,
-  },
+  flex: { flex: 1 },
+  grow: { flexGrow: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   button: {
-    borderRadius: 10,
-    paddingVertical: Spacing.three - 2,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
   },
-  buttonText: { fontSize: 16, fontWeight: '600' },
-  error: { color: '#E5484D', fontSize: 14 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
-  badge: { borderRadius: 999, paddingHorizontal: Spacing.two + 2, paddingVertical: 3, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  option: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  option: { borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 10 },
 });

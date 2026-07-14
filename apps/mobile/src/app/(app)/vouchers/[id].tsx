@@ -135,9 +135,9 @@ export default function VoucherDetailScreen() {
             </View>
           ))}
           <View style={{ height: 8 }} />
-          <TotalRow label="Neto" value={formatCurrency(Number(data.netAmount))} color={c.text} />
-          <TotalRow label="IVA" value={formatCurrency(Number(data.ivaAmount))} color={c.text} />
-          <TotalRow label="Total" value={formatCurrency(Number(data.totalAmount))} color={c.text} bold />
+          <TotalRow label="Neto" value={formatCurrency(Number(data.netAmount))} color={c.colors.textPrimary} />
+          <TotalRow label="IVA" value={formatCurrency(Number(data.ivaAmount))} color={c.colors.textPrimary} />
+          <TotalRow label="Total" value={formatCurrency(Number(data.totalAmount))} color={c.colors.textPrimary} bold />
         </Card>
 
         {authorized ? (

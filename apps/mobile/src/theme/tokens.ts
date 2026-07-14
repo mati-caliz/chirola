@@ -185,3 +185,83 @@ export const fontFamily = {
 } as const;
 
 export const trackingCaps = 0.66;
+
+export type ShadowStyle = {
+  shadowColor: string;
+  shadowOffset: { width: number; height: number };
+  shadowOpacity: number;
+  shadowRadius: number;
+  elevation: number;
+};
+
+export type ShadowKey = 'card' | 'raised' | 'sheet' | 'fab';
+
+export type ShadowSet = { [K in ShadowKey]: ShadowStyle };
+
+export const lightShadows: ShadowSet = {
+  card: {
+    shadowColor: palette.neutral950,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  raised: {
+    shadowColor: palette.neutral950,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  sheet: {
+    shadowColor: palette.neutral950,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
+    elevation: 20,
+  },
+  fab: {
+    shadowColor: palette.brand700,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+};
+
+export const darkShadows: ShadowSet = {
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  raised: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    elevation: 8,
+  },
+  sheet: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 20,
+  },
+  fab: {
+    shadowColor: palette.brand900,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+};
+
+export const duration = {
+  fast: 140,
+  base: 220,
+  slow: 360,
+} as const;
