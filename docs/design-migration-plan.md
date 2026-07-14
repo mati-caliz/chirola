@@ -1,13 +1,14 @@
 # Plan de migración — Chirola Design System → app RN/Expo
 
-> **Estado:** Fases 1–3 (fundaciones §2, librería §3, navegación §4) + gran parte de §5 hechas y
-> verificadas (tsc + lint + tests + bundle Metro). Pantallas rediseñadas con el DS: Certificado
-> (wizard Stepper), Emitir (modal + sheet de confirmación + fases progreso/error), Detalle,
-> Comprobantes (lista real, endpoint nuevo `GET /issuers/:id/vouchers`), Fiscal (posición IVA +
-> vencimientos), Login/Registro (wordmark). Decisiones §7: Emitir = modal; emisor activo con
-> AsyncStorage; backend en paralelo. **Pendiente:** rediseño de alta/edición de emisor y
-> clientes (hoy funcionan con el barrel de compat reskineado), y pantallas nuevas de roadmap
-> (PdV, notificaciones, config, perfil, recuperar contraseña).
+> **Estado:** Fases 1–5 completas y verificadas (tsc + lint + tests 87/87 + bundle Metro). Todas
+> las pantallas núcleo están rediseñadas con el DS: Certificado (wizard Stepper), Emitir (modal +
+> confirmación + fases progreso/error), Detalle, Comprobantes (lista real, endpoint nuevo
+> `GET /issuers/:id/vouchers`), Fiscal (IVA + vencimientos), Login/Registro (wordmark), alta de
+> emisor y de cliente, lista de clientes, detalle de emisor. La navegación es un tab bar de 5
+> destinos con emisor activo global (AsyncStorage). Decisiones §7: Emitir = modal; AsyncStorage;
+> backend en paralelo. **Pendiente (features nuevas de roadmap, no rediseño):** ABM de puntos de
+> venta (1.2), centro de notificaciones, configuración (biometría, toggle de dark mode), perfil,
+> recuperar contraseña, autocompletado por padrón.
 
 Objetivo: que **toda la app mobile se vea y se comporte como el "Chirola Design System"** que se
 diseñó en Claude Design, sin quedarnos en el look improvisado de hoy.
