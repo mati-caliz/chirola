@@ -84,6 +84,37 @@ export interface VoucherSummary {
 export const listVouchers = (issuerId: string) =>
   apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
 
+export interface IvaRateBreakdown {
+  rate: number;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface IvaPosition {
+  year: number;
+  month: number;
+  breakdown: IvaRateBreakdown[];
+  totalDebit: number;
+  totalCredit: number;
+  balance: number;
+}
+
+export type VencimientoStatus = 'OVERDUE' | 'DUE_SOON' | 'UPCOMING';
+
+export interface Vencimiento {
+  type: string;
+  label: string;
+  dueDate: string;
+  status: VencimientoStatus;
+}
+
+export const getIvaPosition = (issuerId: string, year: number, month: number) =>
+  apiFetch<IvaPosition>(`/fiscal/iva-position?issuerId=${issuerId}&year=${year}&month=${month}`);
+
+export const getVencimientos = (issuerId: string) =>
+  apiFetch<Vencimiento[]>(`/fiscal/vencimientos?issuerId=${issuerId}`);
+
 export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
 
 export const createIssuer = (body: CreateIssuer) =>
