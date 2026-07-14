@@ -9,6 +9,7 @@ export { ListItem } from '@/components/ds/ListItem';
 export { Divider } from '@/components/ds/Divider';
 export { StatusBadge } from '@/components/ds/StatusBadge';
 export { Chip } from '@/components/ds/Chip';
+export { Segmented } from '@/components/ds/Segmented';
 export { Amount, type AmountSize } from '@/components/ds/Amount';
 export { EmptyState } from '@/components/ds/EmptyState';
 export { Banner, type BannerKind } from '@/components/ds/Banner';

@@ -11,10 +11,10 @@ import {
 } from '@chirola/shared';
 import { X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Amount, Banner, BottomSheet, Button, Card, Chip, Input, ListItem, Select } from '@/components/ds';
+import { Amount, Banner, BottomSheet, Button, Card, Chip, Input, ListItem, Segmented, Select } from '@/components/ds';
 import { issueVoucher, listClients, type Client } from '@/lib/resources';
 import { formatCurrency } from '@/lib/format';
-import { useTheme, type Theme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 
 interface ItemForm {
   description: string;
@@ -201,7 +201,7 @@ export default function NewVoucherScreen() {
               ))}
             </ScrollView>
           ) : null}
-          <Segmented value={docType} options={docTypeOptions} onChange={setDocType} theme={theme} />
+          <Segmented value={docType} options={docTypeOptions} onChange={setDocType} />
           <View style={{ height: 10 }} />
           <Input label="Número de documento" value={docNumber} onChangeText={setDocNumber} keyboardType="number-pad" mono />
           <View style={{ height: 10 }} />
@@ -213,7 +213,7 @@ export default function NewVoucherScreen() {
           ) : null}
         </Card>
 
-        <Segmented value={concept} options={conceptOptions} onChange={setConcept} theme={theme} label="Concepto" />
+        <Segmented value={concept} options={conceptOptions} onChange={setConcept} label="Concepto" />
 
         {items.map((item, index) => {
           const subtotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
@@ -241,7 +241,7 @@ export default function NewVoucherScreen() {
                 </View>
               </View>
               <View style={{ height: 10 }} />
-              <Segmented value={item.ivaRate} options={ivaRates.map((rate) => ({ value: rate, label: `${rate}%` }))} onChange={(v) => setItem(index, { ivaRate: v })} theme={theme} label="IVA" />
+              <Segmented value={item.ivaRate} options={ivaRates.map((rate) => ({ value: rate, label: `${rate}%` }))} onChange={(v) => setItem(index, { ivaRate: v })} label="IVA" />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
                 <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary }}>
                   IVA {item.ivaRate}%
@@ -310,31 +310,3 @@ export default function NewVoucherScreen() {
   );
 }
 
-function Segmented<T extends string | number>({
-  value,
-  options,
-  onChange,
-  theme,
-  label,
-}: {
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-  theme: Theme;
-  label?: string;
-}) {
-  return (
-    <View>
-      {label ? (
-        <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption, color: theme.colors.textPrimary, marginBottom: 6 }}>
-          {label}
-        </Text>
-      ) : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {options.map((option) => (
-          <Chip key={String(option.value)} label={option.label} selected={option.value === value} onPress={() => onChange(option.value)} />
-        ))}
-      </View>
-    </View>
-  );
-}

@@ -2,14 +2,7 @@ import { useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createIssuerSchema, type CreateIssuer } from '@chirola/shared';
-import {
-  Button,
-  ErrorText,
-  OptionGroup,
-  Screen,
-  Subtitle,
-  TextField,
-} from '@/components/ui';
+import { Banner, Button, Input, Screen, Segmented, Subtitle } from '@/components/ds';
 import { createIssuer } from '@/lib/resources';
 
 type IvaCondition = CreateIssuer['ivaCondition'];
@@ -33,36 +26,39 @@ export default function NewIssuerScreen() {
     onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo crear el emisor.'),
   });
 
-  function onSubmit() {
+  const onSubmit = () => {
     setError(null);
     const parsed = createIssuerSchema.safeParse({ cuit, legalName, ivaCondition, environment });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos.');
+      setError(parsed.error.issues[0]?.message ?? 'Revisá los datos ingresados.');
       return;
     }
     mutation.mutate(parsed.data);
-  }
+  };
 
   return (
     <>
       <Stack.Screen options={{ title: 'Nuevo emisor' }} />
       <Screen>
-        <Subtitle>Cargá el CUIT que va a facturar.</Subtitle>
-        <TextField
-          label="CUIT (11 dígitos)"
+        <Subtitle>Un emisor es el CUIT en cuyo nombre vas a facturar.</Subtitle>
+        {error ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
+        <Input
+          label="CUIT"
           value={cuit}
           onChangeText={setCuit}
           keyboardType="number-pad"
-          maxLength={11}
+          mono
           placeholder="20123456789"
+          hint="Los 11 dígitos sin guiones, como figuran en ARCA."
         />
-        <TextField
+        <Input
           label="Razón social"
           value={legalName}
           onChangeText={setLegalName}
           placeholder="Juan Pérez"
+          hint="El nombre que va a aparecer en tus facturas."
         />
-        <OptionGroup<IvaCondition>
+        <Segmented<IvaCondition>
           label="Condición frente al IVA"
           value={ivaCondition}
           onChange={setIvaCondition}
@@ -72,7 +68,7 @@ export default function NewIssuerScreen() {
             { label: 'Exento', value: 'EXENTO' },
           ]}
         />
-        <OptionGroup<Environment>
+        <Segmented<Environment>
           label="Ambiente"
           value={environment}
           onChange={setEnvironment}
@@ -81,8 +77,14 @@ export default function NewIssuerScreen() {
             { label: 'Producción', value: 'produccion' },
           ]}
         />
-        <ErrorText>{error}</ErrorText>
-        <Button title="Crear emisor" onPress={onSubmit} loading={mutation.isPending} />
+        <Subtitle>
+          {environment === 'homologacion'
+            ? 'Homologación es para probar: las facturas no tienen validez fiscal.'
+            : 'Producción emite comprobantes reales con validez fiscal.'}
+        </Subtitle>
+        <Button variant="primary" full loading={mutation.isPending} onPress={onSubmit}>
+          Crear emisor
+        </Button>
       </Screen>
     </>
   );
