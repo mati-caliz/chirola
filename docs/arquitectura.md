@@ -59,6 +59,25 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
   guardada, validando que la clave pública del cert coincida con la del par generado.
 - `POST /emisores/:id/certificado` → flujo manual (subir clave+cert propios), como antes.
 
+### Alta de emisores desde un API client (implementado)
+El onboarding de certificados descrito arriba vivía sólo detrás de `JwtAuthGuard`, o sea la
+superficie de la app mobile. Un consumidor de la API (respondi) no tenía forma de dar de alta a
+un contribuyente. `V1IssuersController` expone el mismo ciclo bajo `ServiceAuthGuard`:
+`POST /v1/issuers`, `GET /v1/issuers`, `GET /v1/issuers/:id`, `POST /v1/issuers/:id/csr` y
+`PUT /v1/issuers/:id/certificate`.
+
+**Propiedad del emisor:** `Issuer.userId` es obligatorio y apunta a `User`, pero un `ApiClient` no
+es un usuario. En vez de hacer nullable esa relación y reescribir el aislamiento en todos los
+queries, cada `ApiClient` tiene un **usuario de servicio** implícito
+(`<apiClientId>@service.chirola.internal`) que se crea solo la primera vez y es dueño de los
+emisores dados de alta por API. Ese usuario no puede loguearse: su `password` no tiene el formato
+`scrypt$salt$hash` que exige `verifyPassword`, así que la comparación siempre falla. Como efecto
+secundario, el `@@unique([userId, cuit, environment])` que ya existía pasa a garantizar un emisor
+por CUIT y entorno para cada API client, sin agregar constraints nuevas.
+
+El paso de ARCA sigue siendo manual e inevitable: el CSR se genera acá, pero alguien tiene que
+llevarlo al sitio de ARCA y volver con el `.crt` firmado. Ninguna API puede saltear ese trámite.
+
 ### Lo próximo para avanzar
 1. **Cerrar Fase 1/2 de verdad:** con el onboarding ya listo, falta la parte externa del
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
