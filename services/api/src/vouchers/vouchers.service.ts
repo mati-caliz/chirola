@@ -51,6 +51,9 @@ const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_RETRY_BASE_MS = 60_000;
 const RETRY_BATCH_SIZE = 25;
 
+const DEFAULT_VOUCHER_LIST_LIMIT = 20;
+const MAX_VOUCHER_LIST_LIMIT = 100;
+
 export interface IssuedVoucher {
   id: string;
   voucherType: number;
@@ -125,9 +128,19 @@ export class VouchersService {
     if (issuer.userId !== userId) {
       throw new ForbiddenException('El emisor no pertenece al usuario.');
     }
+    return this.listForIssuer(issuerId);
+  }
+
+  listForIssuer(issuerId: string, limit?: number) {
+    const take =
+      limit === undefined || !Number.isFinite(limit) || limit < 1
+        ? DEFAULT_VOUCHER_LIST_LIMIT
+        : Math.min(Math.trunc(limit), MAX_VOUCHER_LIST_LIMIT);
+
     return this.prisma.voucher.findMany({
       where: { issuerId },
       orderBy: [{ voucherDate: 'desc' }, { number: 'desc' }],
+      take,
       select: {
         id: true,
         voucherType: true,
@@ -140,6 +153,15 @@ export class VouchersService {
         client: { select: { legalName: true, docNumber: true } },
       },
     });
+  }
+
+  async listForApiClient(
+    apiClient: AuthenticatedApiClient,
+    issuerId: string,
+    limit?: number,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
+    return this.listForIssuer(issuerId, limit);
   }
 
   async getForApiClient(apiClient: AuthenticatedApiClient, id: string) {

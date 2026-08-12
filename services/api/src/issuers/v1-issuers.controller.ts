@@ -26,6 +26,7 @@ import {
   type AuthenticatedApiClient,
 } from '../service-auth/api-client.service';
 import { CertsService } from '../certs/certs.service';
+import { SalesPointsService } from './sales-points.service';
 import { IssuersService } from './issuers.service';
 
 @Controller('v1/issuers')
@@ -36,6 +37,7 @@ export class V1IssuersController {
     private readonly issuers: IssuersService,
     private readonly certs: CertsService,
     private readonly apiClients: ApiClientService,
+    private readonly salesPoints: SalesPointsService,
   ) {}
 
   @Post()
@@ -58,6 +60,15 @@ export class V1IssuersController {
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     return this.issuers.getWithCertificate(id);
+  }
+
+  @Get(':id/sales-points')
+  async listSalesPoints(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param('id') id: string,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, id);
+    return this.salesPoints.listForIssuer(id);
   }
 
   @Post(':id/csr')

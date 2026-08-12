@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -46,6 +47,19 @@ export class V1VouchersController {
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
   ) {
     return this.vouchers.computeEmissionPlanForApiClient(apiClient, body);
+  }
+
+  @Get()
+  list(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Query('issuerId') issuerId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.vouchers.listForApiClient(
+      apiClient,
+      issuerId,
+      limit === undefined ? undefined : Number(limit),
+    );
   }
 
   @Get(':id')

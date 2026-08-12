@@ -13,6 +13,10 @@ export class SalesPointsService {
 
   async list(userId: string, issuerId: string) {
     await this.issuers.getFromUser(issuerId, userId);
+    return this.listForIssuer(issuerId);
+  }
+
+  listForIssuer(issuerId: string) {
     return this.prisma.salesPoint.findMany({
       where: { issuerId },
       orderBy: { number: 'asc' },
