@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: chirola-production
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: checks
+    environment: production
+    steps:
+      - name: Validate deploy secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_HOST" || { echo "::error::Missing DEPLOY_HOST secret"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "::error::Missing DEPLOY_USER secret"; exit 1; }
+          test -n "$DEPLOY_SSH_KEY" || { echo "::error::Missing DEPLOY_SSH_KEY secret"; exit 1; }
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          command_timeout: 30m
+          script: |
+            set -eu
+
+            cd /home/deploy/chirola
+
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+
+            docker network inspect shared-nginx >/dev/null 2>&1 || docker network create shared-nginx
+
+            COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
+
+            # El schema no se crea solo: prisma migrate deploy antes de levantar el código nuevo.
+            $COMPOSE build api
+            $COMPOSE run --rm api npx prisma migrate deploy --schema=prisma/schema.prisma
+
+            $COMPOSE up -d --build --remove-orphans
+            $COMPOSE ps
