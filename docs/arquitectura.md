@@ -23,7 +23,7 @@ Módulos:
 - `arca/wsaa` — LTR + firma CMS + cache del TA.
 - `arca/wsfe` — cliente SOAP de WSFEv1 (emisión, numeración, params).
 - `comprobantes` — dominio de facturación, persistencia, numeración, PDF + QR.
-- `clientes` — ABM de receptores por emisor (rutas anidadas `/emisores/:emisorId/clientes`).
+- `clientes` — ABM de receptores por emisor (rutas anidadas `/issuers/:issuerId/clients`).
 
 ### `packages/shared` — TypeScript + Zod
 Tipos y validaciones compartidas (payloads de emisión, enums de tipos de comprobante/IVA/doc)
@@ -52,12 +52,12 @@ persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
 
 ### Onboarding de certificados (implementado)
 `certs` genera el par de claves + CSR en el backend y empareja luego el `.crt` de ARCA:
-- `POST /emisores/:id/csr` → genera clave RSA 2048 + CSR con el subject que exige ARCA
+- `POST /issuers/:id/csr` → genera clave RSA 2048 + CSR con el subject que exige ARCA
   (`C=AR, O=<razón social>, CN=<alias>, serialNumber=CUIT <cuit>`), guarda la clave privada
   cifrada y devuelve el CSR en PEM. La clave privada nunca sale del backend.
-- `PUT /emisores/:id/certificado` → empareja el `.crt` descargado de ARCA con la clave ya
+- `PUT /issuers/:id/certificate` → empareja el `.crt` descargado de ARCA con la clave ya
   guardada, validando que la clave pública del cert coincida con la del par generado.
-- `POST /emisores/:id/certificado` → flujo manual (subir clave+cert propios), como antes.
+- `POST /issuers/:id/certificate` → flujo manual (subir clave+cert propios), como antes.
 
 ### Alta de emisores desde un API client (implementado)
 El onboarding de certificados descrito arriba vivía sólo detrás de `JwtAuthGuard`, o sea la
@@ -81,7 +81,7 @@ llevarlo al sitio de ARCA y volver con el `.crt` firmado. Ninguna API puede salt
 ### Lo próximo para avanzar
 1. **Cerrar Fase 1/2 de verdad:** con el onboarding ya listo, falta la parte externa del
    usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
-   Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /comprobantes` end-to-end.
+   Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /vouchers` end-to-end.
 2. **Probar la app en un dispositivo/emulador** apuntando `EXPO_PUBLIC_API_URL` al backend de
    la LAN, y pulir UX (loading/errores, selección de cliente al facturar).
 
@@ -107,7 +107,7 @@ Pantallas: login/registro → lista/alta de emisores → detalle → onboarding 
 
 ### Módulo `clientes` (implementado)
 ABM de receptores por emisor, con rutas anidadas y ownership vía `EmisoresService`:
-`POST/GET /emisores/:emisorId/clientes`, `GET/PATCH/DELETE /emisores/:emisorId/clientes/:id`.
+`POST/GET /issuers/:issuerId/clients`, `GET/PATCH/DELETE /issuers/:issuerId/clients/:id`.
 Unique `(emisor, tipoDoc, numeroDoc)` → 409 en duplicados; validación de CUIT/CUIL (11 dígitos)
 en `@chirola/shared`. Aislamiento entre usuarios verificado (otro user → 403).
 
@@ -117,7 +117,7 @@ en `@chirola/shared`. Aislamiento entre usuarios verificado (otro user → 403).
 - `comprobantes/pdf.util.ts` — `renderComprobantePdf` (lib `pdfkit`): A4 con letra A/B/C,
   emisor, receptor, tabla de ítems (formato es-AR), totales, comprobantes asociados, CAE +
   vencimiento y el QR embebido.
-- Endpoints: `GET /comprobantes/:id/qr.png` (image/png) y `GET /comprobantes/:id/pdf`
+- Endpoints: `GET /vouchers/:id/qr.png` (image/png) y `GET /vouchers/:id/pdf`
   (application/pdf). El Content-Type se fija recién con el buffer listo para que los errores
   sigan devolviendo JSON.
 
