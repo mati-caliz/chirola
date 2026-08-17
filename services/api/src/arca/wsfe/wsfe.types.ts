@@ -62,6 +62,17 @@ export interface CaeResult {
   caeVto: Date;
 }
 
+export interface CurrencyInfo {
+  id: string;
+  description: string;
+}
+
+export interface ExchangeRateInfo {
+  currencyId: string;
+  rate: number;
+  date: Date;
+}
+
 export interface SalesPointInfo {
   number: number;
   emissionType: string;

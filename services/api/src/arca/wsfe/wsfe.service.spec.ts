@@ -294,3 +294,80 @@ describe('WsfeService — FEParamGetPtosVenta', () => {
     expect(result).toEqual([1, 6]);
   });
 });
+
+describe('WsfeService — monedas y cotización', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+
+  function respondWith(xml: string): void {
+    global.fetch = (async () =>
+      new Response(xml, { status: 200 })) as unknown as typeof fetch;
+  }
+
+  it('descarta las monedas dadas de baja', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetTiposMonedasResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetTiposMonedasResult><ResultGet>' +
+        '<Moneda><Id>PES</Id><Desc>Pesos Argentinos</Desc><FchDesde>20090403</FchDesde><FchHasta>NULL</FchHasta></Moneda>' +
+        '<Moneda><Id>DOL</Id><Desc>Dolar Estadounidense</Desc><FchDesde>20090403</FchDesde><FchHasta></FchHasta></Moneda>' +
+        '<Moneda><Id>OLD</Id><Desc>Moneda vieja</Desc><FchDesde>19990101</FchDesde><FchHasta>20100101</FchHasta></Moneda>' +
+        '</ResultGet></FEParamGetTiposMonedasResult></FEParamGetTiposMonedasResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getCurrencies(auth);
+
+    expect(result).toEqual([{ id: 'DOL', description: 'Dolar Estadounidense' }]);
+  });
+
+  it('devuelve la cotización con su fecha', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetCotizacionResult><ResultGet>' +
+        '<MonId>DOL</MonId><MonCotiz>1305.5</MonCotiz><FchCotiz>20260814</FchCotiz>' +
+        '</ResultGet></FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getExchangeRate(auth, 'DOL');
+
+    expect(result.currencyId).toBe('DOL');
+    expect(result.rate).toBe(1305.5);
+    expect(result.date).toEqual(new Date(2026, 7, 14));
+  });
+
+  it('manda FchCotiz sólo cuando se pide una fecha', async () => {
+    let sentBody = '';
+    global.fetch = (async (_url: string, init: { body: string }) => {
+      sentBody = init.body;
+      return new Response(
+        '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+          '<FEParamGetCotizacionResult><ResultGet>' +
+          '<MonId>DOL</MonId><MonCotiz>1305.5</MonCotiz><FchCotiz>20260814</FchCotiz>' +
+          '</ResultGet></FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>',
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+
+    await service().getExchangeRate(auth, 'DOL');
+    expect(sentBody).not.toContain('FchCotiz');
+
+    await service().getExchangeRate(auth, 'DOL', new Date(2026, 7, 14));
+    expect(sentBody).toContain('<ar:FchCotiz>20260814</ar:FchCotiz>');
+  });
+
+  it('propaga el rechazo de ARCA ante una moneda inexistente', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetCotizacionResult><Errors><Err><Code>602</Code><Msg>Sin Resultados</Msg></Err></Errors>' +
+        '</FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>',
+    );
+
+    await expect(service().getExchangeRate(auth, 'XXX')).rejects.toThrow(
+      /Sin Resultados/,
+    );
+  });
+});

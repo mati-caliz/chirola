@@ -103,6 +103,23 @@ export const updateClient = (
     body,
   });
 
+export interface Currency {
+  id: string;
+  description: string;
+}
+
+export interface ExchangeRate {
+  currencyId: string;
+  rate: number;
+  date: string;
+}
+
+export const listCurrencies = (issuerId: string) =>
+  apiFetch<Currency[]>(`/issuers/${issuerId}/currencies`);
+
+export const getExchangeRate = (issuerId: string, currencyId: string) =>
+  apiFetch<ExchangeRate>(`/issuers/${issuerId}/exchange-rate/${currencyId}`);
+
 export const lookupTaxpayer = (issuerId: string, cuit: string) =>
   apiFetch<TaxpayerInfo>(`/issuers/${issuerId}/taxpayers/${cuit}`);
 

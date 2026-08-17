@@ -3,7 +3,12 @@ import { inferFiscalCondition, type FiscalConditionType } from '@chirola/shared'
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { AuthContext, SalesPointInfo } from '../arca/wsfe/wsfe.types';
+import type {
+  AuthContext,
+  CurrencyInfo,
+  ExchangeRateInfo,
+  SalesPointInfo,
+} from '../arca/wsfe/wsfe.types';
 
 @Injectable()
 export class ArcaParamsService {
@@ -19,6 +24,22 @@ export class ArcaParamsService {
   }): Promise<SalesPointInfo[]> {
     const auth = await this.buildAuth(issuer);
     return this.wsfe.getSalesPoints(auth);
+  }
+
+  async getCurrencies(issuer: {
+    id: string;
+    cuit: string;
+  }): Promise<CurrencyInfo[]> {
+    const auth = await this.buildAuth(issuer);
+    return this.wsfe.getCurrencies(auth);
+  }
+
+  async getExchangeRate(
+    issuer: { id: string; cuit: string },
+    currencyId: string,
+  ): Promise<ExchangeRateInfo> {
+    const auth = await this.buildAuth(issuer);
+    return this.wsfe.getExchangeRate(auth, currencyId);
   }
 
   async detectFiscalCondition(issuer: {

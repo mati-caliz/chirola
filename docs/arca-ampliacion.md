@@ -79,15 +79,14 @@ El cliente manda `id`, `description`, `taxableBase` y `rate`; el **importe lo ca
 backend** (`iva-calculator.ts`), nunca el mobile. Los tributos se suman al `ImpTotal` y se
 persisten en `Voucher.tributes`.
 
-### A.4 🟡 Cotización de moneda extranjera
+### A.4 ✅ Cotización de moneda extranjera — implementado
 
-Se envían `MonId` y `MonCotiz` pero nunca se consulta `FEParamGetCotizacion`. El usuario tendría
-que tipear la cotización a mano y ARCA la valida contra la suya (**error 10051** si difiere).
+Regla: la cotización a usar es la del **día hábil anterior** a la fecha del comprobante. Cuando
+no se manda `FchCotiz`, ARCA devuelve la última vigente, que es lo que la app usa.
 
-Regla: la cotización a usar es la del **día hábil anterior** a la fecha del comprobante.
-
-Trabajo: método `getExchangeRate(currencyId, date)` en `wsfe.service.ts`, endpoint que lo
-exponga, y prellenado del campo en la app con opción a override.
+`getExchangeRate` y `getCurrencies` (que descarta las monedas con `FchHasta`) se exponen en
+`GET /issuers/:id/exchange-rate/:currencyId` y `GET /issuers/:id/currencies`. La app trae la
+cotización al elegir moneda y deja editarla, porque ARCA valida contra la suya (**error 10051**).
 
 ### A.5 🟢 Completar los `FEParamGet*`
 
@@ -95,8 +94,9 @@ Hoy sólo se consultan `PtosVenta` y `TiposCbte`; el resto de las tablas está h
 `packages/shared` (`ivaRateAfipId`, `DocumentType`, `RecipientIvaCondition`). Funciona, pero se
 desincroniza cuando ARCA cambia una tabla.
 
-Faltan: `FEParamGetTiposIva`, `FEParamGetTiposDoc`, `FEParamGetTiposMonedas`,
-`FEParamGetTiposTributos`, `FEParamGetTiposOpcional`, `FEParamGetCondicionIvaReceptor`.
+Faltan: `FEParamGetTiposIva`, `FEParamGetTiposDoc`, `FEParamGetTiposTributos`,
+`FEParamGetTiposOpcional`, `FEParamGetCondicionIvaReceptor`. `FEParamGetTiposMonedas` ya está
+(entró con A.4), pero sin cachear.
 
 Sugerencia: cachearlos en DB con TTL largo (ya existe el patrón en `AccessTicketCache`) y usar
 las constantes de `shared` como fallback, no como fuente de verdad.

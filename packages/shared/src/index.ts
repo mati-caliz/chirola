@@ -125,6 +125,9 @@ export const ivaRateAfipId: Record<number, number> = {
   27: 6,
 };
 
+export const LOCAL_CURRENCY = 'PES';
+export const LOCAL_EXCHANGE_RATE = 1;
+
 export const TaxTreatment = {
   TAXED: 'TAXED',
   EXEMPT: 'EXEMPT',
@@ -253,8 +256,8 @@ export const issueVoucherSchema = z
       ivaConditionId: z.number().int().optional(),
     }),
     items: z.array(itemSchema).min(1),
-    currency: z.string().default('PES'),
-    exchangeRate: z.number().positive().default(1),
+    currency: z.string().default(LOCAL_CURRENCY),
+    exchangeRate: z.number().positive().default(LOCAL_EXCHANGE_RATE),
 
     associatedVouchers: z.array(associatedVoucherSchema).optional(),
 

@@ -7,6 +7,8 @@ import type {
   AuthContext,
   CaeRequest,
   CaeResult,
+  CurrencyInfo,
+  ExchangeRateInfo,
   SalesPointInfo,
 } from './wsfe.types';
 
@@ -148,6 +150,56 @@ export class WsfeService {
     return collectByTag(parsed, 'CbteTipo')
       .map((node) => Number(node.Id))
       .filter((id) => Number.isFinite(id));
+  }
+
+  async getCurrencies(auth: AuthContext): Promise<CurrencyInfo[]> {
+    const soap = this.envelope(
+      '<ar:FEParamGetTiposMonedas>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        '</ar:FEParamGetTiposMonedas>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FEParamGetTiposMonedas`,
+      soap,
+    );
+    const parsed = this.parser.parse(res) as Record<string, unknown>;
+    return collectByTag(parsed, 'Moneda')
+      .filter((node) => String(node.FchHasta ?? '').trim().length === 0)
+      .map((node) => ({
+        id: String(node.Id ?? ''),
+        description: String(node.Desc ?? ''),
+      }))
+      .filter((currency) => currency.id.length > 0);
+  }
+
+  async getExchangeRate(
+    auth: AuthContext,
+    currencyId: string,
+    date?: Date,
+  ): Promise<ExchangeRateInfo> {
+    const soap = this.envelope(
+      '<ar:FEParamGetCotizacion>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        `<ar:MonId>${escapeXml(currencyId)}</ar:MonId>` +
+        (date ? `<ar:FchCotiz>${toArcaDate(date)}</ar:FchCotiz>` : '') +
+        '</ar:FEParamGetCotizacion>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FEParamGetCotizacion`,
+      soap,
+    );
+    const xml = new ParsedXml(res);
+    const errors = xml.errors();
+    if (errors.length > 0) {
+      throw new ArcaRejectionError(xml.errorCodes(), errors);
+    }
+    return {
+      currencyId,
+      rate: Number(xml.required('MonCotiz')),
+      date: parseArcaDate(xml.required('FchCotiz')),
+    };
   }
 
   private isActiveCaePoint(node: Record<string, unknown>): boolean {

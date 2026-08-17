@@ -40,6 +40,22 @@ export class IssuersController {
     return this.params.getSalesPoints(issuer);
   }
 
+  @Get(':id/currencies')
+  async currencies(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.params.getCurrencies(issuer);
+  }
+
+  @Get(':id/exchange-rate/:currencyId')
+  async exchangeRate(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('currencyId') currencyId: string,
+  ) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.params.getExchangeRate(issuer, currencyId);
+  }
+
   @Get(':id/fiscal-condition')
   async fiscalCondition(
     @CurrentUser() user: JwtPayload,

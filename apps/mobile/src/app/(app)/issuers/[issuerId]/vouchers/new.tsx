@@ -5,6 +5,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ivaRates,
   issueVoucherSchema,
+  LOCAL_CURRENCY,
+  LOCAL_EXCHANGE_RATE,
   requiresRecipientCuit,
   recipientIvaConditionName,
   requiresServicePeriod,
@@ -32,8 +34,10 @@ import {
   Title,
 } from '@/components/ui';
 import {
+  getExchangeRate,
   issueVoucher,
   listClients,
+  listCurrencies,
   lookupTaxpayer,
   type Client,
 } from '@/lib/resources';
@@ -54,6 +58,8 @@ interface TributeForm {
   taxableBase: string;
   rate: string;
 }
+
+const SELECTABLE_CURRENCIES = [LOCAL_CURRENCY, 'DOL', 'EUR'];
 
 const DEFAULT_IVA_RATE = 21;
 const NO_IVA_RATE = 0;
@@ -96,6 +102,8 @@ export default function NewVoucherScreen() {
   const [recipientIvaConditionId, setRecipientIvaConditionId] = useState<number | null>(
     null,
   );
+  const [currency, setCurrency] = useState(LOCAL_CURRENCY);
+  const [exchangeRate, setExchangeRate] = useState(String(LOCAL_EXCHANGE_RATE));
   const [items, setItems] = useState<ItemForm[]>([newItem()]);
   const [tributes, setTributes] = useState<TributeForm[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +118,35 @@ export default function NewVoucherScreen() {
     onSuccess: (res) => router.replace(`/(app)/vouchers/${res.id}`),
     onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo emitir el comprobante.'),
   });
+
+  const { data: currencies } = useQuery({
+    queryKey: ['currencies', issuerId],
+    queryFn: () => listCurrencies(issuerId),
+  });
+
+  const exchangeRateLookup = useMutation({
+    mutationFn: (currencyId: string) => getExchangeRate(issuerId, currencyId),
+    onSuccess: (quote) => setExchangeRate(String(quote.rate)),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : 'No se pudo obtener la cotización.'),
+  });
+
+  function chooseCurrency(currencyId: string) {
+    setCurrency(currencyId);
+    if (currencyId === LOCAL_CURRENCY) {
+      setExchangeRate(String(LOCAL_EXCHANGE_RATE));
+      return;
+    }
+    exchangeRateLookup.mutate(currencyId);
+  }
+
+  const currencyOptions = useMemo(() => {
+    const byId = new Map((currencies ?? []).map((item) => [item.id, item.description]));
+    return SELECTABLE_CURRENCIES.map((id) => ({
+      label: id === LOCAL_CURRENCY ? 'Pesos' : (byId.get(id) ?? id),
+      value: id,
+    }));
+  }, [currencies]);
 
   const padronLookup = useMutation({
     mutationFn: () => lookupTaxpayer(issuerId, docNumber.trim()),
@@ -218,6 +255,8 @@ export default function NewVoucherScreen() {
             }))
           : undefined,
       servicePeriod: requiresServicePeriod(concept) ? servicePeriod : undefined,
+      currency,
+      exchangeRate: Number(exchangeRate),
     };
     const parsed = issueVoucherSchema.safeParse(payload);
     if (!parsed.success) {
@@ -262,6 +301,22 @@ export default function NewVoucherScreen() {
             { label: 'Ambos', value: VoucherConcept.PRODUCTS_AND_SERVICES },
           ]}
         />
+
+        <OptionGroup<string>
+          label="Moneda"
+          value={currency}
+          onChange={chooseCurrency}
+          options={currencyOptions}
+        />
+        {currency !== LOCAL_CURRENCY ? (
+          <TextField
+            label="Cotización"
+            value={exchangeRate}
+            onChangeText={setExchangeRate}
+            keyboardType="decimal-pad"
+            placeholder={exchangeRateLookup.isPending ? 'Consultando a ARCA…' : ''}
+          />
+        ) : null}
 
         {needsServicePeriod ? (
           <Card>
