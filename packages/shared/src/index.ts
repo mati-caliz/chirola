@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { RecipientIvaCondition } from './recipient-iva-condition';
+import { ivaRates } from './iva-rate';
+import {
+  isCreditDebitNote,
+  requiresRecipientCuit,
+  VoucherType,
+} from './voucher-type';
 
 export * from './auth';
 export * from './issuer';
@@ -7,51 +13,11 @@ export * from './client';
 export * from './purchase-invoice';
 export * from './recipient-iva-condition';
 export * from './taxpayer';
-
-export const VoucherType = {
-  FACTURA_A: 1,
-  NOTA_DEBITO_A: 2,
-  NOTA_CREDITO_A: 3,
-  FACTURA_B: 6,
-  NOTA_DEBITO_B: 7,
-  NOTA_CREDITO_B: 8,
-  FACTURA_C: 11,
-  NOTA_DEBITO_C: 12,
-  NOTA_CREDITO_C: 13,
-} as const;
-
-const typesRequiringCuit: readonly number[] = [
-  VoucherType.FACTURA_A,
-  VoucherType.NOTA_DEBITO_A,
-  VoucherType.NOTA_CREDITO_A,
-];
-
-export function requiresRecipientCuit(voucherType: number): boolean {
-  return typesRequiringCuit.includes(voucherType);
-}
-
-const creditDebitNoteTypes: readonly number[] = [
-  VoucherType.NOTA_DEBITO_A,
-  VoucherType.NOTA_CREDITO_A,
-  VoucherType.NOTA_DEBITO_B,
-  VoucherType.NOTA_CREDITO_B,
-  VoucherType.NOTA_DEBITO_C,
-  VoucherType.NOTA_CREDITO_C,
-];
-
-export function isCreditDebitNote(voucherType: number): boolean {
-  return creditDebitNoteTypes.includes(voucherType);
-}
-
-const creditNoteTypes: readonly number[] = [
-  VoucherType.NOTA_CREDITO_A,
-  VoucherType.NOTA_CREDITO_B,
-  VoucherType.NOTA_CREDITO_C,
-];
-
-export function isCreditNote(voucherType: number): boolean {
-  return creditNoteTypes.includes(voucherType);
-}
+export * from './voucher-type';
+export * from './document-type';
+export * from './iva-rate';
+export * from './tribute-type';
+export * from './arca-params';
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',
@@ -76,54 +42,11 @@ export function inferFiscalCondition(
   return null;
 }
 
-export const voucherTypeName: Record<number, string> = {
-  1: 'Factura A',
-  2: 'Nota de Débito A',
-  3: 'Nota de Crédito A',
-  6: 'Factura B',
-  7: 'Nota de Débito B',
-  8: 'Nota de Crédito B',
-  11: 'Factura C',
-  12: 'Nota de Débito C',
-  13: 'Nota de Crédito C',
-};
-
-export function voucherLetter(voucherType: number): string {
-  const name = voucherTypeName[voucherType] ?? '';
-  const match = name.match(/ ([ABC])$/);
-  return match ? match[1] : '';
-}
-
-export const DocumentType = {
-  CUIT: 80,
-  CUIL: 86,
-  DNI: 96,
-  CONSUMIDOR_FINAL: 99,
-} as const;
-
-export const documentTypeName: Record<number, string> = {
-  80: 'CUIT',
-  86: 'CUIL',
-  96: 'DNI',
-  99: 'Consumidor Final',
-};
-
 export function defaultRecipientIvaCondition(voucherType: number): number {
   return requiresRecipientCuit(voucherType)
     ? RecipientIvaCondition.RESPONSABLE_INSCRIPTO
     : RecipientIvaCondition.CONSUMIDOR_FINAL;
 }
-
-export const ivaRates = [0, 2.5, 5, 10.5, 21, 27] as const;
-
-export const ivaRateAfipId: Record<number, number> = {
-  0: 3,
-  2.5: 9,
-  5: 8,
-  10.5: 4,
-  21: 5,
-  27: 6,
-};
 
 export const LOCAL_CURRENCY = 'PES';
 export const LOCAL_EXCHANGE_RATE = 1;
@@ -166,22 +89,6 @@ export const itemSchema = z
       });
     }
   });
-
-export const TributeType = {
-  NATIONAL: 1,
-  PROVINCIAL: 2,
-  MUNICIPAL: 3,
-  INTERNAL: 4,
-  OTHER: 99,
-} as const;
-
-export const tributeTypeName: Record<number, string> = {
-  1: 'Impuestos nacionales',
-  2: 'Impuestos provinciales',
-  3: 'Impuestos municipales',
-  4: 'Impuestos internos',
-  99: 'Otros',
-};
 
 export const tributeSchema = z.object({
   id: z.number().int().positive(),

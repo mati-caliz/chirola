@@ -88,18 +88,22 @@ no se manda `FchCotiz`, ARCA devuelve la última vigente, que es lo que la app u
 `GET /issuers/:id/exchange-rate/:currencyId` y `GET /issuers/:id/currencies`. La app trae la
 cotización al elegir moneda y deja editarla, porque ARCA valida contra la suya (**error 10051**).
 
-### A.5 🟢 Completar los `FEParamGet*`
+### A.5 ✅ Completar los `FEParamGet*` — implementado
 
-Hoy sólo se consultan `PtosVenta` y `TiposCbte`; el resto de las tablas está hardcodeado en
-`packages/shared` (`ivaRateAfipId`, `DocumentType`, `RecipientIvaCondition`). Funciona, pero se
-desincroniza cuando ARCA cambia una tabla.
+Se agregaron `TiposDoc`, `TiposIva`, `TiposTributos`, `TiposOpcional` y `CondicionIvaReceptor`,
+todos sobre un helper común, y se expone `GET /issuers/:id/params/:paramType`.
 
-Faltan: `FEParamGetTiposIva`, `FEParamGetTiposDoc`, `FEParamGetTiposTributos`,
-`FEParamGetTiposOpcional`, `FEParamGetCondicionIvaReceptor`. `FEParamGetTiposMonedas` ya está
-(entró con A.4), pero sin cachear.
+Detalle del protocolo que vale recordar: ARCA devuelve el **literal `"NULL"`** en `FchHasta`
+para los registros vigentes, no una cadena vacía. Filtrar por "vacío" descarta todo.
 
-Sugerencia: cachearlos en DB con TTL largo (ya existe el patrón en `AccessTicketCache`) y usar
-las constantes de `shared` como fallback, no como fuente de verdad.
+La caché (`ArcaParamCache`, TTL 7 días vía `ARCA_PARAM_CACHE_TTL_DAYS`) es **por emisor**, no
+global: `FEParamGetTiposCbte` devuelve los tipos habilitados para ese contribuyente en
+particular — es justamente de donde `inferFiscalCondition` deduce si es RI o monotributista.
+
+Degradación en tres pasos: caché vigente → caché vencida si ARCA no responde → constantes
+locales de `packages/shared`. Las constantes pasan a ser el último recurso, no la fuente de
+verdad. `FEParamGetTiposMonedas` y `PtosVenta` quedan fuera de la caché a propósito: los puntos
+de venta cambian cuando el usuario da uno de alta en ARCA y un TTL largo sería molesto.
 
 ---
 

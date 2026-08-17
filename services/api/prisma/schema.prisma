@@ -232,6 +232,16 @@ model AccessTicketCache {
   @@unique([issuerId, service])
 }
 
+model ArcaParamCache {
+  id        String   @id @default(cuid())
+  issuerId  String
+  paramType String
+  entries   Json
+  fetchedAt DateTime @default(now())
+
+  @@unique([issuerId, paramType])
+}
+
 model TaxpayerCache {
   id             String   @id @default(cuid())
   cuit           String   @unique

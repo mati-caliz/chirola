@@ -8,6 +8,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  arcaParamTypeSchema,
+  type ArcaParamTypeName,
   uploadCertificateSchema,
   createIssuerSchema,
   matchCertificateSchema,
@@ -24,6 +26,7 @@ import type { JwtPayload } from '../auth/auth.service';
 import { IssuersService } from './issuers.service';
 import { CertsService } from '../certs/certs.service';
 import { ArcaParamsService } from './arca-params.service';
+import { ArcaParamCacheService } from './arca-param-cache.service';
 
 @Controller('issuers')
 @UseGuards(JwtAuthGuard)
@@ -32,12 +35,24 @@ export class IssuersController {
     private readonly issuers: IssuersService,
     private readonly certs: CertsService,
     private readonly params: ArcaParamsService,
+    private readonly paramCache: ArcaParamCacheService,
   ) {}
 
   @Get(':id/sales-points')
   async salesPoints(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     const issuer = await this.issuers.getFromUser(id, user.sub);
     return this.params.getSalesPoints(issuer);
+  }
+
+  @Get(':id/params/:paramType')
+  async paramTable(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Param('paramType', new ZodValidationPipe(arcaParamTypeSchema))
+    paramType: ArcaParamTypeName,
+  ) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.paramCache.get(issuer, paramType);
   }
 
   @Get(':id/currencies')

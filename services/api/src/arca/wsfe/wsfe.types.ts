@@ -62,6 +62,11 @@ export interface CaeResult {
   caeVto: Date;
 }
 
+export type ArcaParamEntry = {
+  id: number;
+  description: string;
+};
+
 export interface CurrencyInfo {
   id: string;
   description: string;

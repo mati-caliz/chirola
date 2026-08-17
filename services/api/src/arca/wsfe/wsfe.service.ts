@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { buildAuthBlock, callSoap, escapeXml, ParsedXml } from '../arca-soap.util';
 import { ArcaRejectionError } from './arca-errors';
 import type {
+  ArcaParamEntry,
   AuthContext,
   CaeRequest,
   CaeResult,
@@ -50,6 +51,13 @@ function parseArcaDate(s: string): Date {
   const m = Number(s.slice(4, 6));
   const d = Number(s.slice(6, 8));
   return new Date(y, m - 1, d);
+}
+
+const NULL_DATE_MARKERS = ['', 'NULL'];
+
+function isActiveParam(node: Record<string, unknown>): boolean {
+  const until = String(node.FchHasta ?? '').trim();
+  return NULL_DATE_MARKERS.includes(until.toUpperCase());
 }
 
 function isoToArcaDate(iso: string): string {
@@ -136,20 +144,57 @@ export class WsfeService {
   }
 
   async getVoucherTypeIds(auth: AuthContext): Promise<number[]> {
+    const voucherTypes = await this.getVoucherTypes(auth);
+    return voucherTypes.map((voucherType) => voucherType.id);
+  }
+
+  private async getParamTable(
+    auth: AuthContext,
+    operation: string,
+    tag: string,
+  ): Promise<ArcaParamEntry[]> {
     const soap = this.envelope(
-      '<ar:FEParamGetTiposCbte>' +
+      `<ar:${operation}>` +
         buildAuthBlock(auth.cuit, auth.token, auth.sign) +
-        '</ar:FEParamGetTiposCbte>',
+        `</ar:${operation}>`,
     );
-    const res = await callSoap(
-      this.wsfeUrl,
-      `${WSFEV1_NS}FEParamGetTiposCbte`,
-      soap,
-    );
+    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}${operation}`, soap);
     const parsed = this.parser.parse(res) as Record<string, unknown>;
-    return collectByTag(parsed, 'CbteTipo')
-      .map((node) => Number(node.Id))
-      .filter((id) => Number.isFinite(id));
+    return collectByTag(parsed, tag)
+      .filter(isActiveParam)
+      .map((node) => ({
+        id: Number(node.Id),
+        description: String(node.Desc ?? ''),
+      }))
+      .filter((entry) => Number.isFinite(entry.id));
+  }
+
+  getDocumentTypes(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(auth, 'FEParamGetTiposDoc', 'DocTipo');
+  }
+
+  getIvaRates(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(auth, 'FEParamGetTiposIva', 'IvaTipo');
+  }
+
+  getTributeTypes(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(auth, 'FEParamGetTiposTributos', 'TributoTipo');
+  }
+
+  getOptionalTypes(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(auth, 'FEParamGetTiposOpcional', 'OpcionalTipo');
+  }
+
+  getRecipientIvaConditions(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(
+      auth,
+      'FEParamGetCondicionIvaReceptor',
+      'CondicionIvaReceptor',
+    );
+  }
+
+  async getVoucherTypes(auth: AuthContext): Promise<ArcaParamEntry[]> {
+    return this.getParamTable(auth, 'FEParamGetTiposCbte', 'CbteTipo');
   }
 
   async getCurrencies(auth: AuthContext): Promise<CurrencyInfo[]> {
@@ -165,7 +210,7 @@ export class WsfeService {
     );
     const parsed = this.parser.parse(res) as Record<string, unknown>;
     return collectByTag(parsed, 'Moneda')
-      .filter((node) => String(node.FchHasta ?? '').trim().length === 0)
+      .filter(isActiveParam)
       .map((node) => ({
         id: String(node.Id ?? ''),
         description: String(node.Desc ?? ''),

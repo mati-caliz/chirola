@@ -295,6 +295,69 @@ describe('WsfeService — FEParamGetPtosVenta', () => {
   });
 });
 
+describe('WsfeService — tablas de parámetros', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+
+  function respondWith(xml: string): void {
+    global.fetch = (async () =>
+      new Response(xml, { status: 200 })) as unknown as typeof fetch;
+  }
+
+  it('extrae los tipos de documento vigentes', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetTiposDocResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetTiposDocResult><ResultGet>' +
+        '<DocTipo><Id>80</Id><Desc>CUIT</Desc><FchHasta>NULL</FchHasta></DocTipo>' +
+        '<DocTipo><Id>96</Id><Desc>DNI</Desc><FchHasta>NULL</FchHasta></DocTipo>' +
+        '<DocTipo><Id>1</Id><Desc>Documento viejo</Desc><FchHasta>20050101</FchHasta></DocTipo>' +
+        '</ResultGet></FEParamGetTiposDocResult></FEParamGetTiposDocResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getDocumentTypes(auth);
+
+    expect(result).toEqual([
+      { id: 80, description: 'CUIT' },
+      { id: 96, description: 'DNI' },
+    ]);
+  });
+
+  it('extrae los tipos de tributo', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetTiposTributosResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetTiposTributosResult><ResultGet>' +
+        '<TributoTipo><Id>2</Id><Desc>Provinciales</Desc><FchHasta>NULL</FchHasta></TributoTipo>' +
+        '</ResultGet></FEParamGetTiposTributosResult></FEParamGetTiposTributosResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getTributeTypes(auth);
+
+    expect(result).toEqual([{ id: 2, description: 'Provinciales' }]);
+  });
+
+  it('extrae las condiciones de IVA del receptor', async () => {
+    respondWith(
+      '<soap:Envelope><soap:Body><FEParamGetCondicionIvaReceptorResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        '<FEParamGetCondicionIvaReceptorResult><ResultGet>' +
+        '<CondicionIvaReceptor><Id>1</Id><Desc>IVA Responsable Inscripto</Desc></CondicionIvaReceptor>' +
+        '<CondicionIvaReceptor><Id>5</Id><Desc>Consumidor Final</Desc></CondicionIvaReceptor>' +
+        '</ResultGet></FEParamGetCondicionIvaReceptorResult></FEParamGetCondicionIvaReceptorResponse></soap:Body></soap:Envelope>',
+    );
+
+    const result = await service().getRecipientIvaConditions(auth);
+
+    expect(result).toEqual([
+      { id: 1, description: 'IVA Responsable Inscripto' },
+      { id: 5, description: 'Consumidor Final' },
+    ]);
+  });
+});
+
 describe('WsfeService — monedas y cotización', () => {
   const originalFetch = global.fetch;
 
@@ -309,7 +372,7 @@ describe('WsfeService — monedas y cotización', () => {
       new Response(xml, { status: 200 })) as unknown as typeof fetch;
   }
 
-  it('descarta las monedas dadas de baja', async () => {
+  it('trata FchHasta "NULL" como vigente y descarta las dadas de baja', async () => {
     respondWith(
       '<soap:Envelope><soap:Body><FEParamGetTiposMonedasResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         '<FEParamGetTiposMonedasResult><ResultGet>' +
@@ -321,7 +384,10 @@ describe('WsfeService — monedas y cotización', () => {
 
     const result = await service().getCurrencies(auth);
 
-    expect(result).toEqual([{ id: 'DOL', description: 'Dolar Estadounidense' }]);
+    expect(result).toEqual([
+      { id: 'PES', description: 'Pesos Argentinos' },
+      { id: 'DOL', description: 'Dolar Estadounidense' },
+    ]);
   });
 
   it('devuelve la cotización con su fecha', async () => {
