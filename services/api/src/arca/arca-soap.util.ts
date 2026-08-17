@@ -24,6 +24,21 @@ export function buildAuthBlock(cuit: string, token: string, sign: string): strin
   );
 }
 
+export class ArcaSoapFaultError extends InternalServerErrorException {
+  constructor(
+    readonly soapAction: string,
+    readonly httpStatus: number,
+    readonly body: string,
+  ) {
+    super(`ARCA devolvió error HTTP ${httpStatus} en ${soapAction}.`);
+  }
+
+  faultString(): string {
+    const match = this.body.match(/<faultstring>([\s\S]*?)<\/faultstring>/);
+    return match ? match[1].trim() : '';
+  }
+}
+
 export async function callSoap(
   url: string,
   soapAction: string,
@@ -41,9 +56,7 @@ export async function callSoap(
   const text = await res.text();
   if (!res.ok) {
     logger.error(`${soapAction} respondió HTTP ${res.status}: ${text}`);
-    throw new InternalServerErrorException(
-      `ARCA devolvió error HTTP ${res.status} en ${soapAction}.`,
-    );
+    throw new ArcaSoapFaultError(soapAction, res.status, text);
   }
   return text;
 }
@@ -68,6 +81,28 @@ export class ParsedXml {
   optional(tag: string, fallback: string): string {
     const value = this.find(tag);
     return value == null ? fallback : String(value);
+  }
+
+  has(tag: string): boolean {
+    return this.find(tag) !== undefined;
+  }
+
+  all(tag: string): string[] {
+    const out: string[] = [];
+    const walk = (node: unknown): void => {
+      if (node == null || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        if (key === tag) {
+          for (const entry of Array.isArray(value) ? value : [value]) {
+            if (entry != null && typeof entry !== 'object') out.push(String(entry));
+          }
+        } else {
+          walk(value);
+        }
+      }
+    };
+    walk(this.root);
+    return out;
   }
 
   errors(): string[] {

@@ -3,6 +3,7 @@ import type {
   CreateClient,
   CreateIssuer,
   IssueVoucher,
+  TaxpayerInfo,
 } from '@chirola/shared';
 import { apiFetch } from './api';
 
@@ -101,6 +102,9 @@ export const updateClient = (
     method: 'PATCH',
     body,
   });
+
+export const lookupTaxpayer = (issuerId: string, cuit: string) =>
+  apiFetch<TaxpayerInfo>(`/issuers/${issuerId}/taxpayers/${cuit}`);
 
 export const issueVoucher = (body: IssueVoucher) =>
   apiFetch<IssuedVoucher>('/vouchers', { method: 'POST', body });

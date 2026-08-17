@@ -103,12 +103,10 @@ las constantes de `shared` como fallback, no como fuente de verdad.
 
 ---
 
-## Fase B — 🟡 Padrón: consulta de contribuyentes por CUIT
+## Fase B — ✅ Padrón: consulta de contribuyentes por CUIT — implementado
 
-La mejor relación valor/esfuerzo de todo el doc. Autocompletar razón social, condición frente al
-IVA y domicilio a partir del CUIT, en vez de que el usuario los tipee.
-
-Dos servicios, distinto alcance:
+Autocompleta razón social, condición frente al IVA y domicilio a partir del CUIT.
+Se integró `ws_sr_constancia_inscripcion` (padrón A5), el más completo de los dos:
 
 | Servicio | Qué devuelve | Nota |
 |---|---|---|
@@ -126,14 +124,19 @@ Puntos importantes del protocolo:
   `AccessTicketCache` ya está modelado con clave única `(issuerId, service)`, así que no hace
   falta tocarlo.
 
-Trabajo:
+La condición frente al IVA **no viene dada** por el padrón: se deduce de los impuestos en los que
+figura inscripto (`inferRecipientIvaCondition` en `packages/shared`). Monotributo gana sobre IVA
+porque un monotributista puede figurar en ambos padrones.
 
-- `services/api/src/arca/padron/padron.service.ts` reusando `arca-soap.util.ts`.
-- `GET /issuers/:issuerId/padron/:cuit` → datos normalizados del contribuyente.
-- Prellenado en el alta de `Client` y en el receptor de la nueva factura.
-- Validar la `CondicionIVAReceptorId` contra el padrón antes de emitir: hoy viene del cliente y
-  un valor incoherente con la letra del comprobante es causa frecuente de rechazo.
-- Cachear la respuesta (los datos de padrón cambian poco; TTL de días).
+La respuesta se cachea en `TaxpayerCache` con TTL de 30 días (`PADRON_CACHE_TTL_DAYS`). La caché
+es **global, no por emisor**: son datos públicos de ARCA, no datos de un contribuyente usuario,
+así que la regla de aislamiento por `issuerId` no aplica. El `issuerId` de la ruta se usa sólo
+para elegir el certificado con el que se consulta.
+
+Pendiente: usar el padrón para **validar** la `CondicionIVAReceptorId` antes de emitir. Hoy sólo
+la prellena; un valor incoherente con la letra del comprobante sigue siendo causa de rechazo.
+
+Pendiente también: prellenado en el alta de `Client` (hoy sólo está en la nueva factura).
 
 ---
 

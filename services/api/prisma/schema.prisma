@@ -232,6 +232,16 @@ model AccessTicketCache {
   @@unique([issuerId, service])
 }
 
+model TaxpayerCache {
+  id             String   @id @default(cuid())
+  cuit           String   @unique
+  legalName      String
+  status         String
+  ivaConditionId Int
+  address        Json?
+  fetchedAt      DateTime @default(now())
+}
+
 model IdempotencyRecord {
   id        String   @id @default(cuid())
   issuerId  String

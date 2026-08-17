@@ -6,6 +6,7 @@ import {
   ivaRates,
   issueVoucherSchema,
   requiresRecipientCuit,
+  recipientIvaConditionName,
   requiresServicePeriod,
   TaxTreatment,
   taxTreatmentName,
@@ -30,7 +31,12 @@ import {
   TextField,
   Title,
 } from '@/components/ui';
-import { issueVoucher, listClients, type Client } from '@/lib/resources';
+import {
+  issueVoucher,
+  listClients,
+  lookupTaxpayer,
+  type Client,
+} from '@/lib/resources';
 import { formatCurrency, toIsoDate } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -87,6 +93,9 @@ export default function NewVoucherScreen() {
   const [docType, setDocType] = useState<number>(DocumentType.CONSUMIDOR_FINAL);
   const [docNumber, setDocNumber] = useState('0');
   const [legalName, setLegalName] = useState('');
+  const [recipientIvaConditionId, setRecipientIvaConditionId] = useState<number | null>(
+    null,
+  );
   const [items, setItems] = useState<ItemForm[]>([newItem()]);
   const [tributes, setTributes] = useState<TributeForm[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +109,17 @@ export default function NewVoucherScreen() {
     mutationFn: issueVoucher,
     onSuccess: (res) => router.replace(`/(app)/vouchers/${res.id}`),
     onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo emitir el comprobante.'),
+  });
+
+  const padronLookup = useMutation({
+    mutationFn: () => lookupTaxpayer(issuerId, docNumber.trim()),
+    onSuccess: (taxpayer) => {
+      setLegalName(taxpayer.legalName);
+      setRecipientIvaConditionId(taxpayer.ivaConditionId);
+      setError(null);
+    },
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : 'No se pudo consultar el padrón.'),
   });
 
   function setItem(index: number, patch: Partial<ItemForm>) {
@@ -116,6 +136,7 @@ export default function NewVoucherScreen() {
     setDocType(client.docType);
     setDocNumber(client.docNumber);
     setLegalName(client.legalName ?? '');
+    setRecipientIvaConditionId(null);
   }
 
   const totals = useMemo(() => {
@@ -178,6 +199,7 @@ export default function NewVoucherScreen() {
         docType,
         docNumber: docNumber.trim(),
         legalName: legalName.trim() || undefined,
+        ivaConditionId: recipientIvaConditionId ?? undefined,
       },
       items: items.map((item) => ({
         description: item.description.trim(),
@@ -301,15 +323,32 @@ export default function NewVoucherScreen() {
           <TextField
             label="Número de documento"
             value={docNumber}
-            onChangeText={setDocNumber}
+            onChangeText={(v) => {
+              setDocNumber(v);
+              setRecipientIvaConditionId(null);
+            }}
             keyboardType="number-pad"
           />
+          {docType === DocumentType.CUIT ? (
+            <Button
+              title="Buscar en padrón ARCA"
+              variant="secondary"
+              onPress={() => padronLookup.mutate()}
+              loading={padronLookup.isPending}
+            />
+          ) : null}
           <TextField
             label="Razón social"
             value={legalName}
             onChangeText={setLegalName}
             placeholder="Opcional"
           />
+          {recipientIvaConditionId !== null ? (
+            <Badge
+              text={`Padrón: ${recipientIvaConditionName[recipientIvaConditionId] ?? 'condición desconocida'}`}
+              tone="ok"
+            />
+          ) : null}
           {requiresCuit && docType !== DocumentType.CUIT ? (
             <Badge text="La Factura A requiere CUIT del receptor" tone="warn" />
           ) : null}

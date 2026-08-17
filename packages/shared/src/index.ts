@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { RecipientIvaCondition } from './recipient-iva-condition';
 
 export * from './auth';
 export * from './issuer';
 export * from './client';
 export * from './purchase-invoice';
+export * from './recipient-iva-condition';
+export * from './taxpayer';
 
 export const VoucherType = {
   FACTURA_A: 1,
@@ -104,14 +107,6 @@ export const documentTypeName: Record<number, string> = {
   96: 'DNI',
   99: 'Consumidor Final',
 };
-
-export const RecipientIvaCondition = {
-  RESPONSABLE_INSCRIPTO: 1,
-  SUJETO_EXENTO: 4,
-  CONSUMIDOR_FINAL: 5,
-  MONOTRIBUTO: 6,
-  MONOTRIBUTISTA_SOCIAL: 13,
-} as const;
 
 export function defaultRecipientIvaCondition(voucherType: number): number {
   return requiresRecipientCuit(voucherType)

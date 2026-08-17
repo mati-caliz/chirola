@@ -8,6 +8,7 @@ import { ArcaModule } from './arca/arca.module';
 import { CertsModule } from './certs/certs.module';
 import { IssuersModule } from './issuers/issuers.module';
 import { ClientsModule } from './clients/clients.module';
+import { TaxpayersModule } from './taxpayers/taxpayers.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 import { PurchaseInvoicesModule } from './purchase-invoices/purchase-invoices.module';
 import { FiscalModule } from './fiscal/fiscal.module';
@@ -25,6 +26,7 @@ import { HealthController } from './health/health.controller';
     CertsModule,
     IssuersModule,
     ClientsModule,
+    TaxpayersModule,
     VouchersModule,
     PurchaseInvoicesModule,
     FiscalModule,
