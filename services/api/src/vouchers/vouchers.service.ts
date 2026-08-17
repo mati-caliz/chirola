@@ -47,6 +47,11 @@ interface EmissionOutcome {
 
 type PendingVoucherRow = PendingVoucher;
 
+function parseIsoDate(iso: string): Date {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_RETRY_BASE_MS = 60_000;
 const RETRY_BATCH_SIZE = 25;
@@ -163,6 +168,14 @@ export class VouchersService {
         ivaRate: Number(it.ivaRate),
         subtotal: Number(it.subtotal),
       })),
+      servicePeriod:
+        voucher.serviceFrom && voucher.serviceTo && voucher.paymentDueDate
+          ? {
+              from: voucher.serviceFrom,
+              to: voucher.serviceTo,
+              paymentDueDate: voucher.paymentDueDate,
+            }
+          : null,
       associatedVouchers: Array.isArray(voucher.associatedVouchers)
         ? (voucher.associatedVouchers as unknown as {
             type: number;
@@ -359,6 +372,7 @@ export class VouchersService {
       currency: input.currency,
       exchangeRate: input.exchangeRate,
       associatedVouchers: input.associatedVouchers,
+      servicePeriod: input.servicePeriod,
     });
 
     const { result: cae, number } = await this.requestCaeWithRecovery(
@@ -403,6 +417,15 @@ export class VouchersService {
         number,
         voucherDate: date,
         concept: input.concept,
+        serviceFrom: input.servicePeriod
+          ? parseIsoDate(input.servicePeriod.from)
+          : null,
+        serviceTo: input.servicePeriod
+          ? parseIsoDate(input.servicePeriod.to)
+          : null,
+        paymentDueDate: input.servicePeriod
+          ? parseIsoDate(input.servicePeriod.paymentDueDate)
+          : null,
         netAmount: amounts.netAmount,
         ivaAmount: amounts.ivaAmount,
         totalAmount: amounts.totalAmount,

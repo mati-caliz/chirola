@@ -19,6 +19,12 @@ export interface AssociatedVoucherPdf {
   number: number;
 }
 
+export interface ServicePeriodPdf {
+  from: Date;
+  to: Date;
+  paymentDueDate: Date;
+}
+
 export interface VoucherPdfData {
   issuer: { legalName: string; cuit: string; ivaCondition: string };
   recipient: { docType: number; docNumber: string } | null;
@@ -34,6 +40,7 @@ export interface VoucherPdfData {
   caeExpiration: Date;
   items: PdfItem[];
   associatedVouchers: AssociatedVoucherPdf[];
+  servicePeriod: ServicePeriodPdf | null;
   qrPng: Buffer;
 }
 
@@ -78,6 +85,21 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
       width: 220,
       align: 'right',
     });
+
+    if (data.servicePeriod) {
+      doc.fontSize(8).text(
+        `Período facturado: ${date(data.servicePeriod.from)} al ${date(data.servicePeriod.to)}`,
+        right - 220,
+        78,
+        { width: 220, align: 'right' },
+      );
+      doc.text(
+        `Vencimiento de pago: ${date(data.servicePeriod.paymentDueDate)}`,
+        right - 220,
+        90,
+        { width: 220, align: 'right' },
+      );
+    }
 
     doc.moveTo(left, 110).lineTo(right, 110).stroke();
 

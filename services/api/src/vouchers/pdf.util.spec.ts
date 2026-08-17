@@ -54,6 +54,7 @@ describe('pdf util', () => {
         { description: 'Servicio de consultoría', quantity: 1, unitPrice: 121, ivaRate: 21, subtotal: 121 },
       ],
       associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }],
+      servicePeriod: null,
       qrPng: Buffer.alloc(0),
       ...overrides,
     };
@@ -70,6 +71,21 @@ describe('pdf util', () => {
     const qrPng = await renderQrPng(qrUrl);
     const pdf = await renderVoucherPdf(
       data({ qrPng, recipient: null, associatedVouchers: [] }),
+    );
+    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  it('renderiza el período facturado en comprobantes de servicios', async () => {
+    const qrPng = await renderQrPng(qrUrl);
+    const pdf = await renderVoucherPdf(
+      data({
+        qrPng,
+        servicePeriod: {
+          from: new Date(2026, 6, 1),
+          to: new Date(2026, 6, 31),
+          paymentDueDate: new Date(2026, 7, 10),
+        },
+      }),
     );
     expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   });

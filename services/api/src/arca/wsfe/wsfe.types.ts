@@ -1,4 +1,4 @@
-import type { AssociatedVoucher, Item } from '@chirola/shared';
+import type { AssociatedVoucher, Item, ServicePeriod } from '@chirola/shared';
 
 export interface AuthContext {
   cuit: string;
@@ -41,6 +41,8 @@ export interface CaeRequest {
   exchangeRate: number;
 
   associatedVouchers?: AssociatedVoucher[];
+
+  servicePeriod?: ServicePeriod;
 }
 
 export interface CaeResult {

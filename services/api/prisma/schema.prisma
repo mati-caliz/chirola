@@ -125,6 +125,10 @@ model Voucher {
   voucherDate DateTime
   concept     Int
 
+  serviceFrom    DateTime?
+  serviceTo      DateTime?
+  paymentDueDate DateTime?
+
   netAmount    Decimal @db.Decimal(15, 2)
   ivaAmount    Decimal @db.Decimal(15, 2)
   totalAmount  Decimal @db.Decimal(15, 2)

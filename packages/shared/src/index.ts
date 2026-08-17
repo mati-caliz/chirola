@@ -139,6 +139,42 @@ export const itemSchema = z.object({
   }),
 });
 
+export const VoucherConcept = {
+  PRODUCTS: 1,
+  SERVICES: 2,
+  PRODUCTS_AND_SERVICES: 3,
+} as const;
+
+export type VoucherConceptType =
+  (typeof VoucherConcept)[keyof typeof VoucherConcept];
+
+export const voucherConceptName: Record<number, string> = {
+  1: 'Productos',
+  2: 'Servicios',
+  3: 'Productos y Servicios',
+};
+
+const conceptsRequiringServicePeriod: readonly number[] = [
+  VoucherConcept.SERVICES,
+  VoucherConcept.PRODUCTS_AND_SERVICES,
+];
+
+export function requiresServicePeriod(concept: number): boolean {
+  return conceptsRequiringServicePeriod.includes(concept);
+}
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+  message: 'La fecha debe tener formato AAAA-MM-DD.',
+});
+
+export const servicePeriodSchema = z.object({
+  from: isoDate,
+  to: isoDate,
+  paymentDueDate: isoDate,
+});
+
+export type ServicePeriod = z.infer<typeof servicePeriodSchema>;
+
 export const associatedVoucherSchema = z.object({
   type: z.number().int().positive(),
   salesPoint: z.number().int().positive(),
@@ -154,7 +190,11 @@ export const issueVoucherSchema = z
     issuerId: z.string().min(1),
     salesPoint: z.number().int().positive(),
     voucherType: z.number().int().positive(),
-    concept: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    concept: z.union([
+      z.literal(VoucherConcept.PRODUCTS),
+      z.literal(VoucherConcept.SERVICES),
+      z.literal(VoucherConcept.PRODUCTS_AND_SERVICES),
+    ]),
     recipient: z.object({
       docType: z.number().int(),
       docNumber: z.string().min(1),
@@ -167,6 +207,8 @@ export const issueVoucherSchema = z
     exchangeRate: z.number().positive().default(1),
 
     associatedVouchers: z.array(associatedVoucherSchema).optional(),
+
+    servicePeriod: servicePeriodSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if (
@@ -178,6 +220,36 @@ export const issueVoucherSchema = z
         path: ['associatedVouchers'],
         message:
           'Las notas de crédito/débito requieren al menos un comprobante asociado.',
+      });
+    }
+
+    if (requiresServicePeriod(data.concept)) {
+      if (!data.servicePeriod) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['servicePeriod'],
+          message:
+            'Los comprobantes de servicios requieren el período facturado y la fecha de vencimiento de pago.',
+        });
+        return;
+      }
+      if (data.servicePeriod.from > data.servicePeriod.to) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['servicePeriod', 'to'],
+          message:
+            'La fecha de fin del período no puede ser anterior a la de inicio.',
+        });
+      }
+      return;
+    }
+
+    if (data.servicePeriod) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['servicePeriod'],
+        message:
+          'El período facturado sólo corresponde a comprobantes de servicios.',
       });
     }
   });

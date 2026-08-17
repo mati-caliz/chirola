@@ -6,8 +6,11 @@ import {
   ivaRates,
   issueVoucherSchema,
   requiresRecipientCuit,
+  requiresServicePeriod,
+  VoucherConcept,
   VoucherType,
   DocumentType,
+  type VoucherConceptType,
 } from '@chirola/shared';
 import {
   Badge,
@@ -23,7 +26,7 @@ import {
   Title,
 } from '@/components/ui';
 import { issueVoucher, listClients, type Client } from '@/lib/resources';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, toIsoDate } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 
 interface ItemForm {
@@ -40,13 +43,23 @@ const newItem = (): ItemForm => ({
   ivaRate: 21,
 });
 
+const currentMonthPeriod = () => {
+  const today = new Date();
+  return {
+    from: toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to: toIsoDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+    paymentDueDate: toIsoDate(today),
+  };
+};
+
 export default function NewVoucherScreen() {
   const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
   const router = useRouter();
 
   const [voucherType, setVoucherType] = useState<number>(VoucherType.FACTURA_B);
   const [salesPoint, setSalesPoint] = useState('1');
-  const [concept, setConcept] = useState<1 | 2 | 3>(1);
+  const [concept, setConcept] = useState<VoucherConceptType>(VoucherConcept.PRODUCTS);
+  const [servicePeriod, setServicePeriod] = useState(currentMonthPeriod);
   const [docType, setDocType] = useState<number>(DocumentType.CONSUMIDOR_FINAL);
   const [docNumber, setDocNumber] = useState('0');
   const [legalName, setLegalName] = useState('');
@@ -105,6 +118,7 @@ export default function NewVoucherScreen() {
         unitPrice: Number(item.unitPrice),
         ivaRate: item.ivaRate,
       })),
+      servicePeriod: requiresServicePeriod(concept) ? servicePeriod : undefined,
     };
     const parsed = issueVoucherSchema.safeParse(payload);
     if (!parsed.success) {
@@ -115,6 +129,7 @@ export default function NewVoucherScreen() {
   }
 
   const requiresCuit = requiresRecipientCuit(voucherType);
+  const needsServicePeriod = requiresServicePeriod(concept);
 
   return (
     <>
@@ -138,16 +153,48 @@ export default function NewVoucherScreen() {
           onChangeText={setSalesPoint}
           keyboardType="number-pad"
         />
-        <OptionGroup<1 | 2 | 3>
+        <OptionGroup<VoucherConceptType>
           label="Concepto"
           value={concept}
           onChange={setConcept}
           options={[
-            { label: 'Productos', value: 1 },
-            { label: 'Servicios', value: 2 },
-            { label: 'Ambos', value: 3 },
+            { label: 'Productos', value: VoucherConcept.PRODUCTS },
+            { label: 'Servicios', value: VoucherConcept.SERVICES },
+            { label: 'Ambos', value: VoucherConcept.PRODUCTS_AND_SERVICES },
           ]}
         />
+
+        {needsServicePeriod ? (
+          <Card>
+            <Label>Período facturado</Label>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="Desde"
+                  value={servicePeriod.from}
+                  onChangeText={(v) => setServicePeriod((prev) => ({ ...prev, from: v }))}
+                  placeholder="AAAA-MM-DD"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="Hasta"
+                  value={servicePeriod.to}
+                  onChangeText={(v) => setServicePeriod((prev) => ({ ...prev, to: v }))}
+                  placeholder="AAAA-MM-DD"
+                />
+              </View>
+            </View>
+            <TextField
+              label="Vencimiento de pago"
+              value={servicePeriod.paymentDueDate}
+              onChangeText={(v) =>
+                setServicePeriod((prev) => ({ ...prev, paymentDueDate: v }))
+              }
+              placeholder="AAAA-MM-DD"
+            />
+          </Card>
+        ) : null}
 
         <Card>
           <Label>Receptor</Label>

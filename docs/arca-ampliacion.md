@@ -31,11 +31,7 @@ pero **ningún código los usa todavía**: el tipo está adelantado, la integrac
 Son limitaciones del armado de `FECAEDetRequest`, no features nuevas. Hay casos que la app
 declara soportar y que ARCA rechazaría.
 
-### A.1 🔴 Concepto "servicios" y "productos y servicios"
-
-`issueVoucherSchema` acepta `concept: 1 | 2 | 3`, pero el detalle nunca incluye
-`FchServDesde`, `FchServHasta` ni `FchVtoPago`. ARCA los exige cuando `Concepto` es 2 o 3, y
-rechaza con **error 10016 / 10017** si faltan. En la práctica hoy sólo funciona el concepto 1.
+### A.1 ✅ Concepto "servicios" y "productos y servicios" — implementado
 
 Reglas del protocolo:
 
@@ -46,16 +42,15 @@ Reglas del protocolo:
 - `FchVtoPago` es la fecha de vencimiento del pago; para comprobantes de contado se usa la
   misma fecha del comprobante.
 
-Trabajo:
+`servicePeriod` (`from`, `to`, `paymentDueDate`) viaja en `issueVoucherSchema` en formato
+`AAAA-MM-DD` y se convierte a formato ARCA recién en `buildDetail`. El `superRefine` lo exige
+para conceptos 2 y 3, y lo **prohíbe** para el 1.
 
-- Agregar `servicePeriod` (`from`, `to`, `paymentDueDate`) a `issueVoucherSchema`, condicional
-  al concepto vía `superRefine`.
-- Propagarlo por `CaeRequest` y emitirlo en `buildDetail`.
-- Persistir el período en `Voucher` (migración: tres columnas `DateTime?`).
-- Mostrarlo en el PDF (los comprobantes de servicios deben exhibir el período facturado).
-- Selector de concepto + rango de fechas en la pantalla de nueva factura.
+Junto con esto se corrigió el orden de `ImpTrib` / `ImpIVA` en `FECAEDetRequest`: estaban
+invertidos respecto del XSD, que define una `sequence` estricta.
 
-Criterio de aceptación: emitir una Factura C de servicios en homologación y obtener CAE.
+Pendiente: emitir una Factura C de servicios contra homologación y confirmar el CAE. Depende del
+bloqueante 1.1 de `docs/roadmap.md`.
 
 ### A.2 🔴 Importes exentos y no gravados
 

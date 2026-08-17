@@ -50,6 +50,10 @@ function parseArcaDate(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function isoToArcaDate(iso: string): string {
+  return iso.replace(/-/g, '');
+}
+
 const num = (n: number): string => n.toFixed(2);
 
 @Injectable()
@@ -228,6 +232,16 @@ export class WsfeService {
     );
   }
 
+  private buildServicePeriod(request: CaeRequest): string {
+    const { servicePeriod } = request;
+    if (!servicePeriod) return '';
+    return (
+      `<ar:FchServDesde>${isoToArcaDate(servicePeriod.from)}</ar:FchServDesde>` +
+      `<ar:FchServHasta>${isoToArcaDate(servicePeriod.to)}</ar:FchServHasta>` +
+      `<ar:FchVtoPago>${isoToArcaDate(servicePeriod.paymentDueDate)}</ar:FchVtoPago>`
+    );
+  }
+
   private buildDetail(request: CaeRequest): string {
     const { amounts } = request;
     const ivaArray =
@@ -259,8 +273,9 @@ export class WsfeService {
       '<ar:ImpTotConc>0</ar:ImpTotConc>' +
       `<ar:ImpNeto>${num(amounts.netAmount)}</ar:ImpNeto>` +
       '<ar:ImpOpEx>0</ar:ImpOpEx>' +
-      `<ar:ImpIVA>${num(amounts.ivaAmount)}</ar:ImpIVA>` +
       '<ar:ImpTrib>0</ar:ImpTrib>' +
+      `<ar:ImpIVA>${num(amounts.ivaAmount)}</ar:ImpIVA>` +
+      this.buildServicePeriod(request) +
       `<ar:MonId>${request.currency}</ar:MonId>` +
       `<ar:MonCotiz>${request.exchangeRate}</ar:MonCotiz>` +
       `<ar:CondicionIVAReceptorId>${request.recipient.ivaConditionId}</ar:CondicionIVAReceptorId>` +

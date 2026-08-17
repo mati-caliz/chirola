@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { VoucherConcept } from '@chirola/shared';
 import { WsfeService } from './wsfe.service';
 import type { CaeRequest } from './wsfe.types';
 
@@ -94,6 +95,55 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
       }),
     );
     expect(xml.match(/<ar:CbteAsoc>/g)).toHaveLength(2);
+  });
+});
+
+describe('WsfeService — período de servicios', () => {
+  const detail = (request: CaeRequest): string =>
+    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
+
+  it('omite las fechas de servicio en comprobantes de productos', () => {
+    const xml = detail(baseRequest({ concept: VoucherConcept.PRODUCTS }));
+
+    expect(xml).not.toContain('FchServDesde');
+    expect(xml).not.toContain('FchServHasta');
+    expect(xml).not.toContain('FchVtoPago');
+  });
+
+  it('emite las tres fechas en formato ARCA para comprobantes de servicios', () => {
+    const xml = detail(
+      baseRequest({
+        concept: VoucherConcept.SERVICES,
+        servicePeriod: {
+          from: '2026-07-01',
+          to: '2026-07-31',
+          paymentDueDate: '2026-08-10',
+        },
+      }),
+    );
+
+    expect(xml).toContain(
+      '<ar:FchServDesde>20260701</ar:FchServDesde>' +
+        '<ar:FchServHasta>20260731</ar:FchServHasta>' +
+        '<ar:FchVtoPago>20260810</ar:FchVtoPago>',
+    );
+  });
+
+  it('ubica las fechas de servicio entre ImpIVA y MonId, como exige el WSDL', () => {
+    const xml = detail(
+      baseRequest({
+        concept: VoucherConcept.PRODUCTS_AND_SERVICES,
+        servicePeriod: {
+          from: '2026-07-01',
+          to: '2026-07-31',
+          paymentDueDate: '2026-08-10',
+        },
+      }),
+    );
+
+    expect(xml.indexOf('<ar:ImpTrib>')).toBeLessThan(xml.indexOf('<ar:ImpIVA>'));
+    expect(xml.indexOf('<ar:ImpIVA>')).toBeLessThan(xml.indexOf('<ar:FchServDesde>'));
+    expect(xml.indexOf('<ar:FchVtoPago>')).toBeLessThan(xml.indexOf('<ar:MonId>'));
   });
 });
 
