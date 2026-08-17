@@ -1,4 +1,4 @@
-import { issueVoucherSchema, VoucherConcept } from '@chirola/shared';
+import { issueVoucherSchema, TaxTreatment, VoucherConcept } from '@chirola/shared';
 
 function input(overrides: Record<string, unknown> = {}) {
   return {
@@ -17,6 +17,85 @@ const validPeriod = {
   to: '2026-07-31',
   paymentDueDate: '2026-08-10',
 };
+
+describe('issueVoucherSchema — tratamiento fiscal de los ítems', () => {
+  it('asume gravado cuando no se especifica', () => {
+    const result = issueVoucherSchema.parse(input());
+
+    expect(result.items[0].taxTreatment).toBe(TaxTreatment.TAXED);
+  });
+
+  it('acepta un ítem exento sin alícuota', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        items: [
+          {
+            description: 'Libro',
+            quantity: 1,
+            unitPrice: 500,
+            ivaRate: 0,
+            taxTreatment: TaxTreatment.EXEMPT,
+          },
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza un ítem exento con alícuota de IVA', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        items: [
+          {
+            description: 'Libro',
+            quantity: 1,
+            unitPrice: 500,
+            ivaRate: 21,
+            taxTreatment: TaxTreatment.EXEMPT,
+          },
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('issueVoucherSchema — tributos', () => {
+  const tribute = {
+    id: 2,
+    description: 'Percepción IIBB CABA',
+    taxableBase: 1000,
+    rate: 3,
+  };
+
+  it('acepta un comprobante sin tributos', () => {
+    expect(issueVoucherSchema.safeParse(input()).success).toBe(true);
+  });
+
+  it('acepta tributos con base y alícuota', () => {
+    expect(
+      issueVoucherSchema.safeParse(input({ tributes: [tribute] })).success,
+    ).toBe(true);
+  });
+
+  it('rechaza un tributo sin descripción', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({ tributes: [{ ...tribute, description: '' }] }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza una base imponible negativa', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({ tributes: [{ ...tribute, taxableBase: -1 }] }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+});
 
 describe('issueVoucherSchema — período de servicios', () => {
   it('acepta concepto productos sin período', () => {

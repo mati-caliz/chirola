@@ -129,11 +129,16 @@ model Voucher {
   serviceTo      DateTime?
   paymentDueDate DateTime?
 
-  netAmount    Decimal @db.Decimal(15, 2)
-  ivaAmount    Decimal @db.Decimal(15, 2)
-  totalAmount  Decimal @db.Decimal(15, 2)
-  currency     String  @default("PES")
-  exchangeRate Decimal @default(1) @db.Decimal(15, 6)
+  netAmount     Decimal @db.Decimal(15, 2)
+  ivaAmount     Decimal @db.Decimal(15, 2)
+  exemptAmount  Decimal @default(0) @db.Decimal(15, 2)
+  untaxedAmount Decimal @default(0) @db.Decimal(15, 2)
+  tributeAmount Decimal @default(0) @db.Decimal(15, 2)
+  totalAmount   Decimal @db.Decimal(15, 2)
+  currency      String  @default("PES")
+  exchangeRate  Decimal @default(1) @db.Decimal(15, 6)
+
+  tributes Json?
 
   status             String    @default("PENDIENTE")
   cae                String?
@@ -262,4 +267,6 @@ model VoucherItem {
   unitPrice   Decimal @db.Decimal(15, 4)
   ivaRate     Decimal @db.Decimal(5, 2)
   subtotal    Decimal @db.Decimal(15, 2)
+
+  taxTreatment String @default("TAXED")
 }

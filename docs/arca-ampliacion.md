@@ -52,13 +52,7 @@ invertidos respecto del XSD, que define una `sequence` estricta.
 Pendiente: emitir una Factura C de servicios contra homologación y confirmar el CAE. Depende del
 bloqueante 1.1 de `docs/roadmap.md`.
 
-### A.2 🔴 Importes exentos y no gravados
-
-`ImpTotConc` (no gravado), `ImpOpEx` (exento) e `ImpTrib` están **hardcodeados en `0`**.
-Consecuencia: no se puede facturar un ítem exento ni uno no gravado, y la suma no cierra si el
-usuario lo intenta.
-
-Notar la asimetría: `PurchaseInvoice` ya tiene `exempt` y `untaxed` en Prisma, pero `Voucher` no.
+### A.2 ✅ Importes exentos y no gravados — implementado
 
 Reglas del protocolo:
 
@@ -68,30 +62,22 @@ Reglas del protocolo:
   Son cosas distintas y se confunden seguido.
 - En Factura C (monotributo) `ImpNeto` es el total y no se informa `Iva`.
 
-Trabajo:
+El tratamiento de cada ítem es **explícito** (`TaxTreatment`: `TAXED` / `EXEMPT` / `UNTAXED`), no
+inferido de la alícuota: es lo que permite distinguir un ítem gravado al 0% de uno exento, que
+en el XML son cosas distintas. Los ítems no gravados y exentos no llevan alícuota, y el schema
+lo rechaza si la traen.
 
-- Extender `itemSchema` con una clasificación explícita (`TAXED` / `EXEMPT` / `UNTAXED`) en vez
-  de inferirla de la alícuota.
-- Ajustar `iva-calculator.ts` para acumular las tres bases por separado.
-- Migración en `Voucher`: `exemptAmount`, `untaxedAmount`, `tributeAmount`.
-- Tests de la identidad de totales en `iva-calculator.spec.ts`.
-
-### A.3 🔴 Tributos (percepciones y retenciones)
-
-Falta el nodo `<Tributos>`. Sin él no se pueden emitir comprobantes con percepción de IIBB,
-percepción de IVA, impuestos internos ni tasas municipales — algo muy común en B2B.
+### A.3 ✅ Tributos (percepciones y retenciones) — implementado
 
 Estructura por tributo: `Id`, `Desc`, `BaseImp`, `Alic`, `Importe`. La suma de los `Importe`
 debe igualar `ImpTrib`.
 
-Tipos (vía `FEParamGetTiposTributos`, se cachean): 1 nacionales · 2 provinciales ·
-3 municipales · 4 internos · 99 otros.
+Tipos: 1 nacionales · 2 provinciales · 3 municipales · 4 internos · 99 otros. Están como
+constantes en `packages/shared`; sincronizarlos contra `FEParamGetTiposTributos` queda en A.5.
 
-Trabajo:
-
-- Nuevo tipo `Tribute` en `packages/shared`, array opcional en `issueVoucherSchema`.
-- `buildTributes` en `wsfe.service.ts`, análogo a `buildAssociatedVouchers`.
-- Persistir en `Voucher` (Json, como `associatedVouchers`) y renderizar en el PDF.
+El cliente manda `id`, `description`, `taxableBase` y `rate`; el **importe lo calcula el
+backend** (`iva-calculator.ts`), nunca el mobile. Los tributos se suman al `ImpTotal` y se
+persisten en `Voucher.tributes`.
 
 ### A.4 🟡 Cotización de moneda extranjera
 
@@ -261,7 +247,7 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 
 1. **A.1** concepto servicios — está declarado en el schema y no funciona.
 2. **A.2 + A.3** exentos, no gravados y tributos — desbloquean B2B real.
-3. **B** padrón — mejor valor/esfuerzo, mejora la UX de todo el flujo.
+3. **B** padrón — mejor valor/esfuerzo, mejora la UX de todo el flujo. ← siguiente
 4. **A.4 + A.5** cotización y tablas de parámetros.
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.

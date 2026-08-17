@@ -15,12 +15,24 @@ export interface ArcaIvaRate {
   amount: number;
 }
 
+export type ArcaTribute = {
+  id: number;
+  description: string;
+  taxableBase: number;
+  rate: number;
+  amount: number;
+};
+
 export interface VoucherAmounts {
   netAmount: number;
   ivaAmount: number;
+  exemptAmount: number;
+  untaxedAmount: number;
+  tributeAmount: number;
   totalAmount: number;
 
   rates: ArcaIvaRate[];
+  tributes: ArcaTribute[];
 }
 
 export interface CaeRequest {

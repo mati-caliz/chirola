@@ -7,9 +7,14 @@ import {
   issueVoucherSchema,
   requiresRecipientCuit,
   requiresServicePeriod,
+  TaxTreatment,
+  taxTreatmentName,
+  TributeType,
+  tributeTypeName,
   VoucherConcept,
   VoucherType,
   DocumentType,
+  type TaxTreatmentType,
   type VoucherConceptType,
 } from '@chirola/shared';
 import {
@@ -34,13 +39,32 @@ interface ItemForm {
   quantity: string;
   unitPrice: string;
   ivaRate: number;
+  taxTreatment: TaxTreatmentType;
 }
+
+interface TributeForm {
+  id: number;
+  description: string;
+  taxableBase: string;
+  rate: string;
+}
+
+const DEFAULT_IVA_RATE = 21;
+const NO_IVA_RATE = 0;
 
 const newItem = (): ItemForm => ({
   description: '',
   quantity: '1',
   unitPrice: '',
-  ivaRate: 21,
+  ivaRate: DEFAULT_IVA_RATE,
+  taxTreatment: TaxTreatment.TAXED,
+});
+
+const newTribute = (): TributeForm => ({
+  id: TributeType.PROVINCIAL,
+  description: '',
+  taxableBase: '',
+  rate: '',
 });
 
 const currentMonthPeriod = () => {
@@ -64,6 +88,7 @@ export default function NewVoucherScreen() {
   const [docNumber, setDocNumber] = useState('0');
   const [legalName, setLegalName] = useState('');
   const [items, setItems] = useState<ItemForm[]>([newItem()]);
+  const [tributes, setTributes] = useState<TributeForm[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const { data: clients } = useQuery({
@@ -81,6 +106,12 @@ export default function NewVoucherScreen() {
     setItems((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
   }
 
+  function setTribute(index: number, patch: Partial<TributeForm>) {
+    setTributes((prev) =>
+      prev.map((tribute, idx) => (idx === index ? { ...tribute, ...patch } : tribute)),
+    );
+  }
+
   function chooseClient(client: Client) {
     setDocType(client.docType);
     setDocNumber(client.docNumber);
@@ -88,17 +119,53 @@ export default function NewVoucherScreen() {
   }
 
   const totals = useMemo(() => {
+    let taxedGross = 0;
+    let exempt = 0;
+    let untaxed = 0;
+    for (const item of items) {
+      const gross = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+      if (item.taxTreatment === TaxTreatment.EXEMPT) exempt += gross;
+      else if (item.taxTreatment === TaxTreatment.UNTAXED) untaxed += gross;
+      else taxedGross += gross;
+    }
+
+    const tributeAmount = tributes.reduce(
+      (acc, tribute) =>
+        acc + ((Number(tribute.taxableBase) || 0) * (Number(tribute.rate) || 0)) / 100,
+      0,
+    );
+
+    if (!requiresRecipientCuit(voucherType)) {
+      const itemsTotal = taxedGross + exempt + untaxed;
+      return {
+        net: itemsTotal,
+        iva: 0,
+        exempt: 0,
+        untaxed: 0,
+        tributeAmount,
+        total: itemsTotal + tributeAmount,
+      };
+    }
+
     let net = 0;
     let iva = 0;
     for (const item of items) {
-      const quantity = Number(item.quantity) || 0;
-      const unitPrice = Number(item.unitPrice) || 0;
-      const subtotal = quantity * unitPrice;
-      net += subtotal;
-      iva += (subtotal * item.ivaRate) / 100;
+      if (item.taxTreatment !== TaxTreatment.TAXED) continue;
+      const gross = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+      const taxableBase = gross / (1 + item.ivaRate / 100);
+      net += taxableBase;
+      iva += gross - taxableBase;
     }
-    return { net, iva, total: net + iva };
-  }, [items]);
+
+    return {
+      net,
+      iva,
+      exempt,
+      untaxed,
+      tributeAmount,
+      total: net + iva + exempt + untaxed + tributeAmount,
+    };
+  }, [items, tributes, voucherType]);
 
   function onSubmit() {
     setError(null);
@@ -116,8 +183,18 @@ export default function NewVoucherScreen() {
         description: item.description.trim(),
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
-        ivaRate: item.ivaRate,
+        ivaRate: item.taxTreatment === TaxTreatment.TAXED ? item.ivaRate : 0,
+        taxTreatment: item.taxTreatment,
       })),
+      tributes:
+        tributes.length > 0
+          ? tributes.map((tribute) => ({
+              id: tribute.id,
+              description: tribute.description.trim(),
+              taxableBase: Number(tribute.taxableBase),
+              rate: Number(tribute.rate),
+            }))
+          : undefined,
       servicePeriod: requiresServicePeriod(concept) ? servicePeriod : undefined,
     };
     const parsed = issueVoucherSchema.safeParse(payload);
@@ -272,19 +349,99 @@ export default function NewVoucherScreen() {
                 />
               </View>
             </View>
-            <OptionGroup<number>
-              label="IVA %"
-              value={item.ivaRate}
-              onChange={(v) => setItem(index, { ivaRate: v })}
-              options={ivaRates.map((rate) => ({ label: `${rate}%`, value: rate }))}
+            <OptionGroup<TaxTreatmentType>
+              label="Tratamiento"
+              value={item.taxTreatment}
+              onChange={(v) =>
+                setItem(index, {
+                  taxTreatment: v,
+                  ivaRate: v === TaxTreatment.TAXED ? DEFAULT_IVA_RATE : NO_IVA_RATE,
+                })
+              }
+              options={[
+                { label: taxTreatmentName.TAXED, value: TaxTreatment.TAXED },
+                { label: taxTreatmentName.EXEMPT, value: TaxTreatment.EXEMPT },
+                { label: taxTreatmentName.UNTAXED, value: TaxTreatment.UNTAXED },
+              ]}
             />
+            {item.taxTreatment === TaxTreatment.TAXED ? (
+              <OptionGroup<number>
+                label="IVA %"
+                value={item.ivaRate}
+                onChange={(v) => setItem(index, { ivaRate: v })}
+                options={ivaRates.map((rate) => ({ label: `${rate}%`, value: rate }))}
+              />
+            ) : null}
           </Card>
         ))}
         <Button title="+ Agregar ítem" variant="secondary" onPress={() => setItems((prev) => [...prev, newItem()])} />
 
+        <Label>Tributos</Label>
+        {tributes.map((tribute, index) => (
+          <Card key={index}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <BodyText>Tributo {index + 1}</BodyText>
+              <Pressable
+                onPress={() => setTributes((prev) => prev.filter((_, idx) => idx !== index))}
+                hitSlop={8}
+              >
+                <Text style={{ color: '#E5484D', fontWeight: '600' }}>Quitar</Text>
+              </Pressable>
+            </View>
+            <OptionGroup<number>
+              label="Tipo"
+              value={tribute.id}
+              onChange={(v) => setTribute(index, { id: v })}
+              options={[
+                { label: tributeTypeName[TributeType.PROVINCIAL], value: TributeType.PROVINCIAL },
+                { label: tributeTypeName[TributeType.MUNICIPAL], value: TributeType.MUNICIPAL },
+                { label: tributeTypeName[TributeType.INTERNAL], value: TributeType.INTERNAL },
+              ]}
+            />
+            <TextField
+              label="Descripción"
+              value={tribute.description}
+              onChangeText={(v) => setTribute(index, { description: v })}
+              placeholder="Percepción IIBB CABA"
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="Base imponible"
+                  value={tribute.taxableBase}
+                  onChangeText={(v) => setTribute(index, { taxableBase: v })}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="Alícuota %"
+                  value={tribute.rate}
+                  onChangeText={(v) => setTribute(index, { rate: v })}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+          </Card>
+        ))}
+        <Button
+          title="+ Agregar tributo"
+          variant="secondary"
+          onPress={() => setTributes((prev) => [...prev, newTribute()])}
+        />
+
         <Card>
           <Row label="Neto" value={formatCurrency(totals.net)} />
+          {totals.untaxed > 0 ? (
+            <Row label="No gravado" value={formatCurrency(totals.untaxed)} />
+          ) : null}
+          {totals.exempt > 0 ? (
+            <Row label="Exento" value={formatCurrency(totals.exempt)} />
+          ) : null}
           <Row label="IVA" value={formatCurrency(totals.iva)} />
+          {totals.tributeAmount > 0 ? (
+            <Row label="Tributos" value={formatCurrency(totals.tributeAmount)} />
+          ) : null}
           <Row label="Total" value={formatCurrency(totals.total)} bold />
         </Card>
 

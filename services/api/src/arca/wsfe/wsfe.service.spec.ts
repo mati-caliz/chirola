@@ -18,7 +18,16 @@ function baseRequest(overrides: Partial<CaeRequest> = {}): CaeRequest {
     number: 5,
     date: new Date(2026, 6, 12),
     recipient: { docType: 80, docNumber: '20111111112', ivaConditionId: 1 },
-    amounts: { netAmount: 100, ivaAmount: 0, totalAmount: 100, rates: [] },
+    amounts: {
+      netAmount: 100,
+      ivaAmount: 0,
+      exemptAmount: 0,
+      untaxedAmount: 0,
+      tributeAmount: 0,
+      totalAmount: 100,
+      rates: [],
+      tributes: [],
+    },
     currency: 'PES',
     exchangeRate: 1,
     ...overrides,
@@ -72,8 +81,12 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
         amounts: {
           netAmount: 100,
           ivaAmount: 21,
+          exemptAmount: 0,
+          untaxedAmount: 0,
+          tributeAmount: 0,
           totalAmount: 121,
           rates: [{ id: 5, taxableBase: 100, amount: 21 }],
+          tributes: [],
         },
         associatedVouchers: [{ type: 1, salesPoint: 1, number: 7 }],
       }),
@@ -95,6 +108,98 @@ describe('WsfeService — CbtesAsoc (NC/ND)', () => {
       }),
     );
     expect(xml.match(/<ar:CbteAsoc>/g)).toHaveLength(2);
+  });
+});
+
+describe('WsfeService — importes exentos, no gravados y tributos', () => {
+  const detail = (request: CaeRequest): string =>
+    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
+
+  const withAmounts = (overrides: Partial<CaeRequest['amounts']>): CaeRequest =>
+    baseRequest({ amounts: { ...baseRequest().amounts, ...overrides } });
+
+  it('informa ImpTotConc e ImpOpEx con los importes reales', () => {
+    const xml = detail(
+      withAmounts({
+        netAmount: 1000,
+        ivaAmount: 210,
+        exemptAmount: 500,
+        untaxedAmount: 300,
+        totalAmount: 2010,
+      }),
+    );
+
+    expect(xml).toContain('<ar:ImpTotConc>300.00</ar:ImpTotConc>');
+    expect(xml).toContain('<ar:ImpOpEx>500.00</ar:ImpOpEx>');
+    expect(xml).toContain('<ar:ImpNeto>1000.00</ar:ImpNeto>');
+  });
+
+  it('omite Tributos cuando no hay', () => {
+    expect(detail(baseRequest())).not.toContain('Tributos');
+  });
+
+  it('arma cada Tributo con Id, Desc, BaseImp, Alic e Importe', () => {
+    const xml = detail(
+      withAmounts({
+        tributeAmount: 30,
+        tributes: [
+          {
+            id: 2,
+            description: 'Percepción IIBB CABA',
+            taxableBase: 1000,
+            rate: 3,
+            amount: 30,
+          },
+        ],
+      }),
+    );
+
+    expect(xml).toContain('<ar:ImpTrib>30.00</ar:ImpTrib>');
+    expect(xml).toContain(
+      '<ar:Tributos><ar:Tributo>' +
+        '<ar:Id>2</ar:Id>' +
+        '<ar:Desc>Percepción IIBB CABA</ar:Desc>' +
+        '<ar:BaseImp>1000.00</ar:BaseImp>' +
+        '<ar:Alic>3.00</ar:Alic>' +
+        '<ar:Importe>30.00</ar:Importe>' +
+        '</ar:Tributo></ar:Tributos>',
+    );
+  });
+
+  it('escapa la descripción del tributo', () => {
+    const xml = detail(
+      withAmounts({
+        tributeAmount: 10,
+        tributes: [
+          {
+            id: 99,
+            description: 'Tasa <Municipal> & otros',
+            taxableBase: 100,
+            rate: 10,
+            amount: 10,
+          },
+        ],
+      }),
+    );
+
+    expect(xml).toContain('<ar:Desc>Tasa &lt;Municipal&gt; &amp; otros</ar:Desc>');
+  });
+
+  it('ubica Tributos entre CbtesAsoc e Iva, como exige el WSDL', () => {
+    const xml = detail(
+      withAmounts({
+        tributeAmount: 30,
+        rates: [{ id: 5, taxableBase: 100, amount: 21 }],
+        tributes: [
+          { id: 2, description: 'IIBB', taxableBase: 1000, rate: 3, amount: 30 },
+        ],
+      }),
+    );
+
+    expect(xml.indexOf('CondicionIVAReceptorId')).toBeLessThan(
+      xml.indexOf('<ar:Tributos>'),
+    );
+    expect(xml.indexOf('<ar:Tributos>')).toBeLessThan(xml.indexOf('<ar:Iva>'));
   });
 });
 

@@ -130,14 +130,69 @@ export const ivaRateAfipId: Record<number, number> = {
   27: 6,
 };
 
-export const itemSchema = z.object({
+export const TaxTreatment = {
+  TAXED: 'TAXED',
+  EXEMPT: 'EXEMPT',
+  UNTAXED: 'UNTAXED',
+} as const;
+
+export type TaxTreatmentType =
+  (typeof TaxTreatment)[keyof typeof TaxTreatment];
+
+export const taxTreatmentName: Record<TaxTreatmentType, string> = {
+  TAXED: 'Gravado',
+  EXEMPT: 'Exento',
+  UNTAXED: 'No gravado',
+};
+
+export const itemSchema = z
+  .object({
+    description: z.string().min(1),
+    quantity: z.number().positive(),
+    unitPrice: z.number().nonnegative(),
+    ivaRate: z.number().refine((v) => (ivaRates as readonly number[]).includes(v), {
+      message: 'Alícuota de IVA no soportada',
+    }),
+
+    taxTreatment: z
+      .enum([TaxTreatment.TAXED, TaxTreatment.EXEMPT, TaxTreatment.UNTAXED])
+      .default(TaxTreatment.TAXED),
+  })
+  .superRefine((item, ctx) => {
+    if (item.taxTreatment !== TaxTreatment.TAXED && item.ivaRate !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ivaRate'],
+        message:
+          'Los ítems exentos y no gravados no llevan alícuota de IVA.',
+      });
+    }
+  });
+
+export const TributeType = {
+  NATIONAL: 1,
+  PROVINCIAL: 2,
+  MUNICIPAL: 3,
+  INTERNAL: 4,
+  OTHER: 99,
+} as const;
+
+export const tributeTypeName: Record<number, string> = {
+  1: 'Impuestos nacionales',
+  2: 'Impuestos provinciales',
+  3: 'Impuestos municipales',
+  4: 'Impuestos internos',
+  99: 'Otros',
+};
+
+export const tributeSchema = z.object({
+  id: z.number().int().positive(),
   description: z.string().min(1),
-  quantity: z.number().positive(),
-  unitPrice: z.number().nonnegative(),
-  ivaRate: z.number().refine((v) => (ivaRates as readonly number[]).includes(v), {
-    message: 'Alícuota de IVA no soportada',
-  }),
+  taxableBase: z.number().nonnegative(),
+  rate: z.number().nonnegative(),
 });
+
+export type Tribute = z.infer<typeof tributeSchema>;
 
 export const VoucherConcept = {
   PRODUCTS: 1,
@@ -209,6 +264,8 @@ export const issueVoucherSchema = z
     associatedVouchers: z.array(associatedVoucherSchema).optional(),
 
     servicePeriod: servicePeriodSchema.optional(),
+
+    tributes: z.array(tributeSchema).optional(),
   })
   .superRefine((data, ctx) => {
     if (

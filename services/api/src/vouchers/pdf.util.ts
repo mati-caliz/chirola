@@ -3,6 +3,8 @@ import {
   voucherLetter,
   voucherTypeName,
   documentTypeName,
+  TaxTreatment,
+  type TaxTreatmentType,
 } from '@chirola/shared';
 
 export interface PdfItem {
@@ -10,6 +12,7 @@ export interface PdfItem {
   quantity: number;
   unitPrice: number;
   ivaRate: number;
+  taxTreatment: TaxTreatmentType;
   subtotal: number;
 }
 
@@ -17,6 +20,11 @@ export interface AssociatedVoucherPdf {
   type: number;
   salesPoint: number;
   number: number;
+}
+
+export interface TributePdf {
+  description: string;
+  amount: number;
 }
 
 export interface ServicePeriodPdf {
@@ -35,7 +43,10 @@ export interface VoucherPdfData {
   currency: string;
   netAmount: number;
   ivaAmount: number;
+  exemptAmount: number;
+  untaxedAmount: number;
   totalAmount: number;
+  tributes: TributePdf[];
   cae: string;
   caeExpiration: Date;
   items: PdfItem[];
@@ -49,6 +60,12 @@ const money = (n: number): string =>
 
 const date = (d: Date): string =>
   `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+const ivaCell = (item: PdfItem): string => {
+  if (item.taxTreatment === TaxTreatment.EXEMPT) return 'Exento';
+  if (item.taxTreatment === TaxTreatment.UNTAXED) return 'No grav.';
+  return money(item.ivaRate);
+};
 
 const voucherId = (type: number, salesPoint: number, number: number): string =>
   `${voucherTypeName[type] ?? `Tipo ${type}`} ${String(salesPoint).padStart(5, '0')}-${String(number).padStart(8, '0')}`;
@@ -131,7 +148,7 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
       doc.text(it.description, cols.desc, y, { width: 240 });
       doc.text(money(it.quantity), cols.cant, y, { width: 50, align: 'right' });
       doc.text(money(it.unitPrice), cols.precio, y, { width: 70, align: 'right' });
-      doc.text(money(it.ivaRate), cols.iva, y, { width: 50, align: 'right' });
+      doc.text(ivaCell(it), cols.iva, y, { width: 50, align: 'right' });
       doc.text(money(it.subtotal), cols.sub, y, { width: 90, align: 'right' });
       y += Math.max(h, 12) + 4;
     }
@@ -145,7 +162,16 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
       y += bold ? 18 : 14;
     };
     totalLabel('Importe Neto:', `$ ${money(data.netAmount)}`);
+    if (data.untaxedAmount > 0) {
+      totalLabel('Importe No Gravado:', `$ ${money(data.untaxedAmount)}`);
+    }
+    if (data.exemptAmount > 0) {
+      totalLabel('Importe Exento:', `$ ${money(data.exemptAmount)}`);
+    }
     totalLabel('IVA:', `$ ${money(data.ivaAmount)}`);
+    for (const tribute of data.tributes) {
+      totalLabel(`${tribute.description}:`, `$ ${money(tribute.amount)}`);
+    }
     totalLabel('Total:', `$ ${money(data.totalAmount)}`, true);
 
     if (data.associatedVouchers.length > 0) {

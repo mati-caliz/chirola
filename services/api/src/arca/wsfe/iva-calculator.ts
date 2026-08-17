@@ -1,32 +1,75 @@
 import {
   ivaRateAfipId,
   requiresRecipientCuit,
+  TaxTreatment,
   type Item,
+  type Tribute,
 } from '@chirola/shared';
-import type { ArcaIvaRate, VoucherAmounts } from './wsfe.types';
+import type { ArcaIvaRate, ArcaTribute, VoucherAmounts } from './wsfe.types';
 
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+function grossOf(item: Item): number {
+  return item.quantity * item.unitPrice;
+}
+
+function sumBy(items: Item[], treatment: string): number {
+  return round2(
+    items
+      .filter((item) => item.taxTreatment === treatment)
+      .reduce((acc, item) => acc + grossOf(item), 0),
+  );
+}
+
+function calculateTributes(tributes: Tribute[]): {
+  entries: ArcaTribute[];
+  total: number;
+} {
+  const entries = tributes.map((tribute) => ({
+    id: tribute.id,
+    description: tribute.description,
+    taxableBase: round2(tribute.taxableBase),
+    rate: tribute.rate,
+    amount: round2((tribute.taxableBase * tribute.rate) / 100),
+  }));
+  const total = round2(entries.reduce((acc, entry) => acc + entry.amount, 0));
+  return { entries, total };
+}
+
 export function calculateAmounts(
   voucherType: number,
   items: Item[],
+  tributes: Tribute[] = [],
 ): VoucherAmounts {
-  const totalAmount = round2(
-    items.reduce((acc, it) => acc + it.quantity * it.unitPrice, 0),
-  );
+  const { entries: tributeEntries, total: tributeAmount } =
+    calculateTributes(tributes);
+  const itemsTotal = round2(items.reduce((acc, item) => acc + grossOf(item), 0));
+  const totalAmount = round2(itemsTotal + tributeAmount);
 
   if (!requiresRecipientCuit(voucherType)) {
-    return { netAmount: totalAmount, ivaAmount: 0, totalAmount, rates: [] };
+    return {
+      netAmount: itemsTotal,
+      ivaAmount: 0,
+      exemptAmount: 0,
+      untaxedAmount: 0,
+      tributeAmount,
+      totalAmount,
+      rates: [],
+      tributes: tributeEntries,
+    };
   }
 
+  const exemptAmount = sumBy(items, TaxTreatment.EXEMPT);
+  const untaxedAmount = sumBy(items, TaxTreatment.UNTAXED);
+
   const grossByRate = new Map<number, number>();
-  for (const it of items) {
-    const gross = it.quantity * it.unitPrice;
+  for (const item of items) {
+    if (item.taxTreatment !== TaxTreatment.TAXED) continue;
     grossByRate.set(
-      it.ivaRate,
-      (grossByRate.get(it.ivaRate) ?? 0) + gross,
+      item.ivaRate,
+      (grossByRate.get(item.ivaRate) ?? 0) + grossOf(item),
     );
   }
 
@@ -48,5 +91,14 @@ export function calculateAmounts(
     rates.push({ id, taxableBase, amount });
   }
 
-  return { netAmount, ivaAmount, totalAmount, rates };
+  return {
+    netAmount,
+    ivaAmount,
+    exemptAmount,
+    untaxedAmount,
+    tributeAmount,
+    totalAmount,
+    rates,
+    tributes: tributeEntries,
+  };
 }

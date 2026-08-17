@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XMLParser } from 'fast-xml-parser';
-import { buildAuthBlock, callSoap, ParsedXml } from '../arca-soap.util';
+import { buildAuthBlock, callSoap, escapeXml, ParsedXml } from '../arca-soap.util';
 import { ArcaRejectionError } from './arca-errors';
 import type {
   AuthContext,
@@ -232,6 +232,27 @@ export class WsfeService {
     );
   }
 
+  private buildTributes(request: CaeRequest): string {
+    const { tributes } = request.amounts;
+    if (tributes.length === 0) return '';
+    return (
+      '<ar:Tributos>' +
+      tributes
+        .map(
+          (tribute) =>
+            '<ar:Tributo>' +
+            `<ar:Id>${tribute.id}</ar:Id>` +
+            `<ar:Desc>${escapeXml(tribute.description)}</ar:Desc>` +
+            `<ar:BaseImp>${num(tribute.taxableBase)}</ar:BaseImp>` +
+            `<ar:Alic>${num(tribute.rate)}</ar:Alic>` +
+            `<ar:Importe>${num(tribute.amount)}</ar:Importe>` +
+            '</ar:Tributo>',
+        )
+        .join('') +
+      '</ar:Tributos>'
+    );
+  }
+
   private buildServicePeriod(request: CaeRequest): string {
     const { servicePeriod } = request;
     if (!servicePeriod) return '';
@@ -270,16 +291,17 @@ export class WsfeService {
       `<ar:CbteHasta>${request.number}</ar:CbteHasta>` +
       `<ar:CbteFch>${toArcaDate(request.date)}</ar:CbteFch>` +
       `<ar:ImpTotal>${num(amounts.totalAmount)}</ar:ImpTotal>` +
-      '<ar:ImpTotConc>0</ar:ImpTotConc>' +
+      `<ar:ImpTotConc>${num(amounts.untaxedAmount)}</ar:ImpTotConc>` +
       `<ar:ImpNeto>${num(amounts.netAmount)}</ar:ImpNeto>` +
-      '<ar:ImpOpEx>0</ar:ImpOpEx>' +
-      '<ar:ImpTrib>0</ar:ImpTrib>' +
+      `<ar:ImpOpEx>${num(amounts.exemptAmount)}</ar:ImpOpEx>` +
+      `<ar:ImpTrib>${num(amounts.tributeAmount)}</ar:ImpTrib>` +
       `<ar:ImpIVA>${num(amounts.ivaAmount)}</ar:ImpIVA>` +
       this.buildServicePeriod(request) +
       `<ar:MonId>${request.currency}</ar:MonId>` +
       `<ar:MonCotiz>${request.exchangeRate}</ar:MonCotiz>` +
       `<ar:CondicionIVAReceptorId>${request.recipient.ivaConditionId}</ar:CondicionIVAReceptorId>` +
       this.buildAssociatedVouchers(request) +
+      this.buildTributes(request) +
       ivaArray +
       '</ar:FECAEDetRequest>' +
       '</ar:FeDetReq>'

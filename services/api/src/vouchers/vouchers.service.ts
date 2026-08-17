@@ -6,10 +6,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, type PendingVoucher } from '@prisma/client';
+import { z } from 'zod';
 import {
   defaultRecipientIvaCondition,
   issueVoucherSchema,
+  TaxTreatment,
   type IssueVoucher,
+  type TaxTreatmentType,
 } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
@@ -31,7 +34,7 @@ import { IssuerLockService } from './issuer-lock.service';
 import { VoucherQueuedException } from './voucher-queued.exception';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
-import { renderVoucherPdf } from './pdf.util';
+import { renderVoucherPdf, type TributePdf } from './pdf.util';
 
 interface CaeWithNumber {
   result: CaeResult;
@@ -46,6 +49,26 @@ interface EmissionOutcome {
 }
 
 type PendingVoucherRow = PendingVoucher;
+
+const storedTributesSchema = z.array(
+  z.object({ description: z.string(), amount: z.number() }),
+);
+
+const storedTaxTreatmentSchema = z.enum([
+  TaxTreatment.TAXED,
+  TaxTreatment.EXEMPT,
+  TaxTreatment.UNTAXED,
+]);
+
+function parseStoredTributes(stored: Prisma.JsonValue | null): TributePdf[] {
+  const parsed = storedTributesSchema.safeParse(stored);
+  return parsed.success ? parsed.data : [];
+}
+
+function parseTaxTreatment(stored: string): TaxTreatmentType {
+  const parsed = storedTaxTreatmentSchema.safeParse(stored);
+  return parsed.success ? parsed.data : TaxTreatment.TAXED;
+}
 
 function parseIsoDate(iso: string): Date {
   const [year, month, day] = iso.split('-').map(Number);
@@ -158,7 +181,10 @@ export class VouchersService {
       currency: voucher.currency,
       netAmount: Number(voucher.netAmount),
       ivaAmount: Number(voucher.ivaAmount),
+      exemptAmount: Number(voucher.exemptAmount),
+      untaxedAmount: Number(voucher.untaxedAmount),
       totalAmount: Number(voucher.totalAmount),
+      tributes: parseStoredTributes(voucher.tributes),
       cae: voucher.cae,
       caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
       items: voucher.items.map((it) => ({
@@ -166,6 +192,7 @@ export class VouchersService {
         quantity: Number(it.quantity),
         unitPrice: Number(it.unitPrice),
         ivaRate: Number(it.ivaRate),
+        taxTreatment: parseTaxTreatment(it.taxTreatment),
         subtotal: Number(it.subtotal),
       })),
       servicePeriod:
@@ -232,7 +259,7 @@ export class VouchersService {
     if (issuer.userId !== userId) {
       throw new ForbiddenException('El emisor no pertenece al usuario.');
     }
-    return calculateAmounts(input.voucherType, input.items);
+    return calculateAmounts(input.voucherType, input.items, input.tributes);
   }
 
   async previewForApiClient(
@@ -240,7 +267,7 @@ export class VouchersService {
     input: IssueVoucher,
   ): Promise<VoucherAmounts> {
     await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
-    return calculateAmounts(input.voucherType, input.items);
+    return calculateAmounts(input.voucherType, input.items, input.tributes);
   }
 
   async computeEmissionPlanForApiClient(
@@ -277,7 +304,7 @@ export class VouchersService {
       input.salesPoint,
       input.voucherType,
     );
-    const amounts = calculateAmounts(input.voucherType, input.items);
+    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
     return {
       salesPoint: input.salesPoint,
       voucherType: input.voucherType,
@@ -351,7 +378,7 @@ export class VouchersService {
       sign: accessTicket.sign,
     };
 
-    const amounts = calculateAmounts(input.voucherType, input.items);
+    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
     const date = new Date();
     const ivaConditionId =
       input.recipient.ivaConditionId ??
@@ -428,7 +455,11 @@ export class VouchersService {
           : null,
         netAmount: amounts.netAmount,
         ivaAmount: amounts.ivaAmount,
+        exemptAmount: amounts.exemptAmount,
+        untaxedAmount: amounts.untaxedAmount,
+        tributeAmount: amounts.tributeAmount,
         totalAmount: amounts.totalAmount,
+        tributes: amounts.tributes.length > 0 ? amounts.tributes : undefined,
         currency: input.currency,
         exchangeRate: input.exchangeRate,
         status: 'AUTORIZADO',
@@ -442,6 +473,7 @@ export class VouchersService {
             quantity: it.quantity,
             unitPrice: it.unitPrice,
             ivaRate: it.ivaRate,
+            taxTreatment: it.taxTreatment,
             subtotal: Math.round(it.quantity * it.unitPrice * 100) / 100,
           })),
         },

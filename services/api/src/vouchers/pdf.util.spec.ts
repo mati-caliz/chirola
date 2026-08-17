@@ -1,3 +1,4 @@
+import { TaxTreatment } from '@chirola/shared';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf, type VoucherPdfData } from './pdf.util';
 import { buildQrUrl } from './qr.util';
@@ -47,11 +48,21 @@ describe('pdf util', () => {
       currency: 'PES',
       netAmount: 100,
       ivaAmount: 21,
+      exemptAmount: 0,
+      untaxedAmount: 0,
       totalAmount: 121,
+      tributes: [],
       cae: '75123456789012',
       caeExpiration: new Date(2026, 6, 22),
       items: [
-        { description: 'Servicio de consultoría', quantity: 1, unitPrice: 121, ivaRate: 21, subtotal: 121 },
+        {
+          description: 'Servicio de consultoría',
+          quantity: 1,
+          unitPrice: 121,
+          ivaRate: 21,
+          taxTreatment: TaxTreatment.TAXED,
+          subtotal: 121,
+        },
       ],
       associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }],
       servicePeriod: null,
@@ -71,6 +82,30 @@ describe('pdf util', () => {
     const qrPng = await renderQrPng(qrUrl);
     const pdf = await renderVoucherPdf(
       data({ qrPng, recipient: null, associatedVouchers: [] }),
+    );
+    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  it('renderiza exentos, no gravados y tributos en los totales', async () => {
+    const qrPng = await renderQrPng(qrUrl);
+    const pdf = await renderVoucherPdf(
+      data({
+        qrPng,
+        exemptAmount: 500,
+        untaxedAmount: 300,
+        totalAmount: 951,
+        tributes: [{ description: 'Percepción IIBB CABA', amount: 30 }],
+        items: [
+          {
+            description: 'Libro',
+            quantity: 1,
+            unitPrice: 500,
+            ivaRate: 0,
+            taxTreatment: TaxTreatment.EXEMPT,
+            subtotal: 500,
+          },
+        ],
+      }),
     );
     expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   });
