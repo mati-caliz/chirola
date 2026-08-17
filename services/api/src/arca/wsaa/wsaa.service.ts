@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { XMLParser } from 'fast-xml-parser';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isProduction } from '../arca-environment';
 import {
   CertificateCredentials,
   ArcaService,
@@ -21,9 +22,8 @@ export class WsaaService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private get wsaaUrl(): string {
-    const env = this.config.get<string>('ARCA_ENV', 'homologacion');
-    return env === 'produccion'
+  private wsaaUrl(environment: string): string {
+    return isProduction(environment)
       ? this.config.get<string>(
           'ARCA_WSAA_URL_PROD',
           'https://wsaa.afip.gov.ar/ws/services/LoginCms',
@@ -37,6 +37,7 @@ export class WsaaService {
   async getAccessTicket(
     issuerId: string,
     creds: CertificateCredentials,
+    environment: string,
     service: ArcaService = 'wsfe',
   ): Promise<AccessTicket> {
     const cached = await this.prisma.accessTicketCache.findUnique({
@@ -55,7 +56,7 @@ export class WsaaService {
       };
     }
 
-    const accessTicket = await this.login(creds, service);
+    const accessTicket = await this.login(creds, service, environment);
     await this.prisma.accessTicketCache.upsert({
       where: { issuerId_service: { issuerId, service } },
       create: { issuerId, service, ...accessTicket },
@@ -70,10 +71,11 @@ export class WsaaService {
   private async login(
     creds: CertificateCredentials,
     service: ArcaService,
+    environment: string,
   ): Promise<AccessTicket> {
     const ltr = this.buildLoginTicketRequest(service);
     const cms = this.signCms(ltr, creds);
-    const responseXml = await this.callLoginCms(cms);
+    const responseXml = await this.callLoginCms(cms, environment);
     return this.parseLoginResponse(responseXml);
   }
 
@@ -125,7 +127,10 @@ export class WsaaService {
     }
   }
 
-  private async callLoginCms(cmsBase64: string): Promise<string> {
+  private async callLoginCms(
+    cmsBase64: string,
+    environment: string,
+  ): Promise<string> {
     const envelope = [
       '<soapenv:Envelope',
       ' xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"',
@@ -139,7 +144,7 @@ export class WsaaService {
       '</soapenv:Envelope>',
     ].join('');
 
-    const res = await fetch(this.wsaaUrl, {
+    const res = await fetch(this.wsaaUrl(environment), {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',

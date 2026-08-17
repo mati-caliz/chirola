@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XMLParser } from 'fast-xml-parser';
 import { buildAuthBlock, callSoap, ParsedXml } from '../arca-soap.util';
+import { isProduction } from '../arca-environment';
 import { ArcaRejectionError } from './arca-errors';
 import type {
   AuthContext,
@@ -59,9 +60,8 @@ export class WsfeService {
 
   constructor(private readonly config: ConfigService) {}
 
-  private get wsfeUrl(): string {
-    const env = this.config.get<string>('ARCA_ENV', 'homologacion');
-    return env === 'produccion'
+  private wsfeUrl(environment: string): string {
+    return isProduction(environment)
       ? this.config.get<string>(
           'ARCA_WSFEV1_URL_PROD',
           'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
@@ -82,9 +82,13 @@ export class WsfeService {
     );
   }
 
-  async ping(): Promise<boolean> {
+  async ping(environment: string): Promise<boolean> {
     const soap = this.envelope('<ar:FEDummy/>');
-    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}FEDummy`, soap);
+    const res = await callSoap(
+      this.wsfeUrl(environment),
+      `${WSFEV1_NS}FEDummy`,
+      soap,
+    );
     return res.includes('OK');
   }
 
@@ -101,7 +105,7 @@ export class WsfeService {
         '</ar:FECompUltimoAutorizado>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECompUltimoAutorizado`,
       soap,
     );
@@ -116,7 +120,7 @@ export class WsfeService {
         '</ar:FEParamGetPtosVenta>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FEParamGetPtosVenta`,
       soap,
     );
@@ -136,7 +140,7 @@ export class WsfeService {
         '</ar:FEParamGetTiposCbte>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FEParamGetTiposCbte`,
       soap,
     );
@@ -170,7 +174,7 @@ export class WsfeService {
         '</ar:FECompConsultar>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECompConsultar`,
       soap,
     );
@@ -193,7 +197,11 @@ export class WsfeService {
         '</ar:FeCAEReq>' +
         '</ar:FECAESolicitar>',
     );
-    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}FECAESolicitar`, soap);
+    const res = await callSoap(
+      this.wsfeUrl(auth.environment),
+      `${WSFEV1_NS}FECAESolicitar`,
+      soap,
+    );
     return this.parseCaeResponse(res);
   }
 

@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
+import type { ArcaIssuer } from '../arca/arca-environment';
 import type { AuthContext, CaeRequest, CaeResult, VoucherAmounts } from '../arca/wsfe/wsfe.types';
 import {
   ArcaRejectionError,
@@ -292,19 +293,21 @@ export class VouchersService {
   }
 
   private async computeEmissionPlan(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     input: IssueVoucher,
   ): Promise<EmissionPlan> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     const auth: AuthContext = {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
     const last = await this.wsfe.getLastAuthorized(
       auth,
@@ -324,7 +327,7 @@ export class VouchersService {
   }
 
   private async issueAuthorized(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
@@ -347,7 +350,7 @@ export class VouchersService {
   }
 
   private async emit(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
@@ -370,19 +373,21 @@ export class VouchersService {
   }
 
   private async attemptCae(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     input: IssueVoucher,
   ): Promise<EmissionOutcome> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     const auth: AuthContext = {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
 
     const amounts = calculateAmounts(input.voucherType, input.items);
@@ -416,7 +421,7 @@ export class VouchersService {
   }
 
   private async persistIssuedVoucher(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     input: IssueVoucher,
     outcome: EmissionOutcome,
     idempotencyKey?: string,

@@ -4,6 +4,7 @@ export interface AuthContext {
   cuit: string;
   token: string;
   sign: string;
+  environment: string;
 }
 
 export interface ArcaIvaRate {

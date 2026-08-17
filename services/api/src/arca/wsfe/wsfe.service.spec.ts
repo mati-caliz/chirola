@@ -103,7 +103,12 @@ describe('WsfeService — FEParamGetPtosVenta', () => {
     global.fetch = originalFetch;
   });
 
-  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+  const auth = {
+    cuit: '20111111112',
+    token: 't',
+    sign: 's',
+    environment: 'homologacion',
+  };
 
   function respondWith(xml: string): void {
     global.fetch = (async () =>
@@ -137,5 +142,45 @@ describe('WsfeService — FEParamGetPtosVenta', () => {
     const result = await service().getVoucherTypeIds(auth);
 
     expect(result).toEqual([1, 6]);
+  });
+});
+
+describe('WsfeService — entorno por emisor', () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const emptySalesPoints =
+    '<soap:Envelope><soap:Body><FEParamGetPtosVentaResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+    '<FEParamGetPtosVentaResult><ResultGet></ResultGet></FEParamGetPtosVentaResult>' +
+    '</FEParamGetPtosVentaResponse></soap:Body></soap:Envelope>';
+
+  async function urlUsedFor(environment: string): Promise<string> {
+    let calledUrl = '';
+    global.fetch = (async (url: string) => {
+      calledUrl = url;
+      return new Response(emptySalesPoints, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await service().getSalesPoints({
+      cuit: '20111111112',
+      token: 't',
+      sign: 's',
+      environment,
+    });
+    return calledUrl;
+  }
+
+  it('usa el WSFEv1 de homologacion para un emisor de homologacion', async () => {
+    expect(await urlUsedFor('homologacion')).toBe(
+      'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+    );
+  });
+
+  it('usa el WSFEv1 de produccion para un emisor de produccion', async () => {
+    expect(await urlUsedFor('produccion')).toBe(
+      'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
+    );
   });
 });
