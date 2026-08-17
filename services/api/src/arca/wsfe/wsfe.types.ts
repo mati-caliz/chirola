@@ -78,6 +78,15 @@ export interface ExchangeRateInfo {
   date: Date;
 }
 
+export interface AuthorizedVoucherDetail {
+  cae: CaeResult;
+  number: number;
+  totalAmount: number;
+  recipientDocType: number;
+  recipientDocNumber: string;
+  date: Date;
+}
+
 export interface SalesPointInfo {
   number: number;
   emissionType: string;

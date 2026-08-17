@@ -53,6 +53,8 @@ interface PendingRow {
   retryCount: number;
   nextRetryAt: Date;
   lastError: string | null;
+  attemptedNumber: number | null;
+  attemptedSalesPoint: number | null;
 }
 
 function buildHarness() {
@@ -174,6 +176,7 @@ function buildHarness() {
       caeVto: new Date('2026-07-22'),
     })),
     queryVoucher: jest.fn(async () => null),
+    queryVoucherDetail: jest.fn(async () => null),
   } as unknown as WsfeService;
 
   const apiClients = {
@@ -320,5 +323,96 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
       WebhookEvent.VOUCHER_FAILED,
       expect.objectContaining({ permanent: true }),
     );
+  });
+});
+
+describe('VouchersService — reconciliación (D.1)', () => {
+  const authorizedInArca = {
+    cae: { cae: '74000000000077', caeVto: new Date('2026-07-22') },
+    number: 1,
+    totalAmount: 100,
+    recipientDocType: 99,
+    recipientDocNumber: '0',
+    date: new Date('2026-07-12'),
+  };
+
+  it('guarda el número intentado al encolar por error de red', async () => {
+    const { service, wsfe, pending } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    expect(pending[0].attemptedNumber).toBe(1);
+    expect(pending[0].attemptedSalesPoint).toBe(1);
+  });
+
+  it('adopta el CAE ya otorgado en vez de emitir un duplicado', async () => {
+    const { service, wsfe, pending, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce(authorizedInArca);
+    (wsfe.requestCae as jest.Mock).mockClear();
+
+    await service.retryPendingVouchers();
+
+    expect(wsfe.requestCae).not.toHaveBeenCalled();
+    expect(pending).toHaveLength(0);
+    expect(vouchers).toHaveLength(1);
+    expect(vouchers[0].cae).toBe('74000000000077');
+  });
+
+  it('emite normalmente si ARCA no tiene ese número autorizado', async () => {
+    const { service, wsfe, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    await service.retryPendingVouchers();
+
+    expect(vouchers).toHaveLength(1);
+    expect(vouchers[0].cae).toBe('74000000000001');
+  });
+
+  it('no adopta un comprobante de ARCA cuyo total no coincide', async () => {
+    const { service, wsfe, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce({
+      ...authorizedInArca,
+      totalAmount: 999,
+    });
+
+    await service.retryPendingVouchers();
+
+    expect(wsfe.requestCae).toHaveBeenCalled();
+    expect(vouchers[0].cae).toBe('74000000000001');
+  });
+
+  it('no adopta un comprobante de ARCA emitido a otro receptor', async () => {
+    const { service, wsfe, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+
+    (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce({
+      ...authorizedInArca,
+      recipientDocType: 80,
+      recipientDocNumber: '30707153745',
+    });
+
+    await service.retryPendingVouchers();
+
+    expect(wsfe.requestCae).toHaveBeenCalled();
+    expect(vouchers[0].cae).toBe('74000000000001');
   });
 });

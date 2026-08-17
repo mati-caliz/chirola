@@ -6,6 +6,7 @@ import { ArcaRejectionError } from './arca-errors';
 import type {
   ArcaParamEntry,
   AuthContext,
+  AuthorizedVoucherDetail,
   CaeRequest,
   CaeResult,
   CurrencyInfo,
@@ -282,6 +283,43 @@ export class WsfeService {
       return null;
     }
     return { cae, caeVto: parseArcaDate(caeVto) };
+  }
+
+  async queryVoucherDetail(
+    auth: AuthContext,
+    salesPoint: number,
+    voucherType: number,
+    number: number,
+  ): Promise<AuthorizedVoucherDetail | null> {
+    const soap = this.envelope(
+      '<ar:FECompConsultar>' +
+        buildAuthBlock(auth.cuit, auth.token, auth.sign) +
+        '<ar:FeCompConsReq>' +
+        `<ar:CbteTipo>${voucherType}</ar:CbteTipo>` +
+        `<ar:CbteNro>${number}</ar:CbteNro>` +
+        `<ar:PtoVta>${salesPoint}</ar:PtoVta>` +
+        '</ar:FeCompConsReq>' +
+        '</ar:FECompConsultar>',
+    );
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FECompConsultar`,
+      soap,
+    );
+    const xml = new ParsedXml(res);
+    const cae = xml.optional('CodAutorizacion', '');
+    const caeVto = xml.optional('FchVto', '');
+    if (!cae || !caeVto) {
+      return null;
+    }
+    return {
+      cae: { cae, caeVto: parseArcaDate(caeVto) },
+      number,
+      totalAmount: Number(xml.optional('ImpTotal', '0')),
+      recipientDocType: Number(xml.optional('DocTipo', '0')),
+      recipientDocNumber: xml.optional('DocNro', ''),
+      date: parseArcaDate(xml.required('CbteFch')),
+    };
   }
 
   async requestCae(auth: AuthContext, request: CaeRequest): Promise<CaeResult> {

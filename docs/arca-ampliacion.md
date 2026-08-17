@@ -198,18 +198,21 @@ Es la fase más grande del doc. Vale la pena sólo si el perfil exportador es ob
 
 ## Fase D — 🟡 Reconciliación y robustez
 
-### D.1 🟡 Reconciliar contra ARCA lo que la app perdió
+### D.1 ✅ Reconciliar contra ARCA lo que la app perdió — implementado
 
-Hoy hay reintento (`voucher-retry.scheduler.ts`) y bloqueo por emisor (`issuer-lock.service.ts`),
-pero si se corta la red **después** de que ARCA otorgó el CAE, el comprobante queda emitido en
-ARCA y `PENDIENTE` en la DB. El reintento lo duplicaría o chocaría con la numeración.
+El agujero: si se cortaba la red **después** de que ARCA otorgó el CAE, el comprobante quedaba
+emitido en ARCA y `PENDIENTE` en la DB. El reintento pedía `FECompUltimoAutorizado`, que ya
+incluía ese comprobante, y emitía **uno nuevo con el número siguiente**: dos comprobantes
+fiscales por la misma venta.
 
-Solución: antes de reintentar, consultar `FECompConsultar` con el número tentativo y, si ya
-existe con ese CAE, adoptarlo en vez de re-emitir. `FECompTotXRequest` da el máximo de registros
-por request, útil si más adelante se hace emisión en lote.
+Ahora `PendingVoucher` guarda el número que se llegó a intentar, y antes de re-emitir se
+consulta `FECompConsultar` por ese número. El CAE sólo se adopta si el comprobante en ARCA
+**coincide en total y receptor** con el encolado; si no coincide, es de otra operación y se
+emite uno nuevo. Sin esa verificación se estaría adoptando un CAE ajeno.
 
-Un job de reconciliación periódica que compare `FECompUltimoAutorizado` contra el último número
-en DB por punto de venta detecta desincronizaciones antes de que rompan una emisión.
+`GET /issuers/:issuerId/reconciliation/numbering` compara `FECompUltimoAutorizado` contra el
+último número en DB por punto de venta y tipo, para detectar desincronizaciones antes de que
+rompan una emisión.
 
 ### D.2 🟢 Registro de las llamadas SOAP
 

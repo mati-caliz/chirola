@@ -18,7 +18,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { AuthContext, CaeRequest, CaeResult, VoucherAmounts } from '../arca/wsfe/wsfe.types';
+import type {
+  AuthContext,
+  AuthorizedVoucherDetail,
+  CaeRequest,
+  CaeResult,
+  VoucherAmounts,
+} from '../arca/wsfe/wsfe.types';
 import {
   ArcaRejectionError,
   ARCA_DUPLICATE_NUMBER_CODE,
@@ -32,6 +38,7 @@ import { WebhookService } from '../webhooks/webhook.service';
 import { WebhookEvent } from '../webhooks/webhook-events';
 import { IssuerLockService } from './issuer-lock.service';
 import { VoucherQueuedException } from './voucher-queued.exception';
+import { CaeAttemptError } from './cae-attempt.error';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf, type TributePdf } from './pdf.util';
@@ -74,6 +81,8 @@ function parseIsoDate(iso: string): Date {
   const [year, month, day] = iso.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
+
+const AMOUNT_TOLERANCE = 0.01;
 
 const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_RETRY_BASE_MS = 60_000;
@@ -356,6 +365,7 @@ export class VouchersService {
         input,
         idempotencyKey,
         this.errorMessage(err),
+        err instanceof CaeAttemptError ? err.attemptedNumber : null,
       );
       throw new VoucherQueuedException(pending.id);
     }
@@ -366,17 +376,7 @@ export class VouchersService {
     issuer: { id: string; cuit: string },
     input: IssueVoucher,
   ): Promise<EmissionOutcome> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      'wsfe',
-    );
-    const auth: AuthContext = {
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-    };
+    const auth = await this.buildAuth(issuer);
 
     const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
     const date = new Date();
@@ -518,9 +518,29 @@ export class VouchersService {
     auth: AuthContext,
     buildRequest: (number: number) => CaeRequest,
   ): Promise<CaeWithNumber> {
+    const { salesPoint } = buildRequest(0);
+    let attemptedNumber: number | null = null;
+    try {
+      return await this.requestCaeAttempt(auth, buildRequest, (candidate) => {
+        attemptedNumber = candidate;
+      });
+    } catch (err) {
+      if (err instanceof ArcaRejectionError) {
+        throw err;
+      }
+      throw new CaeAttemptError(err, salesPoint, attemptedNumber);
+    }
+  }
+
+  private async requestCaeAttempt(
+    auth: AuthContext,
+    buildRequest: (number: number) => CaeRequest,
+    onNumberChosen: (number: number) => void,
+  ): Promise<CaeWithNumber> {
     const { salesPoint, voucherType } = buildRequest(0);
     const last = await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType);
     const number = last + 1;
+    onNumberChosen(number);
     try {
       const result = await this.wsfe.requestCae(auth, buildRequest(number));
       return { result, number };
@@ -545,6 +565,7 @@ export class VouchersService {
       }
       const freshNumber =
         (await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType)) + 1;
+      onNumberChosen(freshNumber);
       this.logger.warn(
         `Número duplicado ${voucherType}-${salesPoint}-${number}, reintentando con ${freshNumber}`,
       );
@@ -595,12 +616,22 @@ export class VouchersService {
     input: IssueVoucher,
     idempotencyKey: string | undefined,
     lastError: string,
+    attemptedNumber: number | null,
   ): Promise<PendingVoucherRow> {
     const payload = JSON.parse(JSON.stringify(input)) as Prisma.InputJsonObject;
     const nextRetryAt = new Date(Date.now() + this.retryBaseMs);
     try {
       return await this.prisma.pendingVoucher.create({
-        data: { issuerId, idempotencyKey, payload, nextRetryAt, lastError },
+        data: {
+          issuerId,
+          idempotencyKey,
+          payload,
+          nextRetryAt,
+          lastError,
+          attemptedNumber,
+          attemptedSalesPoint: attemptedNumber === null ? null : input.salesPoint,
+          attemptedAt: attemptedNumber === null ? null : new Date(),
+        },
       });
     } catch (err) {
       if (
@@ -642,7 +673,9 @@ export class VouchersService {
     await this.issuerLock.runExclusive(issuer.id, async () => {
       let outcome: EmissionOutcome;
       try {
-        outcome = await this.attemptCae(issuer, input);
+        outcome =
+          (await this.recoverAlreadyAuthorized(issuer, input, pending)) ??
+          (await this.attemptCae(issuer, input));
       } catch (err) {
         if (err instanceof ArcaRejectionError) {
           await this.failPending(pending, err.message, true);
@@ -659,6 +692,76 @@ export class VouchersService {
       );
       await this.prisma.pendingVoucher.delete({ where: { id: pending.id } });
     });
+  }
+
+  private async recoverAlreadyAuthorized(
+    issuer: { id: string; cuit: string },
+    input: IssueVoucher,
+    pending: PendingVoucherRow,
+  ): Promise<EmissionOutcome | null> {
+    if (pending.attemptedNumber === null || pending.attemptedSalesPoint === null) {
+      return null;
+    }
+
+    const auth = await this.buildAuth(issuer);
+    const authorized = await this.wsfe.queryVoucherDetail(
+      auth,
+      pending.attemptedSalesPoint,
+      input.voucherType,
+      pending.attemptedNumber,
+    );
+    if (!authorized) {
+      return null;
+    }
+
+    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
+    if (!this.matchesPendingVoucher(authorized, input, amounts)) {
+      this.logger.warn(
+        `El comprobante ${input.voucherType}-${pending.attemptedSalesPoint}-${pending.attemptedNumber} ya existe en ARCA pero no coincide con el encolado ${pending.id}; se emite uno nuevo.`,
+      );
+      return null;
+    }
+
+    this.logger.warn(
+      `Comprobante encolado ${pending.id} ya tenía CAE en ARCA (${authorized.cae.cae}); se adopta en vez de re-emitir.`,
+    );
+    return {
+      cae: authorized.cae,
+      number: authorized.number,
+      amounts,
+      date: authorized.date,
+    };
+  }
+
+  private matchesPendingVoucher(
+    authorized: AuthorizedVoucherDetail,
+    input: IssueVoucher,
+    amounts: VoucherAmounts,
+  ): boolean {
+    const sameTotal =
+      Math.abs(authorized.totalAmount - amounts.totalAmount) < AMOUNT_TOLERANCE;
+    const sameRecipient =
+      authorized.recipientDocType === input.recipient.docType &&
+      authorized.recipientDocNumber.replace(/\D/g, '') ===
+        input.recipient.docNumber.replace(/\D/g, '');
+    return sameTotal && sameRecipient;
+  }
+
+  private async buildAuth(issuer: {
+    id: string;
+    cuit: string;
+  }): Promise<AuthContext> {
+    const credentials = await this.certs.getCredentials(issuer.id);
+    const accessTicket = await this.wsaa.getAccessTicket(
+      issuer.id,
+      credentials,
+      'wsfe',
+    );
+    return {
+      cuit: issuer.cuit,
+      token: accessTicket.token,
+      sign: accessTicket.sign,
+    };
   }
 
   private async bumpPending(

@@ -270,6 +270,10 @@ model PendingVoucher {
   status         String   @default("PENDIENTE")
   retryCount     Int      @default(0)
   nextRetryAt    DateTime
+
+  attemptedNumber     Int?
+  attemptedSalesPoint Int?
+  attemptedAt         DateTime?
   lastError      String?  @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
