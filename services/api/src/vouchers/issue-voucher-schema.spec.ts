@@ -1,6 +1,7 @@
 import {
   DocumentType,
   issueVoucherSchema,
+  RecipientIvaCondition,
   TaxTreatment,
   TransmissionType,
   VoucherConcept,
@@ -270,5 +271,84 @@ describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('issueVoucherSchema — condición de IVA del receptor', () => {
+  const withCondition = (voucherType: number, ivaConditionId?: number) =>
+    issueVoucherSchema.safeParse(
+      input({
+        voucherType,
+        recipient: {
+          docType: DocumentType.CUIT,
+          docNumber: '30111222234',
+          ivaConditionId,
+        },
+      }),
+    );
+
+  it('rechaza un consumidor final en una Factura A', () => {
+    const result = withCondition(
+      VoucherType.FACTURA_A,
+      RecipientIvaCondition.CONSUMIDOR_FINAL,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('Consumidor Final');
+  });
+
+  it('rechaza un responsable inscripto en una Factura B', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        voucherType: VoucherType.FACTURA_B,
+        recipient: {
+          docType: DocumentType.CUIT,
+          docNumber: '30111222234',
+          ivaConditionId: RecipientIvaCondition.RESPONSABLE_INSCRIPTO,
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta un responsable inscripto en una Factura A', () => {
+    expect(
+      withCondition(VoucherType.FACTURA_A, RecipientIvaCondition.RESPONSABLE_INSCRIPTO)
+        .success,
+    ).toBe(true);
+  });
+
+  it('la Factura M sigue la misma regla que la A', () => {
+    expect(
+      withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.MONOTRIBUTO).success,
+    ).toBe(false);
+    expect(
+      withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.RESPONSABLE_INSCRIPTO)
+        .success,
+    ).toBe(true);
+  });
+
+  it('la Factura C acepta cualquier condición', () => {
+    for (const condition of Object.values(RecipientIvaCondition)) {
+      expect(
+        issueVoucherSchema.safeParse(
+          input({ recipient: { docType: 99, docNumber: '0', ivaConditionId: condition } }),
+        ).success,
+      ).toBe(true);
+    }
+  });
+
+  it('deja pasar una condición que la app todavía no conoce', () => {
+    const unknownCondition = 15;
+
+    expect(withCondition(VoucherType.FACTURA_A, unknownCondition).success).toBe(true);
+  });
+
+  it('el default que arma la app es coherente con la letra', () => {
+    expect(withCondition(VoucherType.FACTURA_A).success).toBe(true);
+    expect(
+      issueVoucherSchema.safeParse(input({ voucherType: VoucherType.FCE_FACTURA_B, paymentDueDate: '2026-09-30', recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' } })).success,
+    ).toBe(true);
   });
 });

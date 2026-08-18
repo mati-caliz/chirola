@@ -1,9 +1,14 @@
 import { z } from 'zod';
-import { RecipientIvaCondition } from './recipient-iva-condition';
+import {
+  isRecipientIvaConditionAllowed,
+  recipientIvaConditionName,
+  RecipientIvaCondition,
+} from './recipient-iva-condition';
 import { ivaRates } from './iva-rate';
 import { DocumentType } from './document-type';
 import { TransmissionType } from './optional-type';
 import {
+  discriminatesIva,
   isCreditDebitNote,
   isCreditInvoice,
   requiresRecipientCuit,
@@ -59,7 +64,7 @@ export function inferFiscalCondition(
 }
 
 export function defaultRecipientIvaCondition(voucherType: number): number {
-  return requiresRecipientCuit(voucherType)
+  return discriminatesIva(voucherType)
     ? RecipientIvaCondition.RESPONSABLE_INSCRIPTO
     : RecipientIvaCondition.CONSUMIDOR_FINAL;
 }
@@ -214,6 +219,16 @@ export const issueVoucherSchema = z
         code: z.ZodIssueCode.custom,
         path: ['recipient', 'docType'],
         message: `${voucherTypeName[data.voucherType] ?? 'El comprobante'} requiere identificar al receptor con CUIT.`,
+      });
+    }
+
+    const ivaConditionId =
+      data.recipient.ivaConditionId ?? defaultRecipientIvaCondition(data.voucherType);
+    if (!isRecipientIvaConditionAllowed(data.voucherType, ivaConditionId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipient', 'ivaConditionId'],
+        message: `Un receptor ${recipientIvaConditionName[ivaConditionId]} no puede recibir ${voucherTypeName[data.voucherType] ?? 'este comprobante'}.`,
       });
     }
 

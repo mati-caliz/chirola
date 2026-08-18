@@ -137,10 +137,26 @@ es **global, no por emisor**: son datos públicos de ARCA, no datos de un contri
 así que la regla de aislamiento por `issuerId` no aplica. El `issuerId` de la ruta se usa sólo
 para elegir el certificado con el que se consulta.
 
-Pendiente: usar el padrón para **validar** la `CondicionIVAReceptorId` antes de emitir. Hoy sólo
-la prellena; un valor incoherente con la letra del comprobante sigue siendo causa de rechazo.
+**Coherencia de `CondicionIVAReceptorId` con la letra.** ARCA rechaza el comprobante cuando la
+condición del receptor no corresponde a la letra: una A va **sólo** a Responsable Inscripto, y una
+B a cualquiera **menos** un Responsable Inscripto (la C no restringe, porque no discrimina IVA).
+Eso se valida ahora en el schema, antes de gastar la llamada y el número.
 
-Pendiente también: prellenado en el alta de `Client` (hoy sólo está en la nueva factura).
+La validación es deliberadamente **permisiva con lo que no conoce**: si el id no está en la tabla
+local de `RecipientIvaCondition`, pasa. `FEParamGetCondicionIvaReceptor` devuelve más condiciones
+de las que la app enumera (cliente del exterior, IVA liberado, no alcanzado), y rechazar una
+condición legítima por no tenerla en la lista sería peor que dejar que ARCA la juzgue.
+
+Se eligió esta validación en vez de consultar el padrón en cada emisión: es determinística, no
+agrega latencia ni una dependencia de red al camino crítico del CAE, y cubre el error frecuente.
+El padrón sigue usándose para **prellenar**.
+
+Al hacerlo apareció que `defaultRecipientIvaCondition` deducía el default de `requiresRecipientCuit`,
+que con la M y la FCE dejó de ser equivalente a "letra A": una FCE B habría defaulteado a
+Responsable Inscripto, que es justo lo que la letra B prohíbe. El default ahora sale de
+`discriminatesIva`.
+
+Pendiente: prellenado del padrón en el alta de `Client` (hoy sólo está en la nueva factura).
 
 ---
 
