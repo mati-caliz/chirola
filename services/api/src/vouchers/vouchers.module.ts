@@ -7,6 +7,8 @@ import { IssuerLockService } from './issuer-lock.service';
 import { VoucherRetryScheduler } from './voucher-retry.scheduler';
 import { ReconciliationService } from './reconciliation.service';
 import { ReconciliationController } from './reconciliation.controller';
+import { ExportVouchersService } from './export-vouchers.service';
+import { ExportVouchersController } from './export-vouchers.controller';
 import { ArcaModule } from '../arca/arca.module';
 import { CertsModule } from '../certs/certs.module';
 import { IssuersModule } from '../issuers/issuers.module';
@@ -26,12 +28,14 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
     IssuerVouchersController,
     V1VouchersController,
     ReconciliationController,
+    ExportVouchersController,
   ],
   providers: [
     VouchersService,
     IssuerLockService,
     VoucherRetryScheduler,
     ReconciliationService,
+    ExportVouchersService,
   ],
   exports: [VouchersService],
 })

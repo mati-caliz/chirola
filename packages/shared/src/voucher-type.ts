@@ -5,6 +5,9 @@ export const VoucherType = {
   FACTURA_B: 6,
   NOTA_DEBITO_B: 7,
   NOTA_CREDITO_B: 8,
+  FACTURA_E: 19,
+  NOTA_DEBITO_E: 20,
+  NOTA_CREDITO_E: 21,
   FACTURA_C: 11,
   NOTA_DEBITO_C: 12,
   NOTA_CREDITO_C: 13,
@@ -29,6 +32,9 @@ export const voucherTypeName: Record<number, string> = {
   6: 'Factura B',
   7: 'Nota de Débito B',
   8: 'Nota de Crédito B',
+  19: 'Factura E',
+  20: 'Nota de Débito E',
+  21: 'Nota de Crédito E',
   11: 'Factura C',
   12: 'Nota de Débito C',
   13: 'Nota de Crédito C',
@@ -84,6 +90,8 @@ const creditDebitNoteTypes: readonly number[] = [
   VoucherType.NOTA_CREDITO_C,
   VoucherType.NOTA_DEBITO_M,
   VoucherType.NOTA_CREDITO_M,
+  VoucherType.NOTA_DEBITO_E,
+  VoucherType.NOTA_CREDITO_E,
   VoucherType.FCE_NOTA_DEBITO_A,
   VoucherType.FCE_NOTA_CREDITO_A,
   VoucherType.FCE_NOTA_DEBITO_B,
@@ -101,6 +109,7 @@ const creditNoteTypes: readonly number[] = [
   VoucherType.NOTA_CREDITO_B,
   VoucherType.NOTA_CREDITO_C,
   VoucherType.NOTA_CREDITO_M,
+  VoucherType.NOTA_CREDITO_E,
   VoucherType.FCE_NOTA_CREDITO_A,
   VoucherType.FCE_NOTA_CREDITO_B,
   VoucherType.FCE_NOTA_CREDITO_C,
@@ -112,7 +121,7 @@ export function isCreditNote(voucherType: number): boolean {
 
 export function voucherLetter(voucherType: number): string {
   const name = voucherTypeName[voucherType] ?? '';
-  const match = name.match(/ ([ABCM])$/);
+  const match = name.match(/ ([ABCEM])$/);
   return match ? match[1] : '';
 }
 
@@ -141,3 +150,13 @@ export const issuableInvoiceTypes: readonly number[] = [
   VoucherType.FCE_FACTURA_B,
   VoucherType.FCE_FACTURA_C,
 ];
+
+const exportVoucherTypes: readonly number[] = [
+  VoucherType.FACTURA_E,
+  VoucherType.NOTA_DEBITO_E,
+  VoucherType.NOTA_CREDITO_E,
+];
+
+export function isExportVoucher(voucherType: number): boolean {
+  return exportVoucherTypes.includes(voucherType);
+}

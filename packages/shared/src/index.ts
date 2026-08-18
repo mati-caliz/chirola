@@ -29,6 +29,7 @@ export * from './iva-rate';
 export * from './tribute-type';
 export * from './arca-params';
 export * from './optional-type';
+export * from './export-voucher';
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',

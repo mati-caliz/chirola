@@ -148,6 +148,7 @@ model Voucher {
   qrData             String?
   arcaObservations   Json?
   associatedVouchers Json?
+  exportDetail       Json?
 
   items     VoucherItem[]
   createdAt DateTime      @default(now())

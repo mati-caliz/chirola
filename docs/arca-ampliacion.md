@@ -222,27 +222,40 @@ empresa registrada, nunca a consumidor final.
 Pendiente: la **anulación** de una FCE (el receptor la rechaza) informa el opcional 22 en `S`.
 Hoy se emite siempre en `N`, que es la NC/ND común; el circuito de rechazo no está modelado.
 
-### C.3 🟡 Exportación — WSFEX (tipos 19, 20, 21)
+### C.3 ✅ Exportación — WSFEX (tipos 19, 20, 21) — implementado (backend)
 
-Facturación de exportación. Muy relevante para exportadores de servicios (software, freelance
-facturando al exterior), que es exactamente el perfil de usuario de la app.
+Facturación de exportación: Factura E, ND E y NC E. Es un **servicio SOAP distinto** (`wsfex`),
+no una extensión de WSFEv1: otro WSDL, otro namespace, otro set de operaciones y un ticket WSAA
+propio — que necesita **su propia asociación de certificado en ARCA**, aparte de la de `wsfe`.
 
-Es un **servicio SOAP distinto** (`wsfex`), no una extensión de WSFEv1: otro WSDL, otro set de
-operaciones (`FEXAuthorize`, `FEXGetCMP`, `FEXGetLast_CMP`, `FEXGetPARAM_*`), y un ticket WSAA
-propio (servicio `wsfex`, con su propia asociación de certificado en ARCA).
+Diferencias de negocio que hubo que modelar:
 
-Diferencias de negocio a modelar:
+- **Sin IVA.** No hay array `Iva` ni `ImpIVA`: la operación de exportación no lo lleva. En la DB
+  el total se guarda como exento, para que el libro IVA no lo cuente como débito.
+- **Receptor sin CUIT argentino.** Se identifica con `Dst_cmp` (país), `Cuit_pais_cliente` (el
+  CUIT que ARCA asigna a cada país, de `FEXGetPARAM_DST_CUIT`), domicilio del exterior y, si
+  tiene, su identificación tributaria local.
+- **Campos propios**: Incoterm, idioma del comprobante (español / inglés / portugués), permiso
+  de embarque, destino y forma de pago.
 
-- Sin IVA (operación de exportación).
-- Receptor sin CUIT argentino: se identifica con país, tipo de documento extranjero y
-  domicilio del exterior.
-- Campos propios: Incoterms, idioma del comprobante, permiso de embarque (para bienes),
-  destino, forma de pago.
-- El resultado es un **CAE de exportación**, con su propia validación.
+Reglas del protocolo que condicionan el armado:
 
-Es la fase más grande del doc. Vale la pena sólo si el perfil exportador es objetivo de negocio.
+- `Tipo_expo` distingue bienes (1), servicios (2) y otros (4). El **permiso de embarque sólo
+  aplica a bienes**, y el Incoterm es obligatorio ahí; el schema rechaza un permiso en una
+  exportación de servicios en vez de mandarlo y comerse el rechazo.
+- Cada ítem informa `Pro_total_item` = cantidad × precio − bonificación, e `Imp_total` es la suma
+  de todos. La cuenta la hace el backend.
+- Los errores **no vienen en `Errors` como en WSFEv1**, sino en `FEXErr` con `ErrCode` / `ErrMsg`,
+  y `ErrCode = 0` significa OK. Tratar la presencia del nodo como error rompe todas las llamadas.
 
----
+**Lo mejor de WSFEX y lo que conviene no perder**: cada pedido lleva un `Id` propio, que se saca
+de `FEXGetLast_ID` + 1. Si se reenvía el mismo `Id`, ARCA **no emite otro comprobante**: devuelve
+el que ya autorizó con `Reproceso = S`. Es protección contra duplicados incorporada al protocolo,
+bastante mejor que la reconciliación que hubo que construir a mano para WSFEv1 en D.1. El
+resultado marca `reprocessed` para poder distinguirlo.
+
+Pendiente: la pantalla de emisión de exportación en la app (hoy sólo está `POST /export-vouchers`),
+y las tablas de parámetros de WSFEX no se cachean como las de WSFEv1 en A.5.
 
 ## Fase D — 🟡 Reconciliación y robustez
 
@@ -393,7 +406,7 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 4. **A.4 + A.5** cotización y tablas de parámetros.
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.
-7. **C.3** (WSFEX) si el perfil exportador es objetivo de negocio.
+7. **C.3** (WSFEX) — hecho.
 8. **E.1** importación de compras.
 
 Las fases A, D y E.1 **no dependen de ARCA homologación**: se pueden desarrollar y testear con

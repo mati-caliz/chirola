@@ -152,6 +152,10 @@ export class ParsedXml {
     return value == null ? fallback : String(value);
   }
 
+  raw(): Record<string, unknown> {
+    return this.root;
+  }
+
   has(tag: string): boolean {
     return this.find(tag) !== undefined;
   }
