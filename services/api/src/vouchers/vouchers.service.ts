@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
+import type { ArcaIssuer } from '../arca/arca-environment';
 import type {
   AuthContext,
   AuthorizedVoucherDetail,
@@ -61,9 +62,7 @@ interface EmissionOutcome {
 
 type PendingVoucherRow = PendingVoucher;
 
-type EmissionIssuer = {
-  id: string;
-  cuit: string;
+type EmissionIssuer = ArcaIssuer & {
   cbu: string | null;
   paymentAlias: string | null;
 };
@@ -98,6 +97,9 @@ const AMOUNT_TOLERANCE = 0.01;
 const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_RETRY_BASE_MS = 60_000;
 const RETRY_BATCH_SIZE = 25;
+
+const DEFAULT_VOUCHER_LIST_LIMIT = 20;
+const MAX_VOUCHER_LIST_LIMIT = 100;
 
 export interface IssuedVoucher {
   id: string;
@@ -163,6 +165,50 @@ export class VouchersService {
       throw new ForbiddenException('El comprobante no pertenece al usuario.');
     }
     return voucher;
+  }
+
+  async listByIssuer(userId: string, issuerId: string) {
+    const issuer = await this.prisma.issuer.findUnique({ where: { id: issuerId } });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    if (issuer.userId !== userId) {
+      throw new ForbiddenException('El emisor no pertenece al usuario.');
+    }
+    return this.listForIssuer(issuerId);
+  }
+
+  listForIssuer(issuerId: string, limit?: number) {
+    const take =
+      limit === undefined || !Number.isFinite(limit) || limit < 1
+        ? DEFAULT_VOUCHER_LIST_LIMIT
+        : Math.min(Math.trunc(limit), MAX_VOUCHER_LIST_LIMIT);
+
+    return this.prisma.voucher.findMany({
+      where: { issuerId },
+      orderBy: [{ voucherDate: 'desc' }, { number: 'desc' }],
+      take,
+      select: {
+        id: true,
+        voucherType: true,
+        number: true,
+        voucherDate: true,
+        status: true,
+        cae: true,
+        totalAmount: true,
+        salesPoint: { select: { number: true } },
+        client: { select: { legalName: true, docNumber: true } },
+      },
+    });
+  }
+
+  async listForApiClient(
+    apiClient: AuthenticatedApiClient,
+    issuerId: string,
+    limit?: number,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
+    return this.listForIssuer(issuerId, limit);
   }
 
   async getForApiClient(apiClient: AuthenticatedApiClient, id: string) {
@@ -309,6 +355,7 @@ export class VouchersService {
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     const auth: AuthContext = {
@@ -316,6 +363,7 @@ export class VouchersService {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
     const last = await this.wsfe.getLastAuthorized(
       auth,
@@ -769,14 +817,12 @@ export class VouchersService {
     return sameTotal && sameRecipient;
   }
 
-  private async buildAuth(issuer: {
-    id: string;
-    cuit: string;
-  }): Promise<AuthContext> {
+  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     return {
@@ -784,6 +830,7 @@ export class VouchersService {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
   }
 

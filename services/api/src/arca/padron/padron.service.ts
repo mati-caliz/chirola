@@ -15,6 +15,7 @@ import {
   type ArcaCallLogContext,
   type ArcaCallRecorder,
 } from '../arca-soap.util';
+import { isProduction } from '../arca-environment';
 import type { AuthContext } from '../wsfe/wsfe.types';
 
 const PADRON_A5_NS = 'http://a5.soap.ws.server.puc.sr/';
@@ -40,9 +41,8 @@ export class PadronService {
     };
   }
 
-  private get padronUrl(): string {
-    const env = this.config.get<string>('ARCA_ENV', 'homologacion');
-    return env === 'produccion'
+  private padronUrl(environment: string): string {
+    return isProduction(environment)
       ? this.config.get<string>(
           'ARCA_PADRON_A5_URL_PROD',
           'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5',
@@ -67,21 +67,21 @@ export class PadronService {
       '</soapenv:Body>' +
       '</soapenv:Envelope>';
 
-    const response = await this.callPadron(envelope, cuit, auth.issuerId);
+    const response = await this.callPadron(envelope, cuit, auth);
     return this.parseTaxpayer(response, cuit);
   }
 
   private async callPadron(
     envelope: string,
     cuit: string,
-    issuerId: string,
+    auth: AuthContext,
   ): Promise<string> {
     try {
       return await callSoap(
-        this.padronUrl,
+        this.padronUrl(auth.environment),
         `${PADRON_A5_NS}getPersona`,
         envelope,
-        this.logContext(issuerId),
+        this.logContext(auth.issuerId),
       );
     } catch (err) {
       if (

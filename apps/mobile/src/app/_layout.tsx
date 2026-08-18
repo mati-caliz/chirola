@@ -5,16 +5,29 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from '@react-navigation/native';
+import {
+  Onest_400Regular,
+  Onest_500Medium,
+  Onest_600SemiBold,
+  Onest_700Bold,
+  Onest_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/onest';
+import {
+  SplineSansMono_400Regular,
+  SplineSansMono_500Medium,
+  SplineSansMono_600SemiBold,
+} from '@expo-google-fonts/spline-sans-mono';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { queryClient } from '@/lib/query';
+import { ThemeModeProvider, useThemeMode } from '@/theme/theme-mode';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,27 +35,42 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ThemedRoot />
-          </AuthProvider>
-        </QueryClientProvider>
+        <ThemeModeProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <ThemedRoot />
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeModeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
 function ThemedRoot() {
-  const colorScheme = useColorScheme();
+  const { scheme } = useThemeMode();
   const { loading } = useAuth();
+  const [fontsLoaded] = useFonts({
+    Onest_400Regular,
+    Onest_500Medium,
+    Onest_600SemiBold,
+    Onest_700Bold,
+    Onest_800ExtraBold,
+    SplineSansMono_400Regular,
+    SplineSansMono_500Medium,
+    SplineSansMono_600SemiBold,
+  });
+  const ready = !loading && fontsLoaded;
 
   useEffect(() => {
-    if (!loading) SplashScreen.hideAsync();
-  }, [loading]);
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style="auto" />
+    <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <RootNavigator />
     </ThemeProvider>
   );
@@ -59,7 +87,7 @@ function RootNavigator() {
     if (!user && !inAuth) {
       router.replace('/(auth)/login');
     } else if (user && inAuth) {
-      router.replace('/(app)/issuers');
+      router.replace('/(app)/(tabs)');
     }
   }, [user, loading, segments, router]);
 

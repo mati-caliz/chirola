@@ -41,3 +41,4 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.chirola-respondi-apikey.txt

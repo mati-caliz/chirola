@@ -7,7 +7,11 @@ import type { CertsService } from '../certs/certs.service';
 import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { PadronService } from '../arca/padron/padron.service';
 
-const issuer = { id: 'issuer-1', cuit: '20111111112' };
+const issuer = {
+  id: 'issuer-1',
+  cuit: '20111111112',
+  environment: 'homologacion',
+};
 
 const taxpayer: TaxpayerInfo = {
   cuit: '30707153745',
@@ -48,7 +52,12 @@ function build(options: { cached?: CacheRow } = {}) {
 
   const requestedServices: string[] = [];
   const wsaa = {
-    getAccessTicket: async (_id: string, _creds: unknown, service: string) => {
+    getAccessTicket: async (
+      _id: string,
+      _creds: unknown,
+      _environment: string,
+      service: string,
+    ) => {
       requestedServices.push(service);
       return { token: 't', sign: 's', expiration: new Date(), generation: new Date() };
     },

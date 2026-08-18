@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { ArcaIssuer } from '../arca/arca-environment';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
@@ -24,10 +25,7 @@ export class ReconciliationService {
     private readonly wsfe: WsfeService,
   ) {}
 
-  async checkNumbering(issuer: {
-    id: string;
-    cuit: string;
-  }): Promise<NumberingStatus[]> {
+  async checkNumbering(issuer: ArcaIssuer): Promise<NumberingStatus[]> {
     const grouped = await this.prisma.voucher.groupBy({
       by: ['salesPointId', 'voucherType'],
       where: { issuerId: issuer.id },
@@ -75,14 +73,12 @@ export class ReconciliationService {
     return statuses;
   }
 
-  private async buildAuth(issuer: {
-    id: string;
-    cuit: string;
-  }): Promise<AuthContext> {
+  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     return {
@@ -90,6 +86,7 @@ export class ReconciliationService {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
   }
 }

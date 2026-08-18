@@ -18,6 +18,7 @@ const auth = {
   cuit: '20111111112',
   token: 'token',
   sign: 'sign',
+  environment: 'homologacion',
 };
 
 const originalFetch = global.fetch;

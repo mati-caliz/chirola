@@ -54,6 +54,9 @@ timeout 60 bash -c 'until curl -s -o /dev/null http://localhost:3000/api; do sle
 }
 echo "✅ Backend listo en http://localhost:3000"
 
+echo "👤 Creando usuario demo (demo@demo.com / demo)..."
+pnpm --filter @chirola/api run seed:demo || echo "⚠️  No se pudo crear el usuario demo (¿faltan migraciones?)"
+
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 MOBILE_ENV="apps/mobile/.env"
 if [ -n "$LAN_IP" ] && [ ! -f "$MOBILE_ENV" ]; then

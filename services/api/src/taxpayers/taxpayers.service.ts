@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import type { TaxpayerAddress, TaxpayerInfo } from '@chirola/shared';
+import type { ArcaIssuer } from '../arca/arca-environment';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
@@ -49,7 +50,7 @@ export class TaxpayersService {
   }
 
   async lookup(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     rawCuit: string,
   ): Promise<TaxpayerInfo> {
     const cuit = normalizeCuit(rawCuit);
@@ -90,14 +91,12 @@ export class TaxpayersService {
     return taxpayer;
   }
 
-  private async buildAuth(issuer: {
-    id: string;
-    cuit: string;
-  }): Promise<AuthContext> {
+  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'ws_sr_constancia_inscripcion',
     );
     return {
@@ -105,6 +104,7 @@ export class TaxpayersService {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
   }
 }

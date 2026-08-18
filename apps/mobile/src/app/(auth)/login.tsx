@@ -2,16 +2,21 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { loginSchema } from '@chirola/shared';
-import {
-  brandColor,
-  Button,
-  ErrorText,
-  Screen,
-  Subtitle,
-  TextField,
-  Title,
-} from '@/components/ui';
+import { brandColor, Button, ErrorText, Screen, Subtitle, TextField } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/hooks/use-theme';
+
+const Wordmark = ({ tagline }: { tagline: string }) => {
+  const theme = useTheme();
+  return (
+    <View style={{ alignItems: 'center', gap: 6, marginTop: 48, marginBottom: 8 }}>
+      <Text style={{ fontFamily: theme.font.extrabold, fontSize: theme.fontSize.amount, color: theme.colors.textBrand }}>
+        Chirola
+      </Text>
+      <Subtitle>{tagline}</Subtitle>
+    </View>
+  );
+};
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -39,10 +44,7 @@ export default function LoginScreen() {
 
   return (
     <Screen>
-      <View style={{ gap: 4, marginTop: 24 }}>
-        <Title>Chirola</Title>
-        <Subtitle>Facturá con ARCA de forma simple.</Subtitle>
-      </View>
+      <Wordmark tagline="La forma humana de facturar." />
       <TextField
         label="Email"
         value={email}

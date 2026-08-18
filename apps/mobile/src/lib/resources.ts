@@ -72,6 +72,78 @@ export interface VoucherDetail {
   client: Client | null;
 }
 
+export interface VoucherSummary {
+  id: string;
+  voucherType: number;
+  number: number;
+  voucherDate: string;
+  status: string;
+  cae: string | null;
+  totalAmount: string;
+  salesPoint: { number: number };
+  client: { legalName: string | null; docNumber: string } | null;
+}
+
+export const listVouchers = (issuerId: string) =>
+  apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
+
+export interface IvaRateBreakdown {
+  rate: number;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface IvaPosition {
+  year: number;
+  month: number;
+  breakdown: IvaRateBreakdown[];
+  totalDebit: number;
+  totalCredit: number;
+  balance: number;
+}
+
+export type VencimientoStatus = 'OVERDUE' | 'DUE_SOON' | 'UPCOMING';
+
+export interface Vencimiento {
+  type: string;
+  label: string;
+  dueDate: string;
+  status: VencimientoStatus;
+}
+
+export const getIvaPosition = (issuerId: string, year: number, month: number) =>
+  apiFetch<IvaPosition>(`/fiscal/iva-position?issuerId=${issuerId}&year=${year}&month=${month}`);
+
+export const getVencimientos = (issuerId: string) =>
+  apiFetch<Vencimiento[]>(`/fiscal/vencimientos?issuerId=${issuerId}`);
+
+export interface FiscalAlerts {
+  vencimientos: Vencimiento[];
+  certificate: { validUntil: string; daysToExpiry: number } | null;
+}
+
+export const getFiscalAlerts = (issuerId: string) =>
+  apiFetch<FiscalAlerts>(`/fiscal/alerts?issuerId=${issuerId}`);
+
+export interface SalesPoint {
+  id: string;
+  number: number;
+  description: string | null;
+}
+
+export const listSalesPoints = (issuerId: string) =>
+  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points`);
+
+export const syncSalesPoints = (issuerId: string) =>
+  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points/sync`, { method: 'POST' });
+
+export const updateSalesPoint = (issuerId: string, number: number, description: string) =>
+  apiFetch<SalesPoint>(`/issuers/${issuerId}/sales-points/${number}`, {
+    method: 'PATCH',
+    body: { description },
+  });
+
 export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
 
 export const createIssuer = (body: CreateIssuer) =>

@@ -2,18 +2,12 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { registerSchema } from '@chirola/shared';
-import {
-  brandColor,
-  Button,
-  ErrorText,
-  Screen,
-  Subtitle,
-  TextField,
-  Title,
-} from '@/components/ui';
+import { brandColor, Button, ErrorText, Screen, Subtitle, TextField, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function RegisterScreen() {
+  const theme = useTheme();
   const { register } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +33,10 @@ export default function RegisterScreen() {
 
   return (
     <Screen>
-      <View style={{ gap: 4, marginTop: 24 }}>
+      <View style={{ gap: 4, marginTop: 40 }}>
+        <Text style={{ fontFamily: theme.font.extrabold, fontSize: theme.fontSize.heading, color: theme.colors.textBrand }}>
+          Chirola
+        </Text>
         <Title>Crear cuenta</Title>
         <Subtitle>Registrate para empezar a facturar.</Subtitle>
       </View>

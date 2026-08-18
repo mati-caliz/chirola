@@ -1,100 +1,27 @@
-import { forwardRef, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  type TextInputProps,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Spacing } from '@/constants/theme';
+import { forwardRef } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { Button as DsButton, type ButtonVariant } from '@/components/ds/Button';
 import { useTheme } from '@/hooks/use-theme';
+import { palette } from '@/theme/tokens';
 
-const BRAND = '#208AEF';
+export {
+  Screen,
+  Title,
+  Subtitle,
+  Overline,
+  Label,
+  BodyText,
+  ErrorText,
+  Centered,
+  Loading,
+} from '@/components/ds/Text';
+export { Card } from '@/components/ds/Card';
+export { StatusBadge } from '@/components/ds/StatusBadge';
+export { Amount } from '@/components/ds/Amount';
 
-export function Screen({
-  children,
-  scroll = true,
-}: {
-  children: ReactNode;
-  scroll?: boolean;
-}) {
-  const c = useTheme();
-  const body = scroll ? (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-    >
-      {children}
-    </ScrollView>
-  ) : (
-    <View style={styles.flexContent}>{children}</View>
-  );
-  return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: c.background }]} edges={['bottom']}>
-      {body}
-    </SafeAreaView>
-  );
-}
+export const brandColor = palette.brand700;
 
-export function Title({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.title, { color: c.text }]}>{children}</Text>;
-}
-
-export function Subtitle({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.subtitle, { color: c.textSecondary }]}>{children}</Text>;
-}
-
-export function Card({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
-  const c = useTheme();
-  const inner = <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>{children}</View>;
-  if (onPress) {
-    return (
-      <Pressable onPress={onPress} style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
-        {inner}
-      </Pressable>
-    );
-  }
-  return inner;
-}
-
-export function Label({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={[styles.label, { color: c.textSecondary }]}>{children}</Text>;
-}
-
-export function BodyText({ children }: { children: ReactNode }) {
-  const c = useTheme();
-  return <Text style={{ color: c.text }}>{children}</Text>;
-}
-
-export const TextField = forwardRef<TextInput, TextInputProps & { label?: string }>(
-  function TextField({ label, style, ...props }, ref) {
-    const c = useTheme();
-    return (
-      <View style={styles.field}>
-        {label ? <Label>{label}</Label> : null}
-        <TextInput
-          ref={ref}
-          placeholderTextColor={c.textSecondary}
-          style={[
-            styles.input,
-            { backgroundColor: c.backgroundElement, color: c.text, borderColor: c.backgroundSelected },
-            style,
-          ]}
-          {...props}
-        />
-      </View>
-    );
-  },
-);
-
-export function Button({
+export const Button = ({
   title,
   onPress,
   loading,
@@ -105,59 +32,73 @@ export function Button({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger';
-}) {
-  const c = useTheme();
-  const isDisabled = disabled || loading;
-  const bg =
-    variant === 'primary' ? BRAND : variant === 'danger' ? '#E5484D' : c.backgroundSelected;
-  const fg = variant === 'secondary' ? c.text : '#ffffff';
+  variant?: ButtonVariant;
+}) => (
+  <DsButton variant={variant} full loading={loading} disabled={disabled} onPress={onPress}>
+    {title}
+  </DsButton>
+);
+
+export const TextField = forwardRef<TextInput, TextInputProps & { label?: string }>(function TextField(
+  { label, style, ...props },
+  ref,
+) {
+  const theme = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={isDisabled}
-      style={({ pressed }) => [
-        styles.button,
-        { backgroundColor: bg, opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 },
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator color={fg} />
-      ) : (
-        <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
-      )}
-    </Pressable>
-  );
-}
-
-export function ErrorText({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return <Text style={styles.error}>{children}</Text>;
-}
-
-export function Centered({ children }: { children: ReactNode }) {
-  return <View style={styles.centered}>{children}</View>;
-}
-
-export function Loading() {
-  return (
-    <Centered>
-      <ActivityIndicator color={BRAND} size="large" />
-    </Centered>
-  );
-}
-
-export function Badge({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 'warn' | 'neutral' }) {
-  const bg = tone === 'ok' ? '#DFF5E1' : tone === 'warn' ? '#FDECEC' : '#E6EDF5';
-  const fg = tone === 'ok' ? '#137333' : tone === 'warn' ? '#B3261E' : '#274060';
-  return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Text style={[styles.badgeText, { color: fg }]}>{text}</Text>
+    <View style={styles.field}>
+      {label ? (
+        <Text
+          style={{
+            marginBottom: theme.spacing.xs,
+            fontFamily: theme.font.semibold,
+            fontSize: theme.fontSize.caption,
+            color: theme.colors.textPrimary,
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
+      <TextInput
+        ref={ref}
+        placeholderTextColor={theme.colors.textTertiary}
+        style={[
+          {
+            borderWidth: 1.5,
+            borderColor: theme.colors.borderDefault,
+            borderRadius: theme.radius.md,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            fontSize: theme.fontSize.body,
+            fontFamily: theme.font.regular,
+            backgroundColor: theme.colors.surfaceCard,
+            color: theme.colors.textPrimary,
+            minHeight: theme.spacing.hitTarget,
+          },
+          style,
+        ]}
+        {...props}
+      />
     </View>
   );
-}
+});
 
-export function OptionGroup<T extends string | number>({
+export const Badge = ({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 'warn' | 'neutral' }) => {
+  const theme = useTheme();
+  const { colors } = theme;
+  const map = {
+    ok: { bg: colors.statusAprobadoBg, fg: colors.statusAprobadoFg },
+    warn: { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg },
+    neutral: { bg: colors.statusPendienteBg, fg: colors.statusPendienteFg },
+  } as const;
+  const { bg, fg } = map[tone];
+  return (
+    <View style={[styles.badge, { backgroundColor: bg, borderRadius: theme.radius.pill }]}>
+      <Text style={{ color: fg, fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption }}>{text}</Text>
+    </View>
+  );
+};
+
+export const OptionGroup = <T extends string | number>({
   label,
   value,
   options,
@@ -166,12 +107,24 @@ export function OptionGroup<T extends string | number>({
   label?: string;
   value: T;
   options: { label: string; value: T }[];
-  onChange: (v: T) => void;
-}) {
-  const c = useTheme();
+  onChange: (value: T) => void;
+}) => {
+  const theme = useTheme();
+  const { colors } = theme;
   return (
     <View style={styles.field}>
-      {label ? <Label>{label}</Label> : null}
+      {label ? (
+        <Text
+          style={{
+            marginBottom: theme.spacing.xs,
+            fontFamily: theme.font.semibold,
+            fontSize: theme.fontSize.caption,
+            color: theme.colors.textPrimary,
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
       <View style={styles.optionRow}>
         {options.map((opt) => {
           const selected = opt.value === value;
@@ -179,15 +132,23 @@ export function OptionGroup<T extends string | number>({
             <Pressable
               key={String(opt.value)}
               onPress={() => onChange(opt.value)}
-              style={[
+              style={({ pressed }) => [
                 styles.option,
                 {
-                  backgroundColor: selected ? BRAND : c.backgroundElement,
-                  borderColor: selected ? BRAND : c.backgroundSelected,
+                  borderRadius: theme.radius.pill,
+                  backgroundColor: selected ? colors.actionPrimary : colors.surfaceCard,
+                  borderColor: selected ? colors.actionPrimary : colors.borderDefault,
+                  opacity: pressed ? 0.85 : 1,
                 },
               ]}
             >
-              <Text style={{ color: selected ? '#fff' : c.text, fontWeight: '600', fontSize: 14 }}>
+              <Text
+                style={{
+                  color: selected ? colors.actionPrimaryText : colors.textPrimary,
+                  fontFamily: theme.font.semibold,
+                  fontSize: theme.fontSize.callout,
+                }}
+              >
                 {opt.label}
               </Text>
             </Pressable>
@@ -196,39 +157,11 @@ export function OptionGroup<T extends string | number>({
       </View>
     </View>
   );
-}
-
-export const brandColor = BRAND;
+};
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  scrollContent: { padding: Spacing.three, gap: Spacing.three },
-  flexContent: { flex: 1, padding: Spacing.three, gap: Spacing.three },
-  title: { fontSize: 26, fontWeight: '700' },
-  subtitle: { fontSize: 15 },
-  card: { borderRadius: 12, padding: Spacing.three, gap: Spacing.two },
-  pressed: { opacity: 0.7 },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.one },
-  field: { gap: Spacing.one },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    fontSize: 16,
-  },
-  button: {
-    borderRadius: 10,
-    paddingVertical: Spacing.three - 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  buttonText: { fontSize: 16, fontWeight: '600' },
-  error: { color: '#E5484D', fontSize: 14 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
-  badge: { borderRadius: 999, paddingHorizontal: Spacing.two + 2, paddingVertical: 3, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  option: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  field: { gap: 4 },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  option: { borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 10 },
 });

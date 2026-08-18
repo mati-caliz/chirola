@@ -2,14 +2,7 @@ import { useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClientSchema, DocumentType } from '@chirola/shared';
-import {
-  Button,
-  ErrorText,
-  OptionGroup,
-  Screen,
-  Subtitle,
-  TextField,
-} from '@/components/ui';
+import { Banner, Button, Input, Screen, Segmented, Subtitle } from '@/components/ds';
 import { createClient } from '@/lib/resources';
 
 export default function NewClientScreen() {
@@ -24,8 +17,7 @@ export default function NewClientScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (body: ReturnType<typeof createClientSchema.parse>) =>
-      createClient(issuerId, body),
+    mutationFn: (body: ReturnType<typeof createClientSchema.parse>) => createClient(issuerId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients', issuerId] });
       router.back();
@@ -33,7 +25,7 @@ export default function NewClientScreen() {
     onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo crear el cliente.'),
   });
 
-  function onSubmit() {
+  const onSubmit = () => {
     setError(null);
     const parsed = createClientSchema.safeParse({
       docType,
@@ -42,11 +34,11 @@ export default function NewClientScreen() {
       email: email.trim() || undefined,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos.');
+      setError(parsed.error.issues[0]?.message ?? 'Revisá los datos ingresados.');
       return;
     }
     mutation.mutate(parsed.data);
-  }
+  };
 
   const isCuitCuil = docType === DocumentType.CUIT || docType === DocumentType.CUIL;
 
@@ -55,7 +47,8 @@ export default function NewClientScreen() {
       <Stack.Screen options={{ title: 'Nuevo cliente' }} />
       <Screen>
         <Subtitle>Los receptores que después vas a poder elegir al facturar.</Subtitle>
-        <OptionGroup<number>
+        {error ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
+        <Segmented<number>
           label="Tipo de documento"
           value={docType}
           onChange={setDocType}
@@ -66,30 +59,33 @@ export default function NewClientScreen() {
             { label: 'Cons. Final', value: DocumentType.CONSUMIDOR_FINAL },
           ]}
         />
-        <TextField
+        <Input
           label={isCuitCuil ? 'Número (11 dígitos)' : 'Número de documento'}
           value={docNumber}
           onChangeText={setDocNumber}
           keyboardType="number-pad"
-          maxLength={isCuitCuil ? 11 : 15}
+          mono
           placeholder={isCuitCuil ? '20123456789' : '12345678'}
+          hint={isCuitCuil ? 'Sin guiones. Necesario para emitir Factura A.' : undefined}
         />
-        <TextField
+        <Input
           label="Razón social / Nombre"
           value={legalName}
           onChangeText={setLegalName}
           placeholder="Opcional"
         />
-        <TextField
+        <Input
           label="Email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
           placeholder="Opcional"
+          hint="Para enviarle el comprobante más tarde."
         />
-        <ErrorText>{error}</ErrorText>
-        <Button title="Crear cliente" onPress={onSubmit} loading={mutation.isPending} />
+        <Button variant="primary" full loading={mutation.isPending} onPress={onSubmit}>
+          Crear cliente
+        </Button>
       </Screen>
     </>
   );

@@ -7,6 +7,7 @@ import {
   type ArcaParam,
   type ArcaParamTypeName,
 } from '@chirola/shared';
+import type { ArcaIssuer } from '../arca/arca-environment';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertsService } from '../certs/certs.service';
 import { WsaaService } from '../arca/wsaa/wsaa.service';
@@ -53,7 +54,7 @@ export class ArcaParamCacheService {
   }
 
   async get(
-    issuer: { id: string; cuit: string },
+    issuer: ArcaIssuer,
     paramType: ArcaParamTypeName,
   ): Promise<ArcaParam[]> {
     const cached = await this.prisma.arcaParamCache.findUnique({
@@ -91,14 +92,12 @@ export class ArcaParamCacheService {
     }
   }
 
-  private async buildAuth(issuer: {
-    id: string;
-    cuit: string;
-  }): Promise<AuthContext> {
+  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const accessTicket = await this.wsaa.getAccessTicket(
       issuer.id,
       credentials,
+      issuer.environment,
       'wsfe',
     );
     return {
@@ -106,6 +105,7 @@ export class ArcaParamCacheService {
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
+      environment: issuer.environment,
     };
   }
 }

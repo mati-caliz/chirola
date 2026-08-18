@@ -1,5 +1,19 @@
 # Plan de migración — Chirola Design System → app RN/Expo
 
+> **Estado:** Fases 1–5 completas y verificadas (tsc + lint + tests 87/87 + bundle Metro). Todas
+> las pantallas núcleo están rediseñadas con el DS: Certificado (wizard Stepper), Emitir (modal +
+> confirmación + fases progreso/error), Detalle, Comprobantes (lista real, endpoint nuevo
+> `GET /issuers/:id/vouchers`), Fiscal (IVA + vencimientos), Login/Registro (wordmark), alta de
+> emisor y de cliente, lista de clientes, detalle de emisor. La navegación es un tab bar de 5
+> destinos con emisor activo global (AsyncStorage). Decisiones §7: Emitir = modal; AsyncStorage;
+> backend en paralelo. **Hecho además:** toggle de dark mode manual (Sistema/Claro/Oscuro con
+> `ThemeModeProvider`, pantalla de Configuración) y ABM de puntos de venta (endpoints DB + sync
+> desde ARCA `FEParamGetPtosVenta` + edición de descripción + selector al emitir), centro de
+> novedades (vencimientos + aviso de certificado con campana e indicador en el dashboard, sobre
+> `/fiscal/alerts`), bloqueo con biometría (expo-local-authentication + gate + toggle) y pantalla
+> de perfil. **Pendiente (requieren infra/decisiones):** recuperar contraseña (falta envío de
+> mail) y autocompletado por padrón (falta el servicio de constancia de inscripción de ARCA).
+
 Objetivo: que **toda la app mobile se vea y se comporte como el "Chirola Design System"** que se
 diseñó en Claude Design, sin quedarnos en el look improvisado de hoy.
 
@@ -174,14 +188,14 @@ Leyenda: **[HOY]** existe y se rediseña · **[NUEVA]** no existe · mapeo al mo
 | Pantalla | Estado | Mockup DS | Notas de migración |
 |---|---|---|---|
 | Inicio / Dashboard | [NUEVA] | `ScreenDashboard` | Selector de emisor (pill), card "facturado en el mes" + IVA débito, alerta de cert por vencer, últimos 3 comprobantes. |
-| Comprobantes (lista) | [NUEVA] backend + UI | `ScreenComprobantes` | SearchBar + chips de filtro + `FlatList`. Estados loading (skeleton)/vacío/error. **Requiere** endpoint `GET /issuers/:id/vouchers` (roadmap 1.3). |
-| Detalle comprobante | [HOY] `vouchers/[id]` | `ScreenDetalle` | Card centrada con StatusBadge, Amount xl, QR, CAE+vto en mono, banner si observado/rechazado, acciones Enviar/PDF/Nota de crédito. |
-| Nueva factura | [HOY] `vouchers/new` | `ScreenNuevaFactura` | Select tipo (sheet), Select PdV, Input cliente, cards de ítems con IVA, footer sticky total, sheet de confirmación "Vas a emitir…", fases progreso/ok/error. |
-| Certificado | [HOY] `certificate` | `ScreenCertificado` | Wizard `Stepper` 4 pasos: clave/CSR → guía ARCA + copiar CSR → pegar/adjuntar .crt → éxito. |
+| Comprobantes (lista) | [NUEVA] backend + UI | `ScreenVouchers` | SearchBar + chips de filtro + `FlatList`. Estados loading (skeleton)/vacío/error. **Requiere** endpoint `GET /issuers/:id/vouchers` (roadmap 1.3). |
+| Detalle comprobante | [HOY] `vouchers/[id]` | `ScreenVoucherDetail` | Card centrada con StatusBadge, Amount xl, QR, CAE+vto en mono, banner si observado/rechazado, acciones Enviar/PDF/Nota de crédito. |
+| Nueva factura | [HOY] `vouchers/new` | `ScreenNewInvoice` | Select tipo (sheet), Select PdV, Input cliente, cards de ítems con IVA, footer sticky total, sheet de confirmación "Vas a emitir…", fases progreso/ok/error. |
+| Certificado | [HOY] `certificate` | `ScreenCertificate` | Wizard `Stepper` 4 pasos: clave/CSR → guía ARCA + copiar CSR → pegar/adjuntar .crt → éxito. |
 | Fiscal | [NUEVA] | `ScreenFiscal` | Posición IVA (débito/crédito/saldo), próximos vencimientos, export Libro IVA Ventas. |
-| Más | [NUEVA] | `ScreenMas` | Secciones Emisor (cert, PdV, clientes, cambiar emisor) y Cuenta (perfil, Face ID, notificaciones), logout. |
-| Selector de emisor | [HOY] `issuers/index` | `SheetEmisores` | Pasa a BottomSheet con StatusBadge "Activo" + "Agregar otro emisor". |
-| Enviar comprobante | [NUEVA] | `SheetCompartir` | BottomSheet WhatsApp / Email (roadmap 2.2). |
+| Más | [NUEVA] | `ScreenMore` | Secciones Emisor (cert, PdV, clientes, cambiar emisor) y Cuenta (perfil, Face ID, notificaciones), logout. |
+| Selector de emisor | [HOY] `issuers/index` | `SheetIssuers` | Pasa a BottomSheet con StatusBadge "Activo" + "Agregar otro emisor". |
+| Enviar comprobante | [NUEVA] | `SheetShare` | BottomSheet WhatsApp / Email (roadmap 2.2). |
 
 ### Auth y cuenta
 | Pantalla | Estado | Notas |

@@ -7,7 +7,7 @@ export interface AuditEntry {
   method: string;
   path: string;
   outcome: 'success' | 'error';
-  voucherId?: string;
+  resourceId?: string;
   detail?: string;
 }
 

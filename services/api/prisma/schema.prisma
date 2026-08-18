@@ -213,7 +213,7 @@ model ServiceAuditLog {
   method      String
   path        String
   outcome     String
-  voucherId   String?
+  resourceId  String?
   detail      String?  @db.Text
   createdAt   DateTime @default(now())
 

@@ -41,12 +41,6 @@ export class IssuersController {
     private readonly paramCache: ArcaParamCacheService,
   ) {}
 
-  @Get(':id/sales-points')
-  async salesPoints(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.params.getSalesPoints(issuer);
-  }
-
   @Get(':id/params/:paramType')
   async paramTable(
     @CurrentUser() user: JwtPayload,

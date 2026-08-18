@@ -8,7 +8,7 @@ import { Observable, tap } from 'rxjs';
 import type { RequestWithApiClient } from './service-auth.guard';
 import { ServiceAuditService } from './service-audit.service';
 
-interface IssuedResult {
+interface CreatedResource {
   id?: string;
 }
 
@@ -24,9 +24,11 @@ export class ServiceAuditInterceptor implements NestInterceptor {
     }
 
     const body = (req.body ?? {}) as { issuerId?: string };
+    const query = req.query as { issuerId?: string };
+    const params = req.params as { issuerId?: string };
     const base = {
       apiClientId: apiClient.id,
-      issuerId: body.issuerId,
+      issuerId: body.issuerId ?? query.issuerId ?? params.issuerId,
       method: req.method,
       path: req.originalUrl,
     };
@@ -34,8 +36,8 @@ export class ServiceAuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: (result) => {
-          const voucherId = (result as IssuedResult | undefined)?.id;
-          void this.audit.record({ ...base, outcome: 'success', voucherId });
+          const resourceId = (result as CreatedResource | undefined)?.id;
+          void this.audit.record({ ...base, outcome: 'success', resourceId });
         },
         error: (err: unknown) => {
           const detail = err instanceof Error ? err.message : String(err);

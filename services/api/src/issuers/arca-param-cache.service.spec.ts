@@ -6,7 +6,11 @@ import type { CertsService } from '../certs/certs.service';
 import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { WsfeService } from '../arca/wsfe/wsfe.service';
 
-const issuer = { id: 'issuer-1', cuit: '20111111112' };
+const issuer = {
+  id: 'issuer-1',
+  cuit: '20111111112',
+  environment: 'homologacion',
+};
 
 const fromArca: ArcaParam[] = [
   { id: 1, description: 'Impuestos nacionales' },

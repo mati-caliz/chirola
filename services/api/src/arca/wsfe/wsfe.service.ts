@@ -10,6 +10,7 @@ import {
   type ArcaCallLogContext,
   type ArcaCallRecorder,
 } from '../arca-soap.util';
+import { isProduction } from '../arca-environment';
 import { ArcaRejectionError } from './arca-errors';
 import type {
   ArcaParamEntry,
@@ -91,9 +92,8 @@ export class WsfeService {
     return { issuerId, service: WSFE_SERVICE, recorder: this.callLog };
   }
 
-  private get wsfeUrl(): string {
-    const env = this.config.get<string>('ARCA_ENV', 'homologacion');
-    return env === 'produccion'
+  private wsfeUrl(environment: string): string {
+    return isProduction(environment)
       ? this.config.get<string>(
           'ARCA_WSFEV1_URL_PROD',
           'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
@@ -114,10 +114,10 @@ export class WsfeService {
     );
   }
 
-  async ping(): Promise<boolean> {
+  async ping(environment: string): Promise<boolean> {
     const soap = this.envelope('<ar:FEDummy/>');
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(environment),
       `${WSFEV1_NS}FEDummy`,
       soap,
       this.logContext(null),
@@ -138,7 +138,7 @@ export class WsfeService {
         '</ar:FECompUltimoAutorizado>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECompUltimoAutorizado`,
       soap,
       this.logContext(auth.issuerId),
@@ -154,7 +154,7 @@ export class WsfeService {
         '</ar:FEParamGetPtosVenta>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FEParamGetPtosVenta`,
       soap,
       this.logContext(auth.issuerId),
@@ -184,7 +184,7 @@ export class WsfeService {
         `</ar:${operation}>`,
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}${operation}`,
       soap,
       this.logContext(auth.issuerId),
@@ -234,7 +234,7 @@ export class WsfeService {
         '</ar:FEParamGetTiposMonedas>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FEParamGetTiposMonedas`,
       soap,
       this.logContext(auth.issuerId),
@@ -262,7 +262,7 @@ export class WsfeService {
         '</ar:FEParamGetCotizacion>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FEParamGetCotizacion`,
       soap,
       this.logContext(auth.issuerId),
@@ -303,7 +303,7 @@ export class WsfeService {
         '</ar:FECompConsultar>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECompConsultar`,
       soap,
       this.logContext(auth.issuerId),
@@ -334,7 +334,7 @@ export class WsfeService {
         '</ar:FECompConsultar>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECompConsultar`,
       soap,
       this.logContext(auth.issuerId),
@@ -366,7 +366,7 @@ export class WsfeService {
         '</ar:FECAESolicitar>',
     );
     const res = await callSoap(
-      this.wsfeUrl,
+      this.wsfeUrl(auth.environment),
       `${WSFEV1_NS}FECAESolicitar`,
       soap,
       this.logContext(auth.issuerId),

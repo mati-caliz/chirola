@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { XMLParser } from 'fast-xml-parser';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isProduction } from '../arca-environment';
 import { ArcaCallOutcome } from '../arca-call-log.service';
 import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from '../arca-soap.util';
 import {
@@ -33,9 +34,8 @@ export class WsaaService {
     private readonly callLog: ArcaCallRecorder,
   ) {}
 
-  private get wsaaUrl(): string {
-    const env = this.config.get<string>('ARCA_ENV', 'homologacion');
-    return env === 'produccion'
+  private wsaaUrl(environment: string): string {
+    return isProduction(environment)
       ? this.config.get<string>(
           'ARCA_WSAA_URL_PROD',
           'https://wsaa.afip.gov.ar/ws/services/LoginCms',
@@ -49,6 +49,7 @@ export class WsaaService {
   async getAccessTicket(
     issuerId: string,
     creds: CertificateCredentials,
+    environment: string,
     service: ArcaService = 'wsfe',
   ): Promise<AccessTicket> {
     const cached = await this.prisma.accessTicketCache.findUnique({
@@ -67,7 +68,7 @@ export class WsaaService {
       };
     }
 
-    const accessTicket = await this.login(issuerId, creds, service);
+    const accessTicket = await this.login(issuerId, creds, service, environment);
     await this.prisma.accessTicketCache.upsert({
       where: { issuerId_service: { issuerId, service } },
       create: { issuerId, service, ...accessTicket },
@@ -83,10 +84,11 @@ export class WsaaService {
     issuerId: string,
     creds: CertificateCredentials,
     service: ArcaService,
+    environment: string,
   ): Promise<AccessTicket> {
     const ltr = this.buildLoginTicketRequest(service);
     const cms = this.signCms(ltr, creds);
-    const responseXml = await this.callLoginCms(issuerId, cms);
+    const responseXml = await this.callLoginCms(issuerId, cms, environment);
     return this.parseLoginResponse(responseXml);
   }
 
@@ -141,6 +143,7 @@ export class WsaaService {
   private async callLoginCms(
     issuerId: string,
     cmsBase64: string,
+    environment: string,
   ): Promise<string> {
     const envelope = [
       '<soapenv:Envelope',
@@ -174,7 +177,7 @@ export class WsaaService {
 
     let res: Response;
     try {
-      res = await fetch(this.wsaaUrl, {
+      res = await fetch(this.wsaaUrl(environment), {
         method: 'POST',
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
@@ -187,6 +190,7 @@ export class WsaaService {
       await record(ArcaCallOutcome.NETWORK_ERROR, NO_HTTP_RESPONSE, message);
       throw err;
     }
+
 
     const text = await res.text();
     if (!res.ok) {
