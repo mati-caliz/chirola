@@ -66,6 +66,11 @@ function parseArcaDate(s: string): Date {
 
 const NULL_DATE_MARKERS = ['', 'NULL'];
 
+export function emitsCae(emissionType: string): boolean {
+  const [mechanism] = emissionType.split('-');
+  return mechanism.trim().toUpperCase() === EMISSION_TYPE_CAE;
+}
+
 function isActiveParam(node: Record<string, unknown>): boolean {
   const until = String(node.FchHasta ?? '').trim();
   return NULL_DATE_MARKERS.includes(until.toUpperCase());
@@ -160,7 +165,10 @@ export class WsfeService {
       this.logContext(auth.issuerId),
     );
     const parsed = this.parser.parse(res) as Record<string, unknown>;
-    return collectByTag(parsed, 'PtoVta')
+    return [
+      ...collectByTag(parsed, 'PtoVenta'),
+      ...collectByTag(parsed, 'PtoVta'),
+    ]
       .filter((node) => this.isActiveCaePoint(node))
       .map((node) => ({
         number: Number(node.Nro),
@@ -282,8 +290,11 @@ export class WsfeService {
   private isActiveCaePoint(node: Record<string, unknown>): boolean {
     const blocked = String(node.Bloqueado ?? '') === BLOCKED_FLAG;
     const fchBaja = String(node.FchBaja ?? '').trim();
-    const emissionType = String(node.EmisionTipo ?? '');
-    return !blocked && fchBaja.length === 0 && emissionType === EMISSION_TYPE_CAE;
+    return (
+      !blocked &&
+      NULL_DATE_MARKERS.includes(fchBaja.toUpperCase()) &&
+      emitsCae(String(node.EmisionTipo ?? ''))
+    );
   }
 
   async queryVoucher(
