@@ -10,8 +10,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  importPurchaseInvoicesSchema,
   purchaseInvoiceSchema,
   updatePurchaseInvoiceSchema,
+  type ImportPurchaseInvoicesInput,
   type PurchaseInvoiceInput,
   type UpdatePurchaseInvoiceInput,
 } from '@chirola/shared';
@@ -24,14 +26,36 @@ import {
   type AuthenticatedApiClient,
 } from '../service-auth/api-client.service';
 import { PurchaseInvoicesService } from './purchase-invoices.service';
+import { PurchaseImportService } from './purchase-import.service';
 
 @Controller('v1/purchase-invoices')
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
 export class V1PurchaseInvoicesController {
   constructor(
     private readonly purchaseInvoices: PurchaseInvoicesService,
+    private readonly purchaseImport: PurchaseImportService,
     private readonly apiClients: ApiClientService,
   ) {}
+
+  @Post('import/preview')
+  async previewImport(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
+    body: ImportPurchaseInvoicesInput,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, body.issuerId);
+    return this.purchaseImport.preview(body.issuerId, body.csv);
+  }
+
+  @Post('import')
+  async import(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
+    body: ImportPurchaseInvoicesInput,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, body.issuerId);
+    return this.purchaseImport.import(body.issuerId, body.csv);
+  }
 
   @Post()
   async create(
