@@ -309,6 +309,7 @@ export class VouchersService {
       'wsfe',
     );
     const auth: AuthContext = {
+      issuerId: issuer.id,
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,
@@ -770,6 +771,7 @@ export class VouchersService {
       'wsfe',
     );
     return {
+      issuerId: issuer.id,
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,

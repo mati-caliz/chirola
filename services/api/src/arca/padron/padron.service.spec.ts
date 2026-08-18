@@ -2,15 +2,23 @@ import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RecipientIvaCondition } from '@chirola/shared';
 import { PadronService } from './padron.service';
+import { RecordedArcaCalls } from '../arca-call-recorder.fixture';
+
+const recordedCalls = new RecordedArcaCalls();
 
 function service(): PadronService {
   const config = {
     get: (_key: string, def?: string) => def,
   } as unknown as ConfigService;
-  return new PadronService(config);
+  return new PadronService(config, recordedCalls);
 }
 
-const auth = { cuit: '20111111112', token: 'token', sign: 'sign' };
+const auth = {
+  issuerId: 'issuer-1',
+  cuit: '20111111112',
+  token: 'token',
+  sign: 'sign',
+};
 
 const originalFetch = global.fetch;
 

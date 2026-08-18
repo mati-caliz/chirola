@@ -101,6 +101,7 @@ export class TaxpayersService {
       'ws_sr_constancia_inscripcion',
     );
     return {
+      issuerId: issuer.id,
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,

@@ -1,7 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XMLParser } from 'fast-xml-parser';
-import { buildAuthBlock, callSoap, escapeXml, ParsedXml } from '../arca-soap.util';
+import {
+  buildAuthBlock,
+  callSoap,
+  escapeXml,
+  ParsedXml,
+  ARCA_CALL_RECORDER,
+  type ArcaCallLogContext,
+  type ArcaCallRecorder,
+} from '../arca-soap.util';
 import { ArcaRejectionError } from './arca-errors';
 import type {
   ArcaParamEntry,
@@ -15,6 +23,7 @@ import type {
 } from './wsfe.types';
 
 const WSFEV1_NS = 'http://ar.gov.afip.dif.FEV1/';
+const WSFE_SERVICE = 'wsfe';
 const BLOCKED_FLAG = 'S';
 const EMISSION_TYPE_CAE = 'CAE';
 
@@ -72,7 +81,15 @@ export class WsfeService {
   private readonly logger = new Logger(WsfeService.name);
   private readonly parser = new XMLParser({ ignoreAttributes: false });
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(ARCA_CALL_RECORDER)
+    private readonly callLog: ArcaCallRecorder,
+  ) {}
+
+  private logContext(issuerId: string | null): ArcaCallLogContext {
+    return { issuerId, service: WSFE_SERVICE, recorder: this.callLog };
+  }
 
   private get wsfeUrl(): string {
     const env = this.config.get<string>('ARCA_ENV', 'homologacion');
@@ -99,7 +116,12 @@ export class WsfeService {
 
   async ping(): Promise<boolean> {
     const soap = this.envelope('<ar:FEDummy/>');
-    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}FEDummy`, soap);
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FEDummy`,
+      soap,
+      this.logContext(null),
+    );
     return res.includes('OK');
   }
 
@@ -119,6 +141,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FECompUltimoAutorizado`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const xml = new ParsedXml(res);
     return Number(xml.required('CbteNro'));
@@ -134,6 +157,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FEParamGetPtosVenta`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const parsed = this.parser.parse(res) as Record<string, unknown>;
     return collectByTag(parsed, 'PtoVta')
@@ -159,7 +183,12 @@ export class WsfeService {
         buildAuthBlock(auth.cuit, auth.token, auth.sign) +
         `</ar:${operation}>`,
     );
-    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}${operation}`, soap);
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}${operation}`,
+      soap,
+      this.logContext(auth.issuerId),
+    );
     const parsed = this.parser.parse(res) as Record<string, unknown>;
     return collectByTag(parsed, tag)
       .filter(isActiveParam)
@@ -208,6 +237,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FEParamGetTiposMonedas`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const parsed = this.parser.parse(res) as Record<string, unknown>;
     return collectByTag(parsed, 'Moneda')
@@ -235,6 +265,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FEParamGetCotizacion`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const xml = new ParsedXml(res);
     const errors = xml.errors();
@@ -275,6 +306,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FECompConsultar`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const xml = new ParsedXml(res);
     const cae = xml.optional('CodAutorizacion', '');
@@ -305,6 +337,7 @@ export class WsfeService {
       this.wsfeUrl,
       `${WSFEV1_NS}FECompConsultar`,
       soap,
+      this.logContext(auth.issuerId),
     );
     const xml = new ParsedXml(res);
     const cae = xml.optional('CodAutorizacion', '');
@@ -332,7 +365,12 @@ export class WsfeService {
         '</ar:FeCAEReq>' +
         '</ar:FECAESolicitar>',
     );
-    const res = await callSoap(this.wsfeUrl, `${WSFEV1_NS}FECAESolicitar`, soap);
+    const res = await callSoap(
+      this.wsfeUrl,
+      `${WSFEV1_NS}FECAESolicitar`,
+      soap,
+      this.logContext(auth.issuerId),
+    );
     return this.parseCaeResponse(res);
   }
 

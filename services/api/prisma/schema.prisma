@@ -220,6 +220,23 @@ model ServiceAuditLog {
   @@index([apiClientId, createdAt])
 }
 
+model ArcaCallLog {
+  id           String   @id @default(cuid())
+  issuerId     String?
+  service      String
+  operation    String
+  httpStatus   Int
+  durationMs   Int
+  outcome      String
+  errorCodes   String?
+  requestXml   String   @db.Text
+  responseXml  String   @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([issuerId, createdAt])
+  @@index([createdAt])
+}
+
 model AccessTicketCache {
   id         String   @id @default(cuid())
   issuerId   String

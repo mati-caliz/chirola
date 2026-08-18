@@ -102,6 +102,7 @@ export class ArcaParamCacheService {
       'wsfe',
     );
     return {
+      issuerId: issuer.id,
       cuit: issuer.cuit,
       token: accessTicket.token,
       sign: accessTicket.sign,

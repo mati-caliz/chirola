@@ -1,5 +1,7 @@
 import { InternalServerErrorException, Logger } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
+import { ArcaCallOutcome, type ArcaCallLogEntry } from './arca-call-log.service';
+import type { ArcaService } from './wsaa/wsaa.types';
 
 const logger = new Logger('ArcaSoap');
 const parser = new XMLParser({ ignoreAttributes: false });
@@ -39,25 +41,87 @@ export class ArcaSoapFaultError extends InternalServerErrorException {
   }
 }
 
+export const ARCA_CALL_RECORDER = 'ARCA_CALL_RECORDER';
+
+export interface ArcaCallRecorder {
+  record(entry: ArcaCallLogEntry): Promise<void>;
+}
+
+export interface ArcaCallLogContext {
+  issuerId: string | null;
+  service: ArcaService;
+  recorder: ArcaCallRecorder;
+}
+
+const NO_HTTP_RESPONSE = 0;
+
+export function responseErrorCodes(xml: string): string[] {
+  const errorsBlock = xml.match(/<Errors>([\s\S]*?)<\/Errors>/);
+  if (!errorsBlock) return [];
+  return [...errorsBlock[1].matchAll(/<Code>(\d+)<\/Code>/g)].map(
+    (match) => match[1],
+  );
+}
+
 export async function callSoap(
   url: string,
   soapAction: string,
   envelope: string,
+  logContext?: ArcaCallLogContext,
 ): Promise<string> {
   logger.debug(`REQUEST ${soapAction}`);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/xml; charset=utf-8',
-      SOAPAction: soapAction,
-    },
-    body: envelope,
-  });
+  const startedAt = Date.now();
+
+  const record = async (
+    outcome: ArcaCallLogEntry['outcome'],
+    httpStatus: number,
+    responseXml: string,
+    errorCodes?: string[],
+  ): Promise<void> => {
+    if (!logContext) return;
+    await logContext.recorder.record({
+      issuerId: logContext.issuerId,
+      service: logContext.service,
+      operation: soapAction,
+      httpStatus,
+      durationMs: Date.now() - startedAt,
+      outcome,
+      errorCodes,
+      requestXml: envelope,
+      responseXml,
+    });
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        SOAPAction: soapAction,
+      },
+      body: envelope,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await record(ArcaCallOutcome.NETWORK_ERROR, NO_HTTP_RESPONSE, message);
+    throw err;
+  }
+
   const text = await res.text();
   if (!res.ok) {
     logger.error(`${soapAction} respondió HTTP ${res.status}: ${text}`);
+    await record(ArcaCallOutcome.FAULT, res.status, text);
     throw new ArcaSoapFaultError(soapAction, res.status, text);
   }
+
+  const errorCodes = responseErrorCodes(text);
+  await record(
+    errorCodes.length > 0 ? ArcaCallOutcome.REJECTED : ArcaCallOutcome.SUCCESS,
+    res.status,
+    text,
+    errorCodes,
+  );
   return text;
 }
 

@@ -1,8 +1,15 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { XMLParser } from 'fast-xml-parser';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ArcaCallOutcome } from '../arca-call-log.service';
+import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from '../arca-soap.util';
 import {
   CertificateCredentials,
   ArcaService,
@@ -10,6 +17,9 @@ import {
 } from './wsaa.types';
 
 const TICKET_RENEWAL_MARGIN_MS = 10 * 60_000;
+const WSAA_OPERATION = 'loginCms';
+const WSAA_SERVICE = 'wsaa';
+const NO_HTTP_RESPONSE = 0;
 
 @Injectable()
 export class WsaaService {
@@ -19,6 +29,8 @@ export class WsaaService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    @Inject(ARCA_CALL_RECORDER)
+    private readonly callLog: ArcaCallRecorder,
   ) {}
 
   private get wsaaUrl(): string {
@@ -55,7 +67,7 @@ export class WsaaService {
       };
     }
 
-    const accessTicket = await this.login(creds, service);
+    const accessTicket = await this.login(issuerId, creds, service);
     await this.prisma.accessTicketCache.upsert({
       where: { issuerId_service: { issuerId, service } },
       create: { issuerId, service, ...accessTicket },
@@ -68,12 +80,13 @@ export class WsaaService {
   }
 
   private async login(
+    issuerId: string,
     creds: CertificateCredentials,
     service: ArcaService,
   ): Promise<AccessTicket> {
     const ltr = this.buildLoginTicketRequest(service);
     const cms = this.signCms(ltr, creds);
-    const responseXml = await this.callLoginCms(cms);
+    const responseXml = await this.callLoginCms(issuerId, cms);
     return this.parseLoginResponse(responseXml);
   }
 
@@ -125,7 +138,10 @@ export class WsaaService {
     }
   }
 
-  private async callLoginCms(cmsBase64: string): Promise<string> {
+  private async callLoginCms(
+    issuerId: string,
+    cmsBase64: string,
+  ): Promise<string> {
     const envelope = [
       '<soapenv:Envelope',
       ' xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"',
@@ -139,22 +155,48 @@ export class WsaaService {
       '</soapenv:Envelope>',
     ].join('');
 
-    const res = await fetch(this.wsaaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        SOAPAction: '',
-      },
-      body: envelope,
-    });
+    const startedAt = Date.now();
+    const record = (
+      outcome: (typeof ArcaCallOutcome)[keyof typeof ArcaCallOutcome],
+      httpStatus: number,
+      responseXml: string,
+    ): Promise<void> =>
+      this.callLog.record({
+        issuerId,
+        service: WSAA_SERVICE,
+        operation: WSAA_OPERATION,
+        httpStatus,
+        durationMs: Date.now() - startedAt,
+        outcome,
+        requestXml: envelope,
+        responseXml,
+      });
+
+    let res: Response;
+    try {
+      res = await fetch(this.wsaaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: '',
+        },
+        body: envelope,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await record(ArcaCallOutcome.NETWORK_ERROR, NO_HTTP_RESPONSE, message);
+      throw err;
+    }
 
     const text = await res.text();
     if (!res.ok) {
       this.logger.error(`WSAA respondió ${res.status}: ${text}`);
+      await record(ArcaCallOutcome.FAULT, res.status, text);
       throw new InternalServerErrorException(
         `WSAA devolvió error HTTP ${res.status}.`,
       );
     }
+    await record(ArcaCallOutcome.SUCCESS, res.status, text);
     return text;
   }
 

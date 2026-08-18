@@ -246,13 +246,34 @@ emite uno nuevo. Sin esa verificación se estaría adoptando un CAE ajeno.
 último número en DB por punto de venta y tipo, para detectar desincronizaciones antes de que
 rompan una emisión.
 
-### D.2 🟢 Registro de las llamadas SOAP
+### D.2 ✅ Registro de las llamadas SOAP — implementado
 
-Guardar request/response de cada llamada a ARCA (ya existe `ServiceAuditLog` como base) para
-poder diagnosticar un rechazo sin reproducirlo. Los rechazos de ARCA traen códigos numéricos
-cuyo significado hay que rastrear; sin el XML original el soporte es a ciegas.
+Se guarda cada llamada a ARCA en `ArcaCallLog`: servicio, operación, estado HTTP, duración,
+resultado (`SUCCESS` / `REJECTED` / `FAULT` / `NETWORK_ERROR`), códigos de error y los XML de ida
+y vuelta. Sin el XML original, un rechazo con código numérico se diagnostica a ciegas.
 
-Cuidado: el XML de WSAA contiene el ticket firmado — hay que redactarlo antes de persistir.
+Se descartó `ServiceAuditLog` como base: ese registro es de las llamadas HTTP que entran por la
+API pública y cuelga de un `apiClientId` obligatorio, que en una emisión desde la app no existe.
+
+**Redacción, que es el punto delicado**: se tapan `Token` y `Sign` del bloque `Auth` de WSFEv1,
+el `in0` (CMS firmado) que se manda a WSAA y el `loginCmsReturn` completo de la respuesta. Ese
+último importa aparte: el ticket viene ahí como XML **escapeado** (`&lt;token&gt;`), así que una
+redacción por nombre de tag no lo encuentra y el ticket quedaría en la base en texto plano.
+
+El `NETWORK_ERROR` se registra a propósito: es justo el caso que **no deja rastro en ARCA** y el
+que dispara la reconciliación de D.1.
+
+Detalles de implementación que condicionan el resto:
+
+- `AuthContext` ganó `issuerId`. Antes sólo llevaba el CUIT, y el registro tiene que quedar
+  atado al emisor, no a un número que puede repetirse entre entornos.
+- Los servicios reciben la interfaz `ArcaCallRecorder` por token de inyección, no la clase. Así
+  los tests pasan un doble propio sin castear nada.
+- Escribir el registro **nunca** rompe la emisión: `record` se traga sus propios errores.
+- Los XML se truncan a 20.000 caracteres y se purgan cada 6 horas según
+  `ARCA_CALL_LOG_RETENTION_DAYS` (30 por defecto). Son blobs y crecen rápido.
+
+Pendiente: no hay endpoint para consultar el registro; hoy se mira por SQL.
 
 ### D.3 🟢 Estados de `Voucher` como enum tipado
 

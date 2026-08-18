@@ -1,6 +1,7 @@
 import type { AssociatedVoucher, Item, ServicePeriod } from '@chirola/shared';
 
 export interface AuthContext {
+  issuerId: string;
   cuit: string;
   token: string;
   sign: string;

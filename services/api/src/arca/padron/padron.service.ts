@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   inferRecipientIvaCondition,
@@ -6,10 +6,19 @@ import {
   type TaxpayerAddress,
   type TaxpayerInfo,
 } from '@chirola/shared';
-import { ArcaSoapFaultError, callSoap, escapeXml, ParsedXml } from '../arca-soap.util';
+import {
+  ArcaSoapFaultError,
+  callSoap,
+  escapeXml,
+  ParsedXml,
+  ARCA_CALL_RECORDER,
+  type ArcaCallLogContext,
+  type ArcaCallRecorder,
+} from '../arca-soap.util';
 import type { AuthContext } from '../wsfe/wsfe.types';
 
 const PADRON_A5_NS = 'http://a5.soap.ws.server.puc.sr/';
+const PADRON_SERVICE = 'ws_sr_constancia_inscripcion';
 const NOT_FOUND_FAULT = 'No existe persona con ese Id';
 const NATURAL_PERSON = 'FISICA';
 
@@ -17,7 +26,19 @@ const NATURAL_PERSON = 'FISICA';
 export class PadronService {
   private readonly logger = new Logger(PadronService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(ARCA_CALL_RECORDER)
+    private readonly callLog: ArcaCallRecorder,
+  ) {}
+
+  private logContext(issuerId: string): ArcaCallLogContext {
+    return {
+      issuerId,
+      service: PADRON_SERVICE,
+      recorder: this.callLog,
+    };
+  }
 
   private get padronUrl(): string {
     const env = this.config.get<string>('ARCA_ENV', 'homologacion');
@@ -46,13 +67,22 @@ export class PadronService {
       '</soapenv:Body>' +
       '</soapenv:Envelope>';
 
-    const response = await this.callPadron(envelope, cuit);
+    const response = await this.callPadron(envelope, cuit, auth.issuerId);
     return this.parseTaxpayer(response, cuit);
   }
 
-  private async callPadron(envelope: string, cuit: string): Promise<string> {
+  private async callPadron(
+    envelope: string,
+    cuit: string,
+    issuerId: string,
+  ): Promise<string> {
     try {
-      return await callSoap(this.padronUrl, `${PADRON_A5_NS}getPersona`, envelope);
+      return await callSoap(
+        this.padronUrl,
+        `${PADRON_A5_NS}getPersona`,
+        envelope,
+        this.logContext(issuerId),
+      );
     } catch (err) {
       if (
         err instanceof ArcaSoapFaultError &&

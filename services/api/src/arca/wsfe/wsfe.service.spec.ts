@@ -1,13 +1,16 @@
 import { ConfigService } from '@nestjs/config';
 import { VoucherConcept } from '@chirola/shared';
 import { WsfeService } from './wsfe.service';
+import { RecordedArcaCalls } from '../arca-call-recorder.fixture';
 import type { CaeRequest } from './wsfe.types';
+
+const recordedCalls = new RecordedArcaCalls();
 
 function service(): WsfeService {
   const config = {
     get: (_k: string, def?: string) => def,
   } as unknown as ConfigService;
-  return new WsfeService(config);
+  return new WsfeService(config, recordedCalls);
 }
 
 function baseRequest(overrides: Partial<CaeRequest> = {}): CaeRequest {
@@ -252,7 +255,7 @@ describe('WsfeService — FEParamGetPtosVenta', () => {
     global.fetch = originalFetch;
   });
 
-  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+  const auth = { issuerId: 'issuer-1', cuit: '20111111112', token: 't', sign: 's' };
 
   function respondWith(xml: string): void {
     global.fetch = (async () =>
@@ -296,7 +299,7 @@ describe('WsfeService — tablas de parámetros', () => {
     global.fetch = originalFetch;
   });
 
-  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+  const auth = { issuerId: 'issuer-1', cuit: '20111111112', token: 't', sign: 's' };
 
   function respondWith(xml: string): void {
     global.fetch = (async () =>
@@ -359,7 +362,7 @@ describe('WsfeService — monedas y cotización', () => {
     global.fetch = originalFetch;
   });
 
-  const auth = { cuit: '20111111112', token: 't', sign: 's' };
+  const auth = { issuerId: 'issuer-1', cuit: '20111111112', token: 't', sign: 's' };
 
   function respondWith(xml: string): void {
     global.fetch = (async () =>
