@@ -6,6 +6,7 @@ import * as Sharing from 'expo-sharing';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import {
+  describeVoucherStatus,
   voucherTypeName,
   documentTypeName,
 } from '@chirola/shared';
@@ -95,7 +96,7 @@ export default function VoucherDetailScreen() {
           {authorized ? (
             <Badge text="Autorizado por ARCA" tone="ok" />
           ) : (
-            <Badge text={data.status} tone="warn" />
+            <Badge text={describeVoucherStatus(data.status)} tone="warn" />
           )}
         </View>
 

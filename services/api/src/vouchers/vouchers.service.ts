@@ -10,6 +10,8 @@ import { z } from 'zod';
 import {
   defaultRecipientIvaCondition,
   issueVoucherSchema,
+  PendingVoucherStatus,
+  VoucherStatus,
   TaxTreatment,
   type IssueVoucher,
   type TaxTreatmentType,
@@ -54,6 +56,7 @@ interface EmissionOutcome {
   number: number;
   amounts: VoucherAmounts;
   date: Date;
+  recovered: boolean;
 }
 
 type PendingVoucherRow = PendingVoucher;
@@ -419,7 +422,7 @@ export class VouchersService {
       auth,
       buildRequest,
     );
-    return { cae, number, amounts, date };
+    return { cae, number, amounts, date, recovered: false };
   }
 
   private async persistIssuedVoucher(
@@ -475,7 +478,9 @@ export class VouchersService {
         tributes: amounts.tributes.length > 0 ? amounts.tributes : undefined,
         currency: input.currency,
         exchangeRate: input.exchangeRate,
-        status: 'AUTORIZADO',
+        status: outcome.recovered
+          ? VoucherStatus.RECOVERED
+          : VoucherStatus.APPROVED,
         cae: cae.cae,
         caeExpiration: cae.caeVto,
         qrData,
@@ -618,7 +623,7 @@ export class VouchersService {
     const pending = await this.prisma.pendingVoucher.findUnique({
       where: { issuerId_idempotencyKey: { issuerId, idempotencyKey: key } },
     });
-    if (pending && pending.status === 'PENDIENTE') {
+    if (pending && pending.status === PendingVoucherStatus.PENDING) {
       throw new VoucherQueuedException(pending.id);
     }
     return null;
@@ -665,7 +670,10 @@ export class VouchersService {
 
   async retryPendingVouchers(): Promise<void> {
     const due = await this.prisma.pendingVoucher.findMany({
-      where: { status: 'PENDIENTE', nextRetryAt: { lte: new Date() } },
+      where: {
+        status: PendingVoucherStatus.PENDING,
+        nextRetryAt: { lte: new Date() },
+      },
       take: RETRY_BATCH_SIZE,
     });
     for (const pending of due) {
@@ -743,6 +751,7 @@ export class VouchersService {
       number: authorized.number,
       amounts,
       date: authorized.date,
+      recovered: true,
     };
   }
 
@@ -804,7 +813,11 @@ export class VouchersService {
   ): Promise<void> {
     await this.prisma.pendingVoucher.update({
       where: { id: pending.id },
-      data: { status: 'ERROR', lastError: reason, retryCount: pending.retryCount + 1 },
+      data: {
+        status: PendingVoucherStatus.FAILED,
+        lastError: reason,
+        retryCount: pending.retryCount + 1,
+      },
     });
     this.logger.error(
       `Comprobante encolado ${pending.id} falló definitivamente: ${reason}`,

@@ -1,4 +1,8 @@
-import type { IssueVoucher } from '@chirola/shared';
+import {
+  PendingVoucherStatus,
+  VoucherStatus,
+  type IssueVoucher,
+} from '@chirola/shared';
 import { VouchersService } from './vouchers.service';
 import { IssuerLockService } from './issuer-lock.service';
 import { ArcaRejectionError } from '../arca/wsfe/arca-errors';
@@ -25,6 +29,7 @@ interface StoredVoucher {
   cae: string | null;
   caeExpiration: Date | null;
   qrData: string | null;
+  status: string;
   salesPoint: { number: number };
 }
 
@@ -79,7 +84,7 @@ function buildHarness() {
       create: jest.fn(async ({ data }: { data: Omit<PendingRow, 'id' | 'status' | 'retryCount'> }) => {
         const row: PendingRow = {
           id: `pending-${pending.length + 1}`,
-          status: 'PENDIENTE',
+          status: PendingVoucherStatus.PENDING,
           retryCount: 0,
           ...data,
           idempotencyKey: data.idempotencyKey ?? null,
@@ -90,7 +95,9 @@ function buildHarness() {
       }),
       findMany: jest.fn(async () =>
         pending.filter(
-          (row) => row.status === 'PENDIENTE' && row.nextRetryAt.getTime() <= Date.now(),
+          (row) =>
+            row.status === PendingVoucherStatus.PENDING &&
+            row.nextRetryAt.getTime() <= Date.now(),
         ),
       ),
       update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<PendingRow> }) => {
@@ -141,6 +148,7 @@ function buildHarness() {
           cae: (data.cae as string) ?? null,
           caeExpiration: (data.caeExpiration as Date) ?? null,
           qrData: (data.qrData as string) ?? null,
+          status: data.status as string,
           salesPoint: { number: 1 },
         };
         vouchers.push(stored);
@@ -267,7 +275,7 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
       VoucherQueuedException,
     );
     expect(pending).toHaveLength(1);
-    expect(pending[0].status).toBe('PENDIENTE');
+    expect(pending[0].status).toBe(PendingVoucherStatus.PENDING);
   });
 
   it('el retry scheduler emite el CAE de un comprobante encolado y lo desencola', async () => {
@@ -317,7 +325,7 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
     );
     await service.retryPendingVouchers();
 
-    expect(pending[0].status).toBe('ERROR');
+    expect(pending[0].status).toBe(PendingVoucherStatus.FAILED);
     expect(webhooks.dispatch).toHaveBeenCalledWith(
       'issuer-1',
       WebhookEvent.VOUCHER_FAILED,
@@ -364,6 +372,7 @@ describe('VouchersService — reconciliación (D.1)', () => {
     expect(pending).toHaveLength(0);
     expect(vouchers).toHaveLength(1);
     expect(vouchers[0].cae).toBe('74000000000077');
+    expect(vouchers[0].status).toBe(VoucherStatus.RECOVERED);
   });
 
   it('emite normalmente si ARCA no tiene ese número autorizado', async () => {
@@ -377,6 +386,7 @@ describe('VouchersService — reconciliación (D.1)', () => {
 
     expect(vouchers).toHaveLength(1);
     expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].status).toBe(VoucherStatus.APPROVED);
   });
 
   it('no adopta un comprobante de ARCA cuyo total no coincide', async () => {

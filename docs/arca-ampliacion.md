@@ -275,13 +275,28 @@ Detalles de implementación que condicionan el resto:
 
 Pendiente: no hay endpoint para consultar el registro; hoy se mira por SQL.
 
-### D.3 🟢 Estados de `Voucher` como enum tipado
+### D.3 ✅ Estados de `Voucher` como enum tipado — implementado
 
-`status` es string libre con valor en español (`"PENDIENTE"`), en contra de la regla de naming
-del proyecto. Migrar a enum compartido (`PENDING` / `APPROVED` / `OBSERVED` / `REJECTED`).
-Encaja acá porque los estados nuevos que trae la reconciliación (`RECOVERED`) necesitan el enum.
+`status` era string libre con el valor en español (`"AUTORIZADO"`, `"PENDIENTE"`), en contra de
+la regla de naming. Ahora son dos enums en `packages/shared`:
 
----
+- `VoucherStatus`: `PENDING` · `APPROVED` · `RECOVERED` · `OBSERVED` · `REJECTED`.
+- `PendingVoucherStatus`: `PENDING` · `FAILED` (antes `"ERROR"`).
+
+El texto en español pasó a `voucherStatusName`, que la app usa para mostrarlo.
+
+`RECOVERED` es el estado que trajo D.1: el comprobante cuyo CAE se adoptó de ARCA en vez de
+emitirlo. Distinguirlo importa porque es el único que la app no emitió ella misma.
+
+**El riesgo de agregar un estado autorizado nuevo** es que las consultas que filtraban por
+`AUTORIZADO` lo dejen afuera en silencio — el libro IVA ventas se calcula así, y un comprobante
+recuperado desaparecería del débito fiscal. Por eso el filtro se hace con
+`authorizedVoucherStatuses` / `isAuthorizedStatus` y no con una comparación suelta: el día que se
+agregue otro estado autorizado, se agrega en un solo lugar.
+
+La migración `20260817190000_voucher_status_enum` reescribe los valores ya guardados antes de
+cambiar el default. `OBSERVED` está definido pero todavía no se asigna: ARCA lo devuelve como
+`Resultado = A` con `Observaciones`, y ese caso no está modelado.
 
 ## Fase E — 🟢 Compras y otros servicios
 
@@ -314,8 +329,8 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 4. **A.4 + A.5** cotización y tablas de parámetros.
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.
-7. **C.3** (WSFEX) si el perfil exportador es objetivo de negocio. ← siguiente
-8. **E.1** importación de compras.
+7. **C.3** (WSFEX) si el perfil exportador es objetivo de negocio.
+8. **E.1** importación de compras. ← siguiente
 
 Las fases A, D y E.1 **no dependen de ARCA homologación**: se pueden desarrollar y testear con
 mocks. Las fases B y C sí requieren el trámite de asociación de servicio al certificado

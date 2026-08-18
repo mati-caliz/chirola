@@ -18,6 +18,7 @@ export * from './purchase-invoice';
 export * from './recipient-iva-condition';
 export * from './taxpayer';
 export * from './voucher-type';
+export * from './voucher-status';
 export * from './document-type';
 export * from './iva-rate';
 export * from './tribute-type';

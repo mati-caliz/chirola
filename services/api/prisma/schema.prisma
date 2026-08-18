@@ -142,7 +142,7 @@ model Voucher {
 
   tributes Json?
 
-  status             String    @default("PENDIENTE")
+  status             String    @default("PENDING")
   cae                String?
   caeExpiration      DateTime?
   qrData             String?
@@ -286,7 +286,7 @@ model PendingVoucher {
   issuerId       String
   idempotencyKey String?
   payload        Json
-  status         String   @default("PENDIENTE")
+  status         String   @default("PENDING")
   retryCount     Int      @default(0)
   nextRetryAt    DateTime
 

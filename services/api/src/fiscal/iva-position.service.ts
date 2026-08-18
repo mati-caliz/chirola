@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { discriminatesIva, isCreditNote, voucherLetter } from '@chirola/shared';
+import {
+  authorizedVoucherStatuses,
+  discriminatesIva,
+  isCreditNote,
+  voucherLetter,
+} from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 const RATE_21 = 21;
@@ -72,7 +77,7 @@ export class IvaPositionService {
     const vouchers = await this.prisma.voucher.findMany({
       where: {
         issuerId,
-        status: 'AUTORIZADO',
+        status: { in: [...authorizedVoucherStatuses] },
         voucherDate: { gte: from, lt: to },
       },
       include: { items: true },
