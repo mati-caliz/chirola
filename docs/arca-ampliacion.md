@@ -300,15 +300,42 @@ cambiar el default. `OBSERVED` está definido pero todavía no se asigna: ARCA l
 
 ## Fase E — 🟢 Compras y otros servicios
 
-### E.1 🟢 Importación de "Mis Comprobantes"
+### E.1 ✅ Importación de "Mis Comprobantes" — implementado (backend)
 
-Las `PurchaseInvoice` se cargan **a mano**. ARCA no expone API pública de Mis Comprobantes, pero
-sí permite exportar CSV/XLS desde el portal. Un importador de ese archivo convierte la app de
-"facturador" a "libro IVA completo" sin depender de un servicio nuevo.
+ARCA no expone API pública de Mis Comprobantes, pero deja exportar CSV desde el portal. El
+importador convierte la app de "facturador" a "libro IVA completo" sin depender de un servicio
+nuevo.
 
-Trabajo: parser del CSV de ARCA, matcheo contra `PurchaseInvoice` existentes por
-`(supplierCuit, invoiceType, salesPoint, number)` para no duplicar, y pantalla de revisión antes
-de confirmar la importación.
+`POST /purchase-invoices/import/preview` clasifica sin escribir; `POST /purchase-invoices/import`
+hace lo mismo y persiste. El import **vuelve a parsear el CSV** en vez de confiar en las filas
+que devuelve la preview: si aceptara filas del cliente, el cliente podría cargar importes que
+nunca estuvieron en el archivo de ARCA.
+
+Formato del export, que es lo que no es derivable del código:
+
+- Separador `;` o `,` según la configuración regional del que exporta; se detecta por línea de
+  encabezado.
+- Importes en formato argentino (`1.234,56`) o con punto decimal, mezclados entre archivos.
+- Fechas `dd/mm/aaaa` o ISO.
+- Encabezados con acentos y BOM al principio.
+
+**El problema de fondo:** el CSV informa el **IVA total**, no el desglose por alícuota, y
+`PurchaseInvoice` guarda por alícuota (21 / 10,5 / 27). La alícuota se deduce del cociente
+`IVA / neto gravado`; cuando no da ninguna conocida, la fila **no se importa** y se marca
+`NEEDS_REVIEW` para carga manual. Adivinar el desglose de una factura con alícuotas mezcladas
+sería meter números inventados en el libro IVA.
+
+Por el mismo motivo se rechaza la fila cuyo total del archivo no coincide con la suma de los
+importes que sí se importan: el export trae una columna de **otros tributos** que el modelo no
+tiene, y sin ese control la diferencia se perdería en silencio.
+
+Las filas ilegibles se juntan y se informan con número de línea en vez de abortar el archivo
+entero: un export de un año tiene cientos de filas y una sola mala no debería tirar todo.
+
+Pendiente: la **pantalla de revisión** en la app (hoy sólo está la API). Y las notas de crédito
+de compra se importan con signo positivo, igual que la carga manual — `PurchaseInvoice` no
+modela el signo, así que restan mal en el libro. Es un problema previo a esta fase, pero el
+importador lo hace más visible porque entran muchas de golpe.
 
 ### E.2 🟢 Servicios ARCA de nicho
 
@@ -330,7 +357,7 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.
 7. **C.3** (WSFEX) si el perfil exportador es objetivo de negocio.
-8. **E.1** importación de compras. ← siguiente
+8. **E.1** importación de compras.
 
 Las fases A, D y E.1 **no dependen de ARCA homologación**: se pueden desarrollar y testear con
 mocks. Las fases B y C sí requieren el trámite de asociación de servicio al certificado

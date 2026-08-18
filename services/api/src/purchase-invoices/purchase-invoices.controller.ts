@@ -10,8 +10,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  importPurchaseInvoicesSchema,
   purchaseInvoiceSchema,
   updatePurchaseInvoiceSchema,
+  type ImportPurchaseInvoicesInput,
   type PurchaseInvoiceInput,
   type UpdatePurchaseInvoiceInput,
 } from '@chirola/shared';
@@ -21,14 +23,36 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.service';
 import { IssuersService } from '../issuers/issuers.service';
 import { PurchaseInvoicesService } from './purchase-invoices.service';
+import { PurchaseImportService } from './purchase-import.service';
 
 @Controller('purchase-invoices')
 @UseGuards(JwtAuthGuard)
 export class PurchaseInvoicesController {
   constructor(
     private readonly purchaseInvoices: PurchaseInvoicesService,
+    private readonly purchaseImport: PurchaseImportService,
     private readonly issuers: IssuersService,
   ) {}
+
+  @Post('import/preview')
+  async previewImport(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
+    body: ImportPurchaseInvoicesInput,
+  ) {
+    await this.issuers.getFromUser(body.issuerId, user.sub);
+    return this.purchaseImport.preview(body.issuerId, body.csv);
+  }
+
+  @Post('import')
+  async import(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
+    body: ImportPurchaseInvoicesInput,
+  ) {
+    await this.issuers.getFromUser(body.issuerId, user.sub);
+    return this.purchaseImport.import(body.issuerId, body.csv);
+  }
 
   @Post()
   async create(

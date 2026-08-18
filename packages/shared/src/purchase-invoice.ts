@@ -25,11 +25,19 @@ export const purchaseInvoiceSchema = z.object({
   untaxed: nonNegative,
 });
 
+export const importPurchaseInvoicesSchema = z.object({
+  issuerId: z.string().min(1),
+  csv: z.string().min(1, 'El archivo está vacío'),
+});
+
 export const updatePurchaseInvoiceSchema = purchaseInvoiceSchema.partial().extend({
   issuerId: z.string().min(1),
 });
 
 export type PurchaseInvoiceInput = z.infer<typeof purchaseInvoiceSchema>;
+export type ImportPurchaseInvoicesInput = z.infer<
+  typeof importPurchaseInvoicesSchema
+>;
 export type UpdatePurchaseInvoiceInput = z.infer<
   typeof updatePurchaseInvoiceSchema
 >;
