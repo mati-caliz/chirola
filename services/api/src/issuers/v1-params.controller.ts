@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
 import { CurrentApiClient } from '../service-auth/current-api-client.decorator';
 import { ApiClientService } from '../service-auth/api-client.service';
@@ -32,6 +32,25 @@ export class V1ParamsController {
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.detectFiscalCondition(issuer);
+  }
+
+  @Get('currencies')
+  async currencies(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Query('issuerId') issuerId: string,
+  ) {
+    const issuer = await this.resolve(apiClient, issuerId);
+    return this.params.getCurrencies(issuer);
+  }
+
+  @Get('exchange-rate/:currencyId')
+  async exchangeRate(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Query('issuerId') issuerId: string,
+    @Param('currencyId') currencyId: string,
+  ) {
+    const issuer = await this.resolve(apiClient, issuerId);
+    return this.params.getExchangeRate(issuer, currencyId);
   }
 
   private async resolve(apiClient: AuthenticatedApiClient, issuerId: string) {
