@@ -1,0 +1,2 @@
+ALTER TABLE "Issuer" ADD COLUMN "cbu" TEXT;
+ALTER TABLE "Issuer" ADD COLUMN "paymentAlias" TEXT;

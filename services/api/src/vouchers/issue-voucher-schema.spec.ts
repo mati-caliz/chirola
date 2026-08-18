@@ -2,6 +2,7 @@ import {
   DocumentType,
   issueVoucherSchema,
   TaxTreatment,
+  TransmissionType,
   VoucherConcept,
   VoucherType,
 } from '@chirola/shared';
@@ -18,11 +19,9 @@ function input(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const validPeriod = {
-  from: '2026-07-01',
-  to: '2026-07-31',
-  paymentDueDate: '2026-08-10',
-};
+const validPeriod = { from: '2026-07-01', to: '2026-07-31' };
+
+const validPaymentDueDate = '2026-08-10';
 
 describe('issueVoucherSchema — tratamiento fiscal de los ítems', () => {
   it('asume gravado cuando no se especifica', () => {
@@ -118,7 +117,11 @@ describe('issueVoucherSchema — período de servicios', () => {
 
   it('acepta concepto servicios con período completo', () => {
     const result = issueVoucherSchema.safeParse(
-      input({ concept: VoucherConcept.SERVICES, servicePeriod: validPeriod }),
+      input({
+        concept: VoucherConcept.SERVICES,
+        servicePeriod: validPeriod,
+        paymentDueDate: validPaymentDueDate,
+      }),
     );
 
     expect(result.success).toBe(true);
@@ -204,5 +207,68 @@ describe('issueVoucherSchema — identificación del receptor (C.1)', () => {
     );
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
+  const fceInput = (overrides: Record<string, unknown> = {}) =>
+    input({
+      voucherType: VoucherType.FCE_FACTURA_A,
+      recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' },
+      ...overrides,
+    });
+
+  it('exige el vencimiento de pago aunque el concepto sea productos', () => {
+    const result = issueVoucherSchema.safeParse(fceInput());
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['paymentDueDate']);
+  });
+
+  it('acepta la FCE de productos con vencimiento de pago y sin período', () => {
+    const result = issueVoucherSchema.safeParse(
+      fceInput({ paymentDueDate: '2026-09-30' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.servicePeriod).toBeUndefined();
+  });
+
+  it('rechaza el vencimiento de pago en una factura común de productos', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({ paymentDueDate: '2026-09-30' }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza el tipo de transmisión en un comprobante que no es FCE', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({ transmissionType: TransmissionType.COLLECTIVE_DEPOSIT }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta el tipo de transmisión en la FCE', () => {
+    const result = issueVoucherSchema.safeParse(
+      fceInput({
+        paymentDueDate: '2026-09-30',
+        transmissionType: TransmissionType.COLLECTIVE_DEPOSIT,
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('exige CUIT del receptor en la FCE', () => {
+    const result = issueVoucherSchema.safeParse(
+      fceInput({
+        paymentDueDate: '2026-09-30',
+        recipient: { docType: DocumentType.DNI, docNumber: '30111222' },
+      }),
+    );
+
+    expect(result.success).toBe(false);
   });
 });

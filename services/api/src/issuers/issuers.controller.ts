@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -12,6 +13,8 @@ import {
   type ArcaParamTypeName,
   uploadCertificateSchema,
   createIssuerSchema,
+  paymentAccountSchema,
+  type PaymentAccount,
   matchCertificateSchema,
   generateCsrSchema,
   type UploadCertificate,
@@ -86,6 +89,16 @@ export class IssuersController {
     @Body(new ZodValidationPipe(createIssuerSchema)) body: CreateIssuer,
   ) {
     return this.issuers.create(user.sub, body);
+  }
+
+  @Patch(':id/payment-account')
+  async updatePaymentAccount(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(paymentAccountSchema)) body: PaymentAccount,
+  ) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.issuers.updatePaymentAccount(issuer.id, body);
   }
 
   @Get()

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import type { CreateIssuer } from '@chirola/shared';
+import type { CreateIssuer, PaymentAccount } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,6 +15,13 @@ export class IssuersService {
         ivaCondition: input.ivaCondition,
         environment: input.environment,
       },
+    });
+  }
+
+  async updatePaymentAccount(id: string, input: PaymentAccount) {
+    return this.prisma.issuer.update({
+      where: { id },
+      data: { cbu: input.cbu, paymentAlias: input.paymentAlias ?? null },
     });
   }
 

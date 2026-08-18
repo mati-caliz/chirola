@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { RecipientIvaCondition } from './recipient-iva-condition';
 import { ivaRates } from './iva-rate';
 import { DocumentType } from './document-type';
+import { TransmissionType } from './optional-type';
 import {
   isCreditDebitNote,
+  isCreditInvoice,
   requiresRecipientCuit,
   voucherTypeName,
   VoucherType,
@@ -20,6 +22,7 @@ export * from './document-type';
 export * from './iva-rate';
 export * from './tribute-type';
 export * from './arca-params';
+export * from './optional-type';
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',
@@ -142,7 +145,6 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
 export const servicePeriodSchema = z.object({
   from: isoDate,
   to: isoDate,
-  paymentDueDate: isoDate,
 });
 
 export type ServicePeriod = z.infer<typeof servicePeriodSchema>;
@@ -182,6 +184,12 @@ export const issueVoucherSchema = z
 
     servicePeriod: servicePeriodSchema.optional(),
 
+    paymentDueDate: isoDate.optional(),
+
+    transmissionType: z
+      .enum([TransmissionType.OPEN_CIRCULATION, TransmissionType.COLLECTIVE_DEPOSIT])
+      .optional(),
+
     tributes: z.array(tributeSchema).optional(),
   })
   .superRefine((data, ctx) => {
@@ -213,12 +221,9 @@ export const issueVoucherSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['servicePeriod'],
-          message:
-            'Los comprobantes de servicios requieren el período facturado y la fecha de vencimiento de pago.',
+          message: 'Los comprobantes de servicios requieren el período facturado.',
         });
-        return;
-      }
-      if (data.servicePeriod.from > data.servicePeriod.to) {
+      } else if (data.servicePeriod.from > data.servicePeriod.to) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['servicePeriod', 'to'],
@@ -226,15 +231,43 @@ export const issueVoucherSchema = z
             'La fecha de fin del período no puede ser anterior a la de inicio.',
         });
       }
-      return;
-    }
-
-    if (data.servicePeriod) {
+    } else if (data.servicePeriod) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['servicePeriod'],
         message:
           'El período facturado sólo corresponde a comprobantes de servicios.',
+      });
+    }
+
+    const needsPaymentDueDate =
+      requiresServicePeriod(data.concept) || isCreditInvoice(data.voucherType);
+
+    if (needsPaymentDueDate && !data.paymentDueDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paymentDueDate'],
+        message: isCreditInvoice(data.voucherType)
+          ? 'La Factura de Crédito Electrónica MiPyME requiere la fecha de vencimiento de pago.'
+          : 'Los comprobantes de servicios requieren la fecha de vencimiento de pago.',
+      });
+    }
+
+    if (!needsPaymentDueDate && data.paymentDueDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paymentDueDate'],
+        message:
+          'La fecha de vencimiento de pago no corresponde a este comprobante.',
+      });
+    }
+
+    if (data.transmissionType && !isCreditInvoice(data.voucherType)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['transmissionType'],
+        message:
+          'El tipo de transmisión sólo corresponde a las Facturas de Crédito Electrónica MiPyME.',
       });
     }
   });

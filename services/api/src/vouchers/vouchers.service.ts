@@ -30,6 +30,7 @@ import {
   ARCA_DUPLICATE_NUMBER_CODE,
 } from '../arca/wsfe/arca-errors';
 import { calculateAmounts } from '../arca/wsfe/iva-calculator';
+import { buildCreditInvoiceOptionals } from '../arca/wsfe/credit-invoice-optionals';
 import {
   ApiClientService,
   AuthenticatedApiClient,
@@ -56,6 +57,13 @@ interface EmissionOutcome {
 }
 
 type PendingVoucherRow = PendingVoucher;
+
+type EmissionIssuer = {
+  id: string;
+  cuit: string;
+  cbu: string | null;
+  paymentAlias: string | null;
+};
 
 const storedTributesSchema = z.array(
   z.object({ description: z.string(), amount: z.number() }),
@@ -205,13 +213,10 @@ export class VouchersService {
         subtotal: Number(it.subtotal),
       })),
       servicePeriod:
-        voucher.serviceFrom && voucher.serviceTo && voucher.paymentDueDate
-          ? {
-              from: voucher.serviceFrom,
-              to: voucher.serviceTo,
-              paymentDueDate: voucher.paymentDueDate,
-            }
+        voucher.serviceFrom && voucher.serviceTo
+          ? { from: voucher.serviceFrom, to: voucher.serviceTo }
           : null,
+      paymentDueDate: voucher.paymentDueDate,
       associatedVouchers: Array.isArray(voucher.associatedVouchers)
         ? (voucher.associatedVouchers as unknown as {
             type: number;
@@ -294,7 +299,7 @@ export class VouchersService {
   }
 
   private async computeEmissionPlan(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
   ): Promise<EmissionPlan> {
     const credentials = await this.certs.getCredentials(issuer.id);
@@ -326,7 +331,7 @@ export class VouchersService {
   }
 
   private async issueAuthorized(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
@@ -349,7 +354,7 @@ export class VouchersService {
   }
 
   private async emit(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
@@ -373,7 +378,7 @@ export class VouchersService {
   }
 
   private async attemptCae(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
   ): Promise<EmissionOutcome> {
     const auth = await this.buildAuth(issuer);
@@ -383,6 +388,11 @@ export class VouchersService {
     const ivaConditionId =
       input.recipient.ivaConditionId ??
       defaultRecipientIvaCondition(input.voucherType);
+    const optionals = buildCreditInvoiceOptionals(
+      input.voucherType,
+      issuer,
+      input.transmissionType,
+    );
 
     const buildRequest = (voucherNumber: number): CaeRequest => ({
       salesPoint: input.salesPoint,
@@ -400,6 +410,8 @@ export class VouchersService {
       exchangeRate: input.exchangeRate,
       associatedVouchers: input.associatedVouchers,
       servicePeriod: input.servicePeriod,
+      paymentDueDate: input.paymentDueDate,
+      optionals,
     });
 
     const { result: cae, number } = await this.requestCaeWithRecovery(
@@ -410,7 +422,7 @@ export class VouchersService {
   }
 
   private async persistIssuedVoucher(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
     outcome: EmissionOutcome,
     idempotencyKey?: string,
@@ -450,8 +462,8 @@ export class VouchersService {
         serviceTo: input.servicePeriod
           ? parseIsoDate(input.servicePeriod.to)
           : null,
-        paymentDueDate: input.servicePeriod
-          ? parseIsoDate(input.servicePeriod.paymentDueDate)
+        paymentDueDate: input.paymentDueDate
+          ? parseIsoDate(input.paymentDueDate)
           : null,
         netAmount: amounts.netAmount,
         ivaAmount: amounts.ivaAmount,
@@ -695,7 +707,7 @@ export class VouchersService {
   }
 
   private async recoverAlreadyAuthorized(
-    issuer: { id: string; cuit: string },
+    issuer: EmissionIssuer,
     input: IssueVoucher,
     pending: PendingVoucherRow,
   ): Promise<EmissionOutcome | null> {

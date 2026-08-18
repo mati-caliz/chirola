@@ -31,7 +31,6 @@ export interface TributePdf {
 export interface ServicePeriodPdf {
   from: Date;
   to: Date;
-  paymentDueDate: Date;
 }
 
 export interface VoucherPdfData {
@@ -53,6 +52,7 @@ export interface VoucherPdfData {
   items: PdfItem[];
   associatedVouchers: AssociatedVoucherPdf[];
   servicePeriod: ServicePeriodPdf | null;
+  paymentDueDate: Date | null;
   qrPng: Buffer;
 }
 
@@ -114,8 +114,11 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
         78,
         { width: 220, align: 'right' },
       );
-      doc.text(
-        `Vencimiento de pago: ${date(data.servicePeriod.paymentDueDate)}`,
+    }
+
+    if (data.paymentDueDate) {
+      doc.fontSize(8).text(
+        `Vencimiento de pago: ${date(data.paymentDueDate)}`,
         right - 220,
         90,
         { width: 220, align: 'right' },

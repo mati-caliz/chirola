@@ -11,6 +11,15 @@ export const VoucherType = {
   FACTURA_M: 51,
   NOTA_DEBITO_M: 52,
   NOTA_CREDITO_M: 53,
+  FCE_FACTURA_A: 201,
+  FCE_NOTA_DEBITO_A: 202,
+  FCE_NOTA_CREDITO_A: 203,
+  FCE_FACTURA_B: 206,
+  FCE_NOTA_DEBITO_B: 207,
+  FCE_NOTA_CREDITO_B: 208,
+  FCE_FACTURA_C: 211,
+  FCE_NOTA_DEBITO_C: 212,
+  FCE_NOTA_CREDITO_C: 213,
 } as const;
 
 export const voucherTypeName: Record<number, string> = {
@@ -26,7 +35,32 @@ export const voucherTypeName: Record<number, string> = {
   51: 'Factura M',
   52: 'Nota de Débito M',
   53: 'Nota de Crédito M',
+  201: 'Factura de Crédito MiPyME A',
+  202: 'Nota de Débito MiPyME A',
+  203: 'Nota de Crédito MiPyME A',
+  206: 'Factura de Crédito MiPyME B',
+  207: 'Nota de Débito MiPyME B',
+  208: 'Nota de Crédito MiPyME B',
+  211: 'Factura de Crédito MiPyME C',
+  212: 'Nota de Débito MiPyME C',
+  213: 'Nota de Crédito MiPyME C',
 };
+
+const creditInvoiceTypes: readonly number[] = [
+  VoucherType.FCE_FACTURA_A,
+  VoucherType.FCE_NOTA_DEBITO_A,
+  VoucherType.FCE_NOTA_CREDITO_A,
+  VoucherType.FCE_FACTURA_B,
+  VoucherType.FCE_NOTA_DEBITO_B,
+  VoucherType.FCE_NOTA_CREDITO_B,
+  VoucherType.FCE_FACTURA_C,
+  VoucherType.FCE_NOTA_DEBITO_C,
+  VoucherType.FCE_NOTA_CREDITO_C,
+];
+
+export function isCreditInvoice(voucherType: number): boolean {
+  return creditInvoiceTypes.includes(voucherType);
+}
 
 const typesRequiringCuit: readonly number[] = [
   VoucherType.FACTURA_A,
@@ -38,7 +72,7 @@ const typesRequiringCuit: readonly number[] = [
 ];
 
 export function requiresRecipientCuit(voucherType: number): boolean {
-  return typesRequiringCuit.includes(voucherType);
+  return typesRequiringCuit.includes(voucherType) || isCreditInvoice(voucherType);
 }
 
 const creditDebitNoteTypes: readonly number[] = [
@@ -50,6 +84,12 @@ const creditDebitNoteTypes: readonly number[] = [
   VoucherType.NOTA_CREDITO_C,
   VoucherType.NOTA_DEBITO_M,
   VoucherType.NOTA_CREDITO_M,
+  VoucherType.FCE_NOTA_DEBITO_A,
+  VoucherType.FCE_NOTA_CREDITO_A,
+  VoucherType.FCE_NOTA_DEBITO_B,
+  VoucherType.FCE_NOTA_CREDITO_B,
+  VoucherType.FCE_NOTA_DEBITO_C,
+  VoucherType.FCE_NOTA_CREDITO_C,
 ];
 
 export function isCreditDebitNote(voucherType: number): boolean {
@@ -61,6 +101,9 @@ const creditNoteTypes: readonly number[] = [
   VoucherType.NOTA_CREDITO_B,
   VoucherType.NOTA_CREDITO_C,
   VoucherType.NOTA_CREDITO_M,
+  VoucherType.FCE_NOTA_CREDITO_A,
+  VoucherType.FCE_NOTA_CREDITO_B,
+  VoucherType.FCE_NOTA_CREDITO_C,
 ];
 
 export function isCreditNote(voucherType: number): boolean {
@@ -94,4 +137,7 @@ export const issuableInvoiceTypes: readonly number[] = [
   VoucherType.FACTURA_B,
   VoucherType.FACTURA_C,
   VoucherType.FACTURA_M,
+  VoucherType.FCE_FACTURA_A,
+  VoucherType.FCE_FACTURA_B,
+  VoucherType.FCE_FACTURA_C,
 ];

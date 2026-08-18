@@ -219,11 +219,8 @@ describe('WsfeService — período de servicios', () => {
     const xml = detail(
       baseRequest({
         concept: VoucherConcept.SERVICES,
-        servicePeriod: {
-          from: '2026-07-01',
-          to: '2026-07-31',
-          paymentDueDate: '2026-08-10',
-        },
+        servicePeriod: { from: '2026-07-01', to: '2026-07-31' },
+        paymentDueDate: '2026-08-10',
       }),
     );
 
@@ -238,11 +235,8 @@ describe('WsfeService — período de servicios', () => {
     const xml = detail(
       baseRequest({
         concept: VoucherConcept.PRODUCTS_AND_SERVICES,
-        servicePeriod: {
-          from: '2026-07-01',
-          to: '2026-07-31',
-          paymentDueDate: '2026-08-10',
-        },
+        servicePeriod: { from: '2026-07-01', to: '2026-07-31' },
+        paymentDueDate: '2026-08-10',
       }),
     );
 
@@ -435,5 +429,62 @@ describe('WsfeService — monedas y cotización', () => {
     await expect(service().getExchangeRate(auth, 'XXX')).rejects.toThrow(
       /Sin Resultados/,
     );
+  });
+});
+
+describe('WsfeService — Opcionales (C.2)', () => {
+  const detail = (request: CaeRequest): string =>
+    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
+
+  it('omite el nodo cuando no hay opcionales', () => {
+    expect(detail(baseRequest())).not.toContain('Opcionales');
+  });
+
+  it('arma un Opcional por cada id/valor', () => {
+    const xml = detail(
+      baseRequest({
+        optionals: [
+          { id: 2101, value: '2850590940090418135201' },
+          { id: 27, value: 'SCA' },
+        ],
+      }),
+    );
+
+    expect(xml).toContain(
+      '<ar:Opcionales>' +
+        '<ar:Opcional><ar:Id>2101</ar:Id>' +
+        '<ar:Valor>2850590940090418135201</ar:Valor></ar:Opcional>' +
+        '<ar:Opcional><ar:Id>27</ar:Id><ar:Valor>SCA</ar:Valor></ar:Opcional>' +
+        '</ar:Opcionales>',
+    );
+  });
+
+  it('ubica Opcionales después de Iva, como exige el WSDL', () => {
+    const xml = detail(
+      baseRequest({
+        amounts: {
+          netAmount: 100,
+          ivaAmount: 21,
+          exemptAmount: 0,
+          untaxedAmount: 0,
+          tributeAmount: 0,
+          totalAmount: 121,
+          rates: [{ id: 5, taxableBase: 100, amount: 21 }],
+          tributes: [],
+        },
+        optionals: [{ id: 27, value: 'ADC' }],
+      }),
+    );
+
+    expect(xml.indexOf('<ar:Iva>')).toBeLessThan(xml.indexOf('<ar:Opcionales>'));
+  });
+
+  it('emite el vencimiento de pago sin período de servicio (FCE de productos)', () => {
+    const xml = detail(
+      baseRequest({ concept: VoucherConcept.PRODUCTS, paymentDueDate: '2026-09-30' }),
+    );
+
+    expect(xml).not.toContain('FchServDesde');
+    expect(xml).toContain('<ar:FchVtoPago>20260930</ar:FchVtoPago>');
   });
 });

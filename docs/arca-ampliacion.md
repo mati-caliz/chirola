@@ -175,24 +175,36 @@ DNI o consumidor final: antes se mandaban a ARCA y volvían rechazados.
 Pendiente: el régimen de retención tiene un piso de monto por debajo del cual no aplica; hoy la
 leyenda se imprime siempre. Confirmar el piso vigente antes de condicionarla.
 
-### C.2 🟡 FCE MiPyME (códigos 201-213)
+### C.2 ✅ FCE MiPyME (códigos 201-213) — implementado
 
-Factura de Crédito Electrónica, **obligatoria** para operaciones de PyME con empresas grandes
-por encima de cierto monto. Mercado concreto y bien definido.
+Factura de Crédito Electrónica, **obligatoria** para operaciones de PyME con empresas grandes por
+encima de cierto monto.
 
-Requiere el nodo `<Opcionales>` que hoy no existe:
+Se agregó el nodo `<Opcionales>` genérico al final de `FECAEDetRequest` (va **después** de `Iva`,
+según la `sequence` del XSD). Los ids que usa la FCE:
 
-- Id `2101` — **CBU** del emisor donde se cobra.
-- Id `27` — tipo de transmisión (`SCA` sistema de circulación abierta / `ADC` agente de depósito
-  colectivo).
-- Id `22` — para la anulación.
+- `2101` — **CBU** del emisor donde se cobra. Obligatorio en la factura: sin él ARCA rechaza, así
+  que el backend corta antes de llamar y pide cargarlo.
+- `2102` — alias de la cuenta, opcional.
+- `27` — tipo de transmisión: `SCA` (circulación abierta) o `ADC` (agente de depósito colectivo).
+- `22` — marca de anulación, que llevan las NC/ND de FCE en vez del CBU.
 
-Además: las NC/ND asociadas a una FCE tienen sus propios códigos (202-213), y el plazo de pago
-es un dato obligatorio del comprobante.
+El CBU y el alias viven en `Issuer` (`PATCH /issuers/:id/payment-account`), no en cada
+comprobante: son datos de la cuenta del emisor, no de la operación.
 
-Trabajo: `<Opcionales>` genérico en `buildDetail`, CBU en el modelo `Issuer`, códigos nuevos en
-`VoucherType` / `voucherTypeName`, y ajuste de `voucherLetter` (hoy parsea la letra del nombre
-con un regex `[ABC]` que no cubre M ni FCE — revisar).
+**El cambio menos obvio de esta fase:** la FCE exige `FchVtoPago` **aunque el concepto sea
+productos**, y hasta acá `paymentDueDate` vivía adentro de `servicePeriod`, que el schema prohíbe
+para concepto 1. Quedaba una FCE de productos imposible de expresar. Se separó: `servicePeriod`
+es `{ from, to }` y `paymentDueDate` es un campo propio, obligatorio cuando el concepto es
+servicios **o** cuando el comprobante es FCE. Las columnas de la DB ya estaban separadas, así que
+el cambio fue de contrato, no de modelo.
+
+Los nombres de los tipos terminan en la letra (`Factura de Crédito MiPyME A`) para que
+`voucherLetter` los siga resolviendo, y todos exigen CUIT del receptor: la FCE se le emite a una
+empresa registrada, nunca a consumidor final.
+
+Pendiente: la **anulación** de una FCE (el receptor la rechaza) informa el opcional 22 en `S`.
+Hoy se emite siempre en `N`, que es la NC/ND común; el circuito de rechazo no está modelado.
 
 ### C.3 🟡 Exportación — WSFEX (tipos 19, 20, 21)
 
@@ -281,7 +293,7 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 4. **A.4 + A.5** cotización y tablas de parámetros.
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.
-7. Decidir entre **C.2** (FCE MiPyME) y **C.3** (WSFEX) según a qué usuario se le vende. ← siguiente
+7. **C.3** (WSFEX) si el perfil exportador es objetivo de negocio. ← siguiente
 8. **E.1** importación de compras.
 
 Las fases A, D y E.1 **no dependen de ARCA homologación**: se pueden desarrollar y testear con

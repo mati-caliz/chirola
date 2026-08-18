@@ -389,12 +389,32 @@ export class WsfeService {
   }
 
   private buildServicePeriod(request: CaeRequest): string {
-    const { servicePeriod } = request;
-    if (!servicePeriod) return '';
+    const { servicePeriod, paymentDueDate } = request;
+    const period = servicePeriod
+      ? `<ar:FchServDesde>${isoToArcaDate(servicePeriod.from)}</ar:FchServDesde>` +
+        `<ar:FchServHasta>${isoToArcaDate(servicePeriod.to)}</ar:FchServHasta>`
+      : '';
+    const dueDate = paymentDueDate
+      ? `<ar:FchVtoPago>${isoToArcaDate(paymentDueDate)}</ar:FchVtoPago>`
+      : '';
+    return period + dueDate;
+  }
+
+  private buildOptionals(request: CaeRequest): string {
+    const optionals = request.optionals ?? [];
+    if (optionals.length === 0) return '';
     return (
-      `<ar:FchServDesde>${isoToArcaDate(servicePeriod.from)}</ar:FchServDesde>` +
-      `<ar:FchServHasta>${isoToArcaDate(servicePeriod.to)}</ar:FchServHasta>` +
-      `<ar:FchVtoPago>${isoToArcaDate(servicePeriod.paymentDueDate)}</ar:FchVtoPago>`
+      '<ar:Opcionales>' +
+      optionals
+        .map(
+          (optional) =>
+            '<ar:Opcional>' +
+            `<ar:Id>${optional.id}</ar:Id>` +
+            `<ar:Valor>${escapeXml(optional.value)}</ar:Valor>` +
+            '</ar:Opcional>',
+        )
+        .join('') +
+      '</ar:Opcionales>'
     );
   }
 
@@ -438,6 +458,7 @@ export class WsfeService {
       this.buildAssociatedVouchers(request) +
       this.buildTributes(request) +
       ivaArray +
+      this.buildOptionals(request) +
       '</ar:FECAEDetRequest>' +
       '</ar:FeDetReq>'
     );

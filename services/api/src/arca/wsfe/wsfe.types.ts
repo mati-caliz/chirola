@@ -35,6 +35,11 @@ export interface VoucherAmounts {
   tributes: ArcaTribute[];
 }
 
+export type ArcaOptional = {
+  id: number;
+  value: string;
+};
+
 export interface CaeRequest {
   salesPoint: number;
   voucherType: number;
@@ -55,6 +60,10 @@ export interface CaeRequest {
   associatedVouchers?: AssociatedVoucher[];
 
   servicePeriod?: ServicePeriod;
+
+  paymentDueDate?: string;
+
+  optionals?: ArcaOptional[];
 }
 
 export interface CaeResult {

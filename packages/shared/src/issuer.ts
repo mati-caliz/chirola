@@ -7,6 +7,14 @@ export const createIssuerSchema = z.object({
   environment: z.enum(['homologacion', 'produccion']).default('homologacion'),
 });
 
+export const paymentAccountSchema = z.object({
+  cbu: z
+    .string()
+    .regex(/^\d{22}$/, 'El CBU debe tener 22 dígitos')
+    .nullable(),
+  paymentAlias: z.string().min(6).max(20).nullable().optional(),
+});
+
 export const uploadCertificateSchema = z.object({
   privateKeyPem: z.string().min(1),
   certPem: z.string().min(1),
@@ -23,6 +31,7 @@ export const matchCertificateSchema = z.object({
 });
 
 export type CreateIssuer = z.infer<typeof createIssuerSchema>;
+export type PaymentAccount = z.infer<typeof paymentAccountSchema>;
 export type UploadCertificate = z.infer<typeof uploadCertificateSchema>;
 export type GenerateCsr = z.infer<typeof generateCsrSchema>;
 export type MatchCertificate = z.infer<typeof matchCertificateSchema>;

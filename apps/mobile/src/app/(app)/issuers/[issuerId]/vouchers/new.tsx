@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArcaParamType,
+  isCreditInvoice,
   issuableInvoiceTypes,
   ivaRates,
   issueVoucherSchema,
@@ -14,8 +15,11 @@ import {
   requiresServicePeriod,
   TaxTreatment,
   taxTreatmentName,
+  TransmissionType,
+  transmissionTypeLabel,
   TributeType,
   tributeTypeName,
+  type TransmissionTypeName,
   VoucherConcept,
   VoucherType,
   voucherTypeName,
@@ -94,9 +98,10 @@ const currentMonthPeriod = () => {
   return {
     from: toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
     to: toIsoDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
-    paymentDueDate: toIsoDate(today),
   };
 };
+
+const todayIso = () => toIsoDate(new Date());
 
 export default function NewVoucherScreen() {
   const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
@@ -106,6 +111,10 @@ export default function NewVoucherScreen() {
   const [salesPoint, setSalesPoint] = useState('1');
   const [concept, setConcept] = useState<VoucherConceptType>(VoucherConcept.PRODUCTS);
   const [servicePeriod, setServicePeriod] = useState(currentMonthPeriod);
+  const [paymentDueDate, setPaymentDueDate] = useState(todayIso);
+  const [transmissionType, setTransmissionType] = useState<TransmissionTypeName>(
+    TransmissionType.OPEN_CIRCULATION,
+  );
   const [docType, setDocType] = useState<number>(DocumentType.CONSUMIDOR_FINAL);
   const [docNumber, setDocNumber] = useState('0');
   const [legalName, setLegalName] = useState('');
@@ -283,6 +292,8 @@ export default function NewVoucherScreen() {
             }))
           : undefined,
       servicePeriod: requiresServicePeriod(concept) ? servicePeriod : undefined,
+      paymentDueDate: needsPaymentDueDate ? paymentDueDate : undefined,
+      transmissionType: isCreditInvoice(voucherType) ? transmissionType : undefined,
       currency,
       exchangeRate: Number(exchangeRate),
     };
@@ -296,6 +307,7 @@ export default function NewVoucherScreen() {
 
   const requiresCuit = requiresRecipientCuit(voucherType);
   const needsServicePeriod = requiresServicePeriod(concept);
+  const needsPaymentDueDate = needsServicePeriod || isCreditInvoice(voucherType);
 
   return (
     <>
@@ -363,15 +375,34 @@ export default function NewVoucherScreen() {
                 />
               </View>
             </View>
-            <TextField
-              label="Vencimiento de pago"
-              value={servicePeriod.paymentDueDate}
-              onChangeText={(v) =>
-                setServicePeriod((prev) => ({ ...prev, paymentDueDate: v }))
-              }
-              placeholder="AAAA-MM-DD"
-            />
           </Card>
+        ) : null}
+
+        {needsPaymentDueDate ? (
+          <TextField
+            label="Vencimiento de pago"
+            value={paymentDueDate}
+            onChangeText={setPaymentDueDate}
+            placeholder="AAAA-MM-DD"
+          />
+        ) : null}
+
+        {isCreditInvoice(voucherType) ? (
+          <OptionGroup<TransmissionTypeName>
+            label="Tipo de transmisión"
+            value={transmissionType}
+            onChange={setTransmissionType}
+            options={[
+              {
+                label: transmissionTypeLabel[TransmissionType.OPEN_CIRCULATION],
+                value: TransmissionType.OPEN_CIRCULATION,
+              },
+              {
+                label: transmissionTypeLabel[TransmissionType.COLLECTIVE_DEPOSIT],
+                value: TransmissionType.COLLECTIVE_DEPOSIT,
+              },
+            ]}
+          />
         ) : null}
 
         <Card>

@@ -66,6 +66,7 @@ describe('pdf util', () => {
       ],
       associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }],
       servicePeriod: null,
+      paymentDueDate: null,
       qrPng: Buffer.alloc(0),
       ...overrides,
     };
@@ -115,11 +116,8 @@ describe('pdf util', () => {
     const pdf = await renderVoucherPdf(
       data({
         qrPng,
-        servicePeriod: {
-          from: new Date(2026, 6, 1),
-          to: new Date(2026, 6, 31),
-          paymentDueDate: new Date(2026, 7, 10),
-        },
+        servicePeriod: { from: new Date(2026, 6, 1), to: new Date(2026, 6, 31) },
+        paymentDueDate: new Date(2026, 7, 10),
       }),
     );
     expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
