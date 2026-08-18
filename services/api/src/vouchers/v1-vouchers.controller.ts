@@ -6,9 +6,11 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { issueVoucherSchema, type IssueVoucher } from '@chirola/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
@@ -60,6 +62,18 @@ export class V1VouchersController {
       issuerId,
       limit === undefined ? undefined : Number(limit),
     );
+  }
+
+  @Get(':id/pdf')
+  async pdf(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.vouchers.renderPdfForApiClient(apiClient, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="voucher-${id}.pdf"`);
+    res.end(pdf);
   }
 
   @Get(':id')

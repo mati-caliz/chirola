@@ -233,7 +233,19 @@ export class VouchersService {
   }
 
   async renderPdf(userId: string, id: string): Promise<Buffer> {
-    const voucher = await this.get(userId, id);
+    return this.buildPdf(await this.get(userId, id));
+  }
+
+  async renderPdfForApiClient(
+    apiClient: AuthenticatedApiClient,
+    id: string,
+  ): Promise<Buffer> {
+    return this.buildPdf(await this.getForApiClient(apiClient, id));
+  }
+
+  private async buildPdf(
+    voucher: Awaited<ReturnType<VouchersService['loadVoucher']>>,
+  ): Promise<Buffer> {
     if (!voucher.qrData || !voucher.cae) {
       throw new NotFoundException(
         'El comprobante no está autorizado todavía (sin CAE/QR).',
