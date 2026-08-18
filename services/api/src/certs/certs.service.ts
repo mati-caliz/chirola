@@ -42,7 +42,17 @@ export class CertsService {
     cuit: string,
     legalName: string,
     alias?: string,
+    regenerate = false,
   ): Promise<{ csrPem: string }> {
+    if (!regenerate) {
+      const pending = await this.prisma.certificate.findUnique({
+        where: { issuerId },
+      });
+      if (pending?.csrPem && !pending.certPem) {
+        return { csrPem: pending.csrPem };
+      }
+    }
+
     const keys = forge.pki.rsa.generateKeyPair({ bits: 2048 });
     const csr = forge.pki.createCertificationRequest();
     csr.publicKey = keys.publicKey;
@@ -61,8 +71,8 @@ export class CertsService {
 
     await this.prisma.certificate.upsert({
       where: { issuerId },
-      create: { issuerId, privateKeyEnc, certPem: null, alias },
-      update: { privateKeyEnc, certPem: null, alias, validUntil: null },
+      create: { issuerId, privateKeyEnc, csrPem, certPem: null, alias },
+      update: { privateKeyEnc, csrPem, certPem: null, alias, validUntil: null },
     });
 
     return { csrPem };

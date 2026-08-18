@@ -112,6 +112,7 @@ export class IssuersController {
       issuer.cuit,
       issuer.legalName,
       body.alias,
+      body.regenerate,
     );
   }
 

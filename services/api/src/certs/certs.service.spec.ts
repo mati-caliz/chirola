@@ -122,6 +122,36 @@ describe('CertsService — CSR / onboarding', () => {
     );
   });
 
+  it('devuelve el mismo CSR si se vuelve a pedir, para no invalidar el de ARCA', async () => {
+    const service = svc();
+    const primero = await service.generateCsr(ISSUER, CUIT, 'Acme SA');
+    const segundo = await service.generateCsr(ISSUER, CUIT, 'Acme SA');
+    expect(segundo.csrPem).toBe(primero.csrPem);
+
+    const cert = certFromCsr(primero.csrPem);
+    await expect(service.matchCertificate(ISSUER, cert)).resolves.toBeUndefined();
+  });
+
+  it('genera uno nuevo sólo si se lo pide explícitamente', async () => {
+    const service = svc();
+    const primero = await service.generateCsr(ISSUER, CUIT, 'Acme SA');
+    const segundo = await service.generateCsr(ISSUER, CUIT, 'Acme SA', undefined, true);
+    expect(segundo.csrPem).not.toBe(primero.csrPem);
+
+    const certViejo = certFromCsr(primero.csrPem);
+    await expect(service.matchCertificate(ISSUER, certViejo)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('vuelve a generar cuando el emisor ya tiene un certificado emparejado', async () => {
+    const service = svc();
+    const primero = await service.generateCsr(ISSUER, CUIT, 'Acme SA');
+    await service.matchCertificate(ISSUER, certFromCsr(primero.csrPem));
+    const renovacion = await service.generateCsr(ISSUER, CUIT, 'Acme SA');
+    expect(renovacion.csrPem).not.toBe(primero.csrPem);
+  });
+
   it('falla al emparejar si no se generó el CSR antes', async () => {
     await expect(svc().matchCertificate('sin-csr', 'x')).rejects.toBeInstanceOf(
       NotFoundException,

@@ -79,7 +79,13 @@ export class V1IssuersController {
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     const issuer = await this.issuers.getById(id);
-    return this.certs.generateCsr(id, issuer.cuit, issuer.legalName, body.alias);
+    return this.certs.generateCsr(
+      id,
+      issuer.cuit,
+      issuer.legalName,
+      body.alias,
+      body.regenerate,
+    );
   }
 
   @Put(':id/certificate')

@@ -81,6 +81,7 @@ model Certificate {
   issuerId      String    @unique
   issuer        Issuer    @relation(fields: [issuerId], references: [id], onDelete: Cascade)
   privateKeyEnc String
+  csrPem        String?
   certPem       String?
   alias         String?
   validUntil    DateTime?

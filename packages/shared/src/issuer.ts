@@ -24,6 +24,8 @@ export const uploadCertificateSchema = z.object({
 export const generateCsrSchema = z.object({
 
   alias: z.string().min(1).optional(),
+
+  regenerate: z.boolean().optional(),
 });
 
 export const matchCertificateSchema = z.object({
