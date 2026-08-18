@@ -289,7 +289,11 @@ Detalles de implementación que condicionan el resto:
 - Los XML se truncan a 20.000 caracteres y se purgan cada 6 horas según
   `ARCA_CALL_LOG_RETENTION_DAYS` (30 por defecto). Son blobs y crecen rápido.
 
-Pendiente: no hay endpoint para consultar el registro; hoy se mira por SQL.
+`GET /issuers/:id/arca-calls` lista las llamadas del emisor (metadatos, sin los XML, que son
+grandes) y `GET /issuers/:id/arca-calls/:callId` devuelve una con el XML redactado. Ambos filtran
+por el `issuerId` del contexto autenticado: el registro guarda el XML de comprobantes ajenos, así
+que un emisor no puede ver el de otro. Las llamadas sin emisor (el `FEDummy` de health-check) no
+aparecen en ninguna lista de usuario.
 
 ### D.3 ✅ Estados de `Voucher` como enum tipado — implementado
 

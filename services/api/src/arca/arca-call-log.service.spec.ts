@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ArcaCallLogService,
@@ -107,5 +108,75 @@ describe('ArcaCallLogService (D.2)', () => {
     const cutoff = deletedBefore[0].getTime();
     expect(cutoff).toBeGreaterThanOrEqual(before - sevenDaysMs);
     expect(cutoff).toBeLessThanOrEqual(after - sevenDaysMs);
+  });
+});
+
+describe('ArcaCallLogService — consulta (D.2)', () => {
+  interface Query {
+    where: { issuerId: string; operation?: string; outcome?: string };
+    take?: number;
+  }
+
+  function buildReader(rows: { id: string; issuerId: string | null }[] = []) {
+    const queries: Query[] = [];
+    const prisma = {
+      arcaCallLog: {
+        findMany: async (query: Query) => {
+          queries.push(query);
+          return rows;
+        },
+        findFirst: async ({ where }: { where: { id: string; issuerId: string } }) =>
+          rows.find((row) => row.id === where.id && row.issuerId === where.issuerId) ??
+          null,
+      },
+    } as unknown as PrismaService;
+    const config = {
+      get: (_key: string, def?: string) => def,
+    } as unknown as ConfigService;
+    return { service: new ArcaCallLogService(prisma, config), queries };
+  }
+
+  it('filtra siempre por el emisor del contexto', async () => {
+    const { service, queries } = buildReader();
+
+    await service.listForIssuer('issuer-1');
+
+    expect(queries[0].where.issuerId).toBe('issuer-1');
+  });
+
+  it('acota el tamaño de página aunque pidan más', async () => {
+    const { service, queries } = buildReader();
+
+    await service.listForIssuer('issuer-1', { limit: 5000 });
+
+    expect(queries[0].take).toBe(200);
+  });
+
+  it('deja filtrar por operación y resultado', async () => {
+    const { service, queries } = buildReader();
+
+    await service.listForIssuer('issuer-1', {
+      operation: 'FECAESolicitar',
+      outcome: ArcaCallOutcome.REJECTED,
+    });
+
+    expect(queries[0].where.operation).toBe('FECAESolicitar');
+    expect(queries[0].where.outcome).toBe(ArcaCallOutcome.REJECTED);
+  });
+
+  it('no deja ver una llamada de otro emisor', async () => {
+    const { service } = buildReader([{ id: 'call-1', issuerId: 'issuer-2' }]);
+
+    await expect(service.getForIssuer('issuer-1', 'call-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('devuelve la llamada propia', async () => {
+    const { service } = buildReader([{ id: 'call-1', issuerId: 'issuer-1' }]);
+
+    expect(await service.getForIssuer('issuer-1', 'call-1')).toMatchObject({
+      id: 'call-1',
+    });
   });
 });
