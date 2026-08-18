@@ -332,10 +332,15 @@ tiene, y sin ese control la diferencia se perdería en silencio.
 Las filas ilegibles se juntan y se informan con número de línea en vez de abortar el archivo
 entero: un export de un año tiene cientos de filas y una sola mala no debería tirar todo.
 
-Pendiente: la **pantalla de revisión** en la app (hoy sólo está la API). Y las notas de crédito
-de compra se importan con signo positivo, igual que la carga manual — `PurchaseInvoice` no
-modela el signo, así que restan mal en el libro. Es un problema previo a esta fase, pero el
-importador lo hace más visible porque entran muchas de golpe.
+De paso se corrigió un error previo del libro IVA: `computeCredit` sumaba el IVA de **todas** las
+compras, así que una **nota de crédito recibida aumentaba** el crédito fiscal en vez de
+reducirlo. El signo sale de `isCreditNote(invoiceType)`, igual que en el débito; no hizo falta
+modelar el signo aparte porque el tipo de comprobante ya lo dice. El importador lo hacía mucho
+más visible porque entran muchas de golpe.
+
+Pendiente: la **pantalla de revisión** en la app. Hoy no existe ninguna pantalla de compras —
+las `PurchaseInvoice` se cargan por API—, así que no es "una pantalla más" sino la sección de
+compras entera. Queda para cuando se decida hacerla.
 
 ### E.2 🟢 Servicios ARCA de nicho
 

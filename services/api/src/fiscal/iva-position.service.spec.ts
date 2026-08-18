@@ -6,9 +6,16 @@ interface VoucherRow {
   items: { ivaRate: number; subtotal: number }[];
 }
 
+interface PurchaseRow {
+  invoiceType: number;
+  iva21: number;
+  iva105: number;
+  iva27: number;
+}
+
 function fakePrisma(
   vouchers: VoucherRow[],
-  purchases: { iva21: number; iva105: number; iva27: number }[],
+  purchases: PurchaseRow[],
 ): PrismaService {
   return {
     voucher: {
@@ -24,7 +31,7 @@ describe('IvaPositionService', () => {
   it('calcula débito (ventas A/B) menos crédito (compras) por alícuota', async () => {
     const prisma = fakePrisma(
       [{ voucherType: 1, items: [{ ivaRate: 21, subtotal: 1210 }] }],
-      [{ iva21: 110, iva105: 0, iva27: 0 }],
+      [{ invoiceType: 1, iva21: 110, iva105: 0, iva27: 0 }],
     );
     const position = await new IvaPositionService(prisma).getMonthlyPosition(
       'issuer-1',
@@ -70,5 +77,43 @@ describe('IvaPositionService', () => {
 
     expect(position.totalDebit).toBe(0);
     expect(position.breakdown).toEqual([]);
+  });
+});
+
+describe('IvaPositionService — notas de crédito de compra', () => {
+  it('resta del crédito fiscal la nota de crédito recibida', async () => {
+    const prisma = fakePrisma(
+      [],
+      [
+        { invoiceType: 1, iva21: 210, iva105: 0, iva27: 0 },
+        { invoiceType: 3, iva21: 105, iva105: 0, iva27: 0 },
+      ],
+    );
+
+    const position = await new IvaPositionService(prisma).getMonthlyPosition(
+      'issuer-1',
+      2026,
+      7,
+    );
+
+    expect(position.totalCredit).toBe(105);
+  });
+
+  it('suma la nota de débito recibida, que no es lo mismo', async () => {
+    const prisma = fakePrisma(
+      [],
+      [
+        { invoiceType: 1, iva21: 210, iva105: 0, iva27: 0 },
+        { invoiceType: 2, iva21: 105, iva105: 0, iva27: 0 },
+      ],
+    );
+
+    const position = await new IvaPositionService(prisma).getMonthlyPosition(
+      'issuer-1',
+      2026,
+      7,
+    );
+
+    expect(position.totalCredit).toBe(315);
   });
 });

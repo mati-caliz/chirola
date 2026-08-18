@@ -119,9 +119,10 @@ export class IvaPositionService {
       }
     };
     for (const purchase of purchases) {
-      add(RATE_21, Number(purchase.iva21));
-      add(RATE_105, Number(purchase.iva105));
-      add(RATE_27, Number(purchase.iva27));
+      const sign = isCreditNote(purchase.invoiceType) ? -1 : 1;
+      add(RATE_21, sign * Number(purchase.iva21));
+      add(RATE_105, sign * Number(purchase.iva105));
+      add(RATE_27, sign * Number(purchase.iva27));
     }
     return creditByRate;
   }
