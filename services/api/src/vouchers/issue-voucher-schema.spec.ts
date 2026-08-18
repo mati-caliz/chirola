@@ -1,4 +1,10 @@
-import { issueVoucherSchema, TaxTreatment, VoucherConcept } from '@chirola/shared';
+import {
+  DocumentType,
+  issueVoucherSchema,
+  TaxTreatment,
+  VoucherConcept,
+  VoucherType,
+} from '@chirola/shared';
 
 function input(overrides: Record<string, unknown> = {}) {
   return {
@@ -154,5 +160,49 @@ describe('issueVoucherSchema — período de servicios', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('issueVoucherSchema — identificación del receptor (C.1)', () => {
+  it('rechaza una Factura A cuyo receptor no se identifica con CUIT', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        voucherType: VoucherType.FACTURA_A,
+        recipient: { docType: DocumentType.DNI, docNumber: '30111222' },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza una Factura M cuyo receptor no se identifica con CUIT', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        voucherType: VoucherType.FACTURA_M,
+        recipient: { docType: DocumentType.CONSUMIDOR_FINAL, docNumber: '0' },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('Factura M');
+  });
+
+  it('acepta una Factura M con CUIT', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({
+        voucherType: VoucherType.FACTURA_M,
+        recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('no exige CUIT en una Factura B', () => {
+    const result = issueVoucherSchema.safeParse(
+      input({ voucherType: VoucherType.FACTURA_B }),
+    );
+
+    expect(result.success).toBe(true);
   });
 });

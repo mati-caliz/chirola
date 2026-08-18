@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
+  ArcaParamType,
+  issuableInvoiceTypes,
   ivaRates,
   issueVoucherSchema,
   LOCAL_CURRENCY,
@@ -16,6 +18,7 @@ import {
   tributeTypeName,
   VoucherConcept,
   VoucherType,
+  voucherTypeName,
   DocumentType,
   type TaxTreatmentType,
   type VoucherConceptType,
@@ -36,6 +39,7 @@ import {
 import {
   getExchangeRate,
   issueVoucher,
+  listArcaParams,
   listClients,
   listCurrencies,
   lookupTaxpayer,
@@ -58,6 +62,12 @@ interface TributeForm {
   taxableBase: string;
   rate: string;
 }
+
+const DEFAULT_INVOICE_TYPES = [
+  VoucherType.FACTURA_A,
+  VoucherType.FACTURA_B,
+  VoucherType.FACTURA_C,
+];
 
 const SELECTABLE_CURRENCIES = [LOCAL_CURRENCY, 'DOL', 'EUR'];
 
@@ -124,6 +134,11 @@ export default function NewVoucherScreen() {
     queryFn: () => listCurrencies(issuerId),
   });
 
+  const { data: enabledVoucherTypes } = useQuery({
+    queryKey: ['params', issuerId, ArcaParamType.VOUCHER_TYPES],
+    queryFn: () => listArcaParams(issuerId, ArcaParamType.VOUCHER_TYPES),
+  });
+
   const exchangeRateLookup = useMutation({
     mutationFn: (currencyId: string) => getExchangeRate(issuerId, currencyId),
     onSuccess: (quote) => setExchangeRate(String(quote.rate)),
@@ -139,6 +154,19 @@ export default function NewVoucherScreen() {
     }
     exchangeRateLookup.mutate(currencyId);
   }
+
+  const voucherTypeOptions = useMemo(() => {
+    const enabledIds = new Set((enabledVoucherTypes ?? []).map((param) => param.id));
+    const available = issuableInvoiceTypes.filter((type) => enabledIds.has(type));
+    const types = available.length > 0 ? available : DEFAULT_INVOICE_TYPES;
+    return types.map((type) => ({ label: voucherTypeName[type], value: type }));
+  }, [enabledVoucherTypes]);
+
+  useEffect(() => {
+    if (!voucherTypeOptions.some((option) => option.value === voucherType)) {
+      setVoucherType(voucherTypeOptions[0].value);
+    }
+  }, [voucherTypeOptions, voucherType]);
 
   const currencyOptions = useMemo(() => {
     const byId = new Map((currencies ?? []).map((item) => [item.id, item.description]));
@@ -279,11 +307,7 @@ export default function NewVoucherScreen() {
           label="Tipo"
           value={voucherType}
           onChange={setVoucherType}
-          options={[
-            { label: 'Factura A', value: VoucherType.FACTURA_A },
-            { label: 'Factura B', value: VoucherType.FACTURA_B },
-            { label: 'Factura C', value: VoucherType.FACTURA_C },
-          ]}
+          options={voucherTypeOptions}
         />
         <TextField
           label="Punto de venta"

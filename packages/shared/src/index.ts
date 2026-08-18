@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { RecipientIvaCondition } from './recipient-iva-condition';
 import { ivaRates } from './iva-rate';
+import { DocumentType } from './document-type';
 import {
   isCreditDebitNote,
   requiresRecipientCuit,
+  voucherTypeName,
   VoucherType,
 } from './voucher-type';
 
@@ -21,15 +23,25 @@ export * from './arca-params';
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',
+  RESPONSABLE_INSCRIPTO_M: 'RESPONSABLE_INSCRIPTO_M',
   MONOTRIBUTISTA: 'MONOTRIBUTISTA',
 } as const;
 
 export type FiscalConditionType =
   (typeof FiscalCondition)[keyof typeof FiscalCondition];
 
+export const fiscalConditionName: Record<FiscalConditionType, string> = {
+  RESPONSABLE_INSCRIPTO: 'Responsable Inscripto',
+  RESPONSABLE_INSCRIPTO_M: 'Responsable Inscripto (habilitado a emitir M)',
+  MONOTRIBUTISTA: 'Monotributista',
+};
+
 export function inferFiscalCondition(
   voucherTypeIds: readonly number[],
 ): FiscalConditionType | null {
+  if (voucherTypeIds.includes(VoucherType.FACTURA_M)) {
+    return FiscalCondition.RESPONSABLE_INSCRIPTO_M;
+  }
   if (
     voucherTypeIds.includes(VoucherType.FACTURA_A) ||
     voucherTypeIds.includes(VoucherType.FACTURA_B)
@@ -182,6 +194,17 @@ export const issueVoucherSchema = z
         path: ['associatedVouchers'],
         message:
           'Las notas de crédito/débito requieren al menos un comprobante asociado.',
+      });
+    }
+
+    if (
+      requiresRecipientCuit(data.voucherType) &&
+      data.recipient.docType !== DocumentType.CUIT
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipient', 'docType'],
+        message: `${voucherTypeName[data.voucherType] ?? 'El comprobante'} requiere identificar al receptor con CUIT.`,
       });
     }
 

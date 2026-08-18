@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isCreditNote, voucherLetter } from '@chirola/shared';
+import { discriminatesIva, isCreditNote, voucherLetter } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 const RATE_21 = 21;
@@ -80,11 +80,11 @@ export class IvaPositionService {
 
     const debitByRate = new Map<number, number>();
     for (const voucher of vouchers) {
-      const letter = voucherLetter(voucher.voucherType);
-      if (letter !== 'A' && letter !== 'B') {
+      const { voucherType } = voucher;
+      if (!discriminatesIva(voucherType) && voucherLetter(voucherType) !== 'B') {
         continue;
       }
-      const sign = isCreditNote(voucher.voucherType) ? -1 : 1;
+      const sign = isCreditNote(voucherType) ? -1 : 1;
       for (const item of voucher.items) {
         const rate = Number(item.ivaRate);
         if (rate === 0) {

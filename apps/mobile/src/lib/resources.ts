@@ -1,4 +1,6 @@
 import type {
+  ArcaParam,
+  ArcaParamTypeName,
   UpdateClient,
   CreateClient,
   CreateIssuer,
@@ -119,6 +121,9 @@ export const listCurrencies = (issuerId: string) =>
 
 export const getExchangeRate = (issuerId: string, currencyId: string) =>
   apiFetch<ExchangeRate>(`/issuers/${issuerId}/exchange-rate/${currencyId}`);
+
+export const listArcaParams = (issuerId: string, paramType: ArcaParamTypeName) =>
+  apiFetch<ArcaParam[]>(`/issuers/${issuerId}/params/${paramType}`);
 
 export const lookupTaxpayer = (issuerId: string, cuit: string) =>
   apiFetch<TaxpayerInfo>(`/issuers/${issuerId}/taxpayers/${cuit}`);

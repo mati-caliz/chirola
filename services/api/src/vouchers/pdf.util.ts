@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import {
+  requiresRetentionNotice,
   voucherLetter,
   voucherTypeName,
   documentTypeName,
@@ -66,6 +67,9 @@ const ivaCell = (item: PdfItem): string => {
   if (item.taxTreatment === TaxTreatment.UNTAXED) return 'No grav.';
   return money(item.ivaRate);
 };
+
+const RETENTION_NOTICE =
+  'COMPROBANTE SUJETO A RETENCIÓN — El receptor actúa como agente de retención de IVA y Ganancias (RG 1575).';
 
 const voucherId = (type: number, salesPoint: number, number: number): string =>
   `${voucherTypeName[type] ?? `Tipo ${type}`} ${String(salesPoint).padStart(5, '0')}-${String(number).padStart(8, '0')}`;
@@ -182,6 +186,11 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
         doc.fontSize(8).text(`• ${voucherId(voucher.type, voucher.salesPoint, voucher.number)}`, left + 10, y);
         y += 12;
       }
+    }
+
+    if (requiresRetentionNotice(data.voucherType)) {
+      y += 12;
+      doc.fontSize(8).text(RETENTION_NOTICE, left, y, { width });
     }
 
     const qrY = doc.page.height - 180;

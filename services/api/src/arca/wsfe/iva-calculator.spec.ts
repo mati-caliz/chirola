@@ -156,3 +156,26 @@ describe('calculateAmounts — tributos', () => {
     expect(r.totalAmount).toBe(1030);
   });
 });
+
+describe('calculateAmounts — Factura M (C.1)', () => {
+  it('discrimina IVA igual que la Factura A', () => {
+    const m = calculateAmounts(VoucherType.FACTURA_M, [taxed()]);
+    const a = calculateAmounts(VoucherType.FACTURA_A, [taxed()]);
+
+    expect(m).toEqual(a);
+  });
+
+  it('separa exentos y no gravados en la Factura M', () => {
+    const r = calculateAmounts(VoucherType.FACTURA_M, [
+      taxed({ unitPrice: 1210 }),
+      taxed({ unitPrice: 500, ivaRate: 0, taxTreatment: TaxTreatment.EXEMPT }),
+      taxed({ unitPrice: 300, ivaRate: 0, taxTreatment: TaxTreatment.UNTAXED }),
+    ]);
+
+    expect(r.netAmount).toBe(1000);
+    expect(r.ivaAmount).toBe(210);
+    expect(r.exemptAmount).toBe(500);
+    expect(r.untaxedAmount).toBe(300);
+    expect(r.totalAmount).toBe(2010);
+  });
+});

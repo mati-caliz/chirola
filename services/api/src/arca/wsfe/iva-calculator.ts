@@ -1,6 +1,6 @@
 import {
   ivaRateAfipId,
-  requiresRecipientCuit,
+  discriminatesIva,
   TaxTreatment,
   type Item,
   type Tribute,
@@ -48,7 +48,7 @@ export function calculateAmounts(
   const itemsTotal = round2(items.reduce((acc, item) => acc + grossOf(item), 0));
   const totalAmount = round2(itemsTotal + tributeAmount);
 
-  if (!requiresRecipientCuit(voucherType)) {
+  if (!discriminatesIva(voucherType)) {
     return {
       netAmount: itemsTotal,
       ivaAmount: 0,

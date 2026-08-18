@@ -146,14 +146,34 @@ Pendiente también: prellenado en el alta de `Client` (hoy sólo está en la nue
 
 ## Fase C — 🟡 Más tipos de comprobante
 
-### C.1 🟡 Factura M (códigos 51, 52, 53)
+### C.1 ✅ Factura M (códigos 51, 52, 53) — implementado
 
 Los emisores nuevos cuya capacidad económica ARCA no acredita **sólo pueden emitir M** en lugar
-de A. Hoy la app no las contempla: ese emisor simplemente no puede facturar.
+de A. Antes de esto, ese emisor simplemente no podía facturar desde la app.
 
-Particularidades: la M lleva la leyenda de retención y el receptor actúa como agente de
-retención de IVA y ganancias. `inferFiscalCondition` en `packages/shared` debe reconocer el caso
-(el emisor tiene habilitado 51 pero no 1).
+Reglas del régimen que se modelaron:
+
+- La M **discrimina IVA igual que la A** y exige identificar al receptor con **CUIT**. El
+  calculador dejó de usar `requiresRecipientCuit` como proxy de "letra A" y ahora pregunta por
+  `discriminatesIva`, que es lo que realmente se está decidiendo.
+- El receptor actúa como **agente de retención de IVA y Ganancias** (RG 1575), y el comprobante
+  debe llevar la leyenda que lo dice: se imprime en el PDF vía `requiresRetentionNotice`.
+- Un emisor habilitado a M **también tiene la B habilitada** (le factura a consumidor final), así
+  que `inferFiscalCondition` chequea el 51 **antes** que el 1/6: si preguntara primero por la B lo
+  clasificaría como responsable inscripto común y la M nunca aparecería.
+
+`voucherLetter` parseaba la letra del nombre con un regex `[ABC]` que descartaba la M en silencio
+—el PDF caía a `'X'` y el libro IVA ventas salteaba el comprobante—; ahora cubre `[ABCM]`.
+
+El selector de tipo en la app dejó de ser una lista fija de tres: sale de `FEParamGetTiposCbte`
+(cacheado por emisor) intersectado con los tipos que la app sabe emitir, de manera que la M
+aparece sólo para quien la tiene habilitada. Sin conexión cae a A/B/C.
+
+De paso se agregó al schema la validación de que los comprobantes que exigen CUIT no viajen con
+DNI o consumidor final: antes se mandaban a ARCA y volvían rechazados.
+
+Pendiente: el régimen de retención tiene un piso de monto por debajo del cual no aplica; hoy la
+leyenda se imprime siempre. Confirmar el piso vigente antes de condicionarla.
 
 ### C.2 🟡 FCE MiPyME (códigos 201-213)
 
@@ -257,11 +277,11 @@ Existen pero los dejaría para el final, salvo que aparezca un usuario que los p
 
 1. **A.1** concepto servicios — está declarado en el schema y no funciona.
 2. **A.2 + A.3** exentos, no gravados y tributos — desbloquean B2B real.
-3. **B** padrón — mejor valor/esfuerzo, mejora la UX de todo el flujo. ← siguiente
+3. **B** padrón — mejor valor/esfuerzo, mejora la UX de todo el flujo.
 4. **A.4 + A.5** cotización y tablas de parámetros.
 5. **D.1** reconciliación — antes de tener volumen, no después.
 6. **C.1** Factura M — barato y desbloquea un tipo de emisor entero.
-7. Decidir entre **C.2** (FCE MiPyME) y **C.3** (WSFEX) según a qué usuario se le vende.
+7. Decidir entre **C.2** (FCE MiPyME) y **C.3** (WSFEX) según a qué usuario se le vende. ← siguiente
 8. **E.1** importación de compras.
 
 Las fases A, D y E.1 **no dependen de ARCA homologación**: se pueden desarrollar y testear con
