@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { isProduction } from '../arca-environment';
 import { ArcaCallOutcome } from '../arca-call-log.service';
 import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from '../arca-soap.util';
+import { wsaaFaultMessage } from './wsaa-fault';
 import {
   CertificateCredentials,
   ArcaService,
@@ -196,9 +197,7 @@ export class WsaaService {
     if (!res.ok) {
       this.logger.error(`WSAA respondió ${res.status}: ${text}`);
       await record(ArcaCallOutcome.FAULT, res.status, text);
-      throw new InternalServerErrorException(
-        `WSAA devolvió error HTTP ${res.status}.`,
-      );
+      throw new InternalServerErrorException(wsaaFaultMessage(text, res.status));
     }
     await record(ArcaCallOutcome.SUCCESS, res.status, text);
     return text;
