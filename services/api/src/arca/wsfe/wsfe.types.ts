@@ -68,9 +68,15 @@ export interface CaeRequest {
   optionals?: ArcaOptional[];
 }
 
+export type ArcaObservation = {
+  code: string;
+  message: string;
+};
+
 export interface CaeResult {
   cae: string;
   caeVto: Date;
+  observations: ArcaObservation[];
 }
 
 export type ArcaParamEntry = {

@@ -30,6 +30,7 @@ interface StoredVoucher {
   caeExpiration: Date | null;
   qrData: string | null;
   status: string;
+  arcaObservations: { code: string; message: string }[] | null;
   salesPoint: { number: number };
 }
 
@@ -149,6 +150,8 @@ function buildHarness() {
           caeExpiration: (data.caeExpiration as Date) ?? null,
           qrData: (data.qrData as string) ?? null,
           status: data.status as string,
+          arcaObservations:
+            (data.arcaObservations as { code: string; message: string }[]) ?? null,
           salesPoint: { number: 1 },
         };
         vouchers.push(stored);
@@ -182,6 +185,7 @@ function buildHarness() {
     requestCae: jest.fn(async () => ({
       cae: '74000000000001',
       caeVto: new Date('2026-07-22'),
+      observations: [],
     })),
     queryVoucher: jest.fn(async () => null),
     queryVoucherDetail: jest.fn(async () => null),
@@ -245,6 +249,7 @@ describe('VouchersService — hardening fiscal (F0)', () => {
     (wsfe.queryVoucher as jest.Mock).mockResolvedValueOnce({
       cae: '74000000000099',
       caeVto: new Date('2026-07-22'),
+      observations: [],
     });
 
     const result = await service.issue('user-1', buildInput());
@@ -336,7 +341,11 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
 
 describe('VouchersService — reconciliación (D.1)', () => {
   const authorizedInArca = {
-    cae: { cae: '74000000000077', caeVto: new Date('2026-07-22') },
+    cae: {
+      cae: '74000000000077',
+      caeVto: new Date('2026-07-22'),
+      observations: [],
+    },
     number: 1,
     totalAmount: 100,
     recipientDocType: 99,
@@ -424,5 +433,41 @@ describe('VouchersService — reconciliación (D.1)', () => {
 
     expect(wsfe.requestCae).toHaveBeenCalled();
     expect(vouchers[0].cae).toBe('74000000000001');
+  });
+});
+
+describe('VouchersService — observaciones de ARCA', () => {
+  const observed = {
+    cae: '74000000000001',
+    caeVto: new Date('2026-07-22'),
+    observations: [{ code: '10013', message: 'Fecha fuera de rango' }],
+  };
+
+  it('marca el comprobante como observado y guarda el aviso', async () => {
+    const { service, wsfe, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockResolvedValueOnce(observed);
+
+    await service.issue('user-1', buildInput());
+
+    expect(vouchers[0].status).toBe(VoucherStatus.OBSERVED);
+    expect(vouchers[0].arcaObservations).toEqual(observed.observations);
+  });
+
+  it('el comprobante observado sigue teniendo CAE válido', async () => {
+    const { service, wsfe, vouchers } = buildHarness();
+    (wsfe.requestCae as jest.Mock).mockResolvedValueOnce(observed);
+
+    await service.issue('user-1', buildInput());
+
+    expect(vouchers[0].cae).toBe('74000000000001');
+  });
+
+  it('no guarda observaciones cuando ARCA no devuelve ninguna', async () => {
+    const { service, vouchers } = buildHarness();
+
+    await service.issue('user-1', buildInput());
+
+    expect(vouchers[0].status).toBe(VoucherStatus.APPROVED);
+    expect(vouchers[0].arcaObservations).toBeNull();
   });
 });

@@ -52,6 +52,11 @@ export interface VoucherItem {
   subtotal: string;
 }
 
+export interface VoucherObservation {
+  code: string;
+  message: string;
+}
+
 export interface VoucherDetail {
   id: string;
   voucherType: number;
@@ -66,6 +71,7 @@ export interface VoucherDetail {
   cae: string | null;
   caeExpiration: string | null;
   qrData: string | null;
+  arcaObservations: VoucherObservation[] | null;
   items: VoucherItem[];
   salesPoint: { number: number };
   issuer: { legalName: string; cuit: string };

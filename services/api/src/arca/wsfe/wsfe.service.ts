@@ -314,7 +314,7 @@ export class WsfeService {
     if (!cae || !caeVto) {
       return null;
     }
-    return { cae, caeVto: parseArcaDate(caeVto) };
+    return { cae, caeVto: parseArcaDate(caeVto), observations: xml.observations() };
   }
 
   async queryVoucherDetail(
@@ -346,7 +346,11 @@ export class WsfeService {
       return null;
     }
     return {
-      cae: { cae, caeVto: parseArcaDate(caeVto) },
+      cae: {
+        cae,
+        caeVto: parseArcaDate(caeVto),
+        observations: xml.observations(),
+      },
       number,
       totalAmount: Number(xml.optional('ImpTotal', '0')),
       recipientDocType: Number(xml.optional('DocTipo', '0')),
@@ -510,7 +514,15 @@ export class WsfeService {
     }
     const cae = xml.required('CAE');
     const caeVto = xml.required('CAEFchVto');
+    const observations = xml.observations();
     this.logger.log(`CAE otorgado: ${cae} (vence ${caeVto})`);
-    return { cae, caeVto: parseArcaDate(caeVto) };
+    if (observations.length > 0) {
+      this.logger.warn(
+        `ARCA autorizó con observaciones: ${observations
+          .map(({ code, message }) => `(${code}) ${message}`)
+          .join(' · ')}`,
+      );
+    }
+    return { cae, caeVto: parseArcaDate(caeVto), observations };
   }
 }

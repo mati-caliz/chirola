@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { VoucherConcept } from '@chirola/shared';
 import { WsfeService } from './wsfe.service';
 import { RecordedArcaCalls } from '../arca-call-recorder.fixture';
-import type { CaeRequest } from './wsfe.types';
+import type { CaeRequest, CaeResult } from './wsfe.types';
 
 const AUTH = {
   issuerId: 'issuer-1',
@@ -533,5 +533,37 @@ describe('WsfeService — entorno por emisor', () => {
     expect(await urlUsedFor('produccion')).toBe(
       'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
     );
+  });
+});
+
+describe('WsfeService — observaciones del CAE', () => {
+  const parse = (res: string) =>
+    (service() as unknown as { parseCaeResponse(r: string): CaeResult }).parseCaeResponse(res);
+
+  const caeBody =
+    '<Resultado>A</Resultado><CAE>74000000000001</CAE><CAEFchVto>20260722</CAEFchVto>';
+
+  it('devuelve el CAE sin observaciones cuando ARCA no manda ninguna', () => {
+    expect(parse(`<r>${caeBody}</r>`).observations).toEqual([]);
+  });
+
+  it('extrae código y mensaje de cada observación', () => {
+    const res =
+      `<r>${caeBody}<Observaciones>` +
+      '<Obs><Code>10013</Code><Msg>Fecha fuera de rango</Msg></Obs>' +
+      '<Obs><Code>10071</Code><Msg>Cotización no informada</Msg></Obs>' +
+      '</Observaciones></r>';
+
+    expect(parse(res).observations).toEqual([
+      { code: '10013', message: 'Fecha fuera de rango' },
+      { code: '10071', message: 'Cotización no informada' },
+    ]);
+  });
+
+  it('no confunde una observación con un rechazo: el CAE se otorga igual', () => {
+    const res =
+      `<r>${caeBody}<Observaciones><Obs><Code>10013</Code><Msg>Aviso</Msg></Obs></Observaciones></r>`;
+
+    expect(parse(res).cae).toBe('74000000000001');
   });
 });

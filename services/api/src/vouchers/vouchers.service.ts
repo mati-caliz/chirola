@@ -62,6 +62,13 @@ interface EmissionOutcome {
 
 type PendingVoucherRow = PendingVoucher;
 
+function emittedStatus(outcome: EmissionOutcome): string {
+  if (outcome.recovered) return VoucherStatus.RECOVERED;
+  return outcome.cae.observations.length > 0
+    ? VoucherStatus.OBSERVED
+    : VoucherStatus.APPROVED;
+}
+
 type EmissionIssuer = ArcaIssuer & {
   cbu: string | null;
   paymentAlias: string | null;
@@ -526,11 +533,11 @@ export class VouchersService {
         tributes: amounts.tributes.length > 0 ? amounts.tributes : undefined,
         currency: input.currency,
         exchangeRate: input.exchangeRate,
-        status: outcome.recovered
-          ? VoucherStatus.RECOVERED
-          : VoucherStatus.APPROVED,
+        status: emittedStatus(outcome),
         cae: cae.cae,
         caeExpiration: cae.caeVto,
+        arcaObservations:
+          cae.observations.length > 0 ? cae.observations : undefined,
         qrData,
         associatedVouchers: input.associatedVouchers ?? undefined,
         items: {

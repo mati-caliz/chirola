@@ -10,17 +10,27 @@ import { documentTypeName, voucherTypeName } from '@chirola/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Amount, Banner, Button, Card, Divider, Loading, StatusBadge } from '@/components/ds';
 import { apiFetchBase64 } from '@/lib/api';
-import { getVoucher } from '@/lib/resources';
+import { getVoucher, type VoucherDetail } from '@/lib/resources';
 import { formatCurrency, formatDate, formatVoucherNumber } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 import { type StatusKey } from '@/theme/tokens';
 
 function toStatusKey(status: string, hasCae: boolean): StatusKey {
-  if (hasCae) return 'aprobado';
   const value = status.toLowerCase();
-  if (value.includes('rechaz') || value.includes('reject')) return 'rechazado';
   if (value.includes('observ')) return 'observado';
+  if (hasCae) return 'aprobado';
+  if (value.includes('rechaz') || value.includes('reject')) return 'rechazado';
   return 'pendiente';
+}
+
+function observationsText(data: VoucherDetail): string {
+  const observations = data.arcaObservations ?? [];
+  if (observations.length === 0) {
+    return 'ARCA la aprobó igual, pero conviene revisar el aviso.';
+  }
+  return observations
+    .map(({ code, message }) => (code ? `(${code}) ${message}` : message))
+    .join('\n');
 }
 
 export default function VoucherDetailScreen() {
@@ -122,7 +132,11 @@ export default function VoucherDetailScreen() {
           </Card>
 
           {status === 'observado' ? (
-            <Banner kind="warning" title="Aprobada con observaciones" body="ARCA la aprobó igual, pero conviene revisar el aviso." />
+            <Banner
+              kind="warning"
+              title="Aprobada con observaciones"
+              body={observationsText(data)}
+            />
           ) : status === 'rechazado' ? (
             <Banner kind="error" title="ARCA rechazó este comprobante" body="No tiene validez fiscal. Corregí el dato observado y volvé a emitir." />
           ) : null}

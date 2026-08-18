@@ -295,8 +295,20 @@ recuperado desaparecería del débito fiscal. Por eso el filtro se hace con
 agregue otro estado autorizado, se agrega en un solo lugar.
 
 La migración `20260817190000_voucher_status_enum` reescribe los valores ya guardados antes de
-cambiar el default. `OBSERVED` está definido pero todavía no se asigna: ARCA lo devuelve como
-`Resultado = A` con `Observaciones`, y ese caso no está modelado.
+cambiar el default.
+
+**Observaciones de ARCA.** `FECAESolicitar` puede devolver `Resultado = A` (autorizado) **con**
+un nodo `<Observaciones>`: el CAE es válido, pero ARCA avisa algo que conviene corregir. Hasta
+acá esas advertencias se descartaban en el parseo —la columna `arcaObservations` existía y nunca
+se escribía—, así que el usuario no se enteraba nunca. Ahora se guardan y el comprobante queda en
+`OBSERVED`.
+
+`OBSERVED` está en `authorizedVoucherStatuses`: el comprobante **tiene CAE y es válido**, así que
+tiene que seguir contando en el libro IVA. Dejarlo afuera por "observado" sería subdeclarar.
+
+Ojo con el orden al mostrarlo: la app derivaba el estado visual preguntando primero si hay CAE, y
+un comprobante observado tiene CAE — se veía como aprobado común y el aviso no aparecía nunca. La
+observación se chequea antes.
 
 ## Fase E — 🟢 Compras y otros servicios
 

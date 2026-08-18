@@ -125,6 +125,11 @@ export async function callSoap(
   return text;
 }
 
+export type CodedEntry = {
+  code: string;
+  message: string;
+};
+
 export class ParsedXml {
   private readonly root: Record<string, unknown>;
 
@@ -181,20 +186,28 @@ export class ParsedXml {
       .filter((code): code is string => code.length > 0);
   }
 
-  private errorEntries(): { code: string; message: string }[] {
-    const errRoot = this.find('Errors');
-    if (errRoot == null || typeof errRoot !== 'object') return [];
-    const out: { code: string; message: string }[] = [];
-    const collect = (err: unknown): void => {
-      if (err == null || typeof err !== 'object') return;
-      const rec = err as Record<string, unknown>;
-      const code = rec.Code != null ? String(rec.Code) : '';
-      const message = rec.Msg != null ? String(rec.Msg) : '';
+  observations(): CodedEntry[] {
+    return this.codedEntries('Observaciones', 'Obs');
+  }
+
+  private errorEntries(): CodedEntry[] {
+    return this.codedEntries('Errors', 'Err');
+  }
+
+  private codedEntries(rootTag: string, itemTag: string): CodedEntry[] {
+    const root = this.find(rootTag);
+    if (root == null || typeof root !== 'object') return [];
+    const out: CodedEntry[] = [];
+    const collect = (entry: unknown): void => {
+      if (entry == null || typeof entry !== 'object') return;
+      const record = entry as Record<string, unknown>;
+      const code = record.Code != null ? String(record.Code) : '';
+      const message = record.Msg != null ? String(record.Msg) : '';
       if (message) out.push({ code, message });
     };
-    const errNode = (errRoot as Record<string, unknown>).Err;
-    if (Array.isArray(errNode)) errNode.forEach(collect);
-    else collect(errNode);
+    const itemNode = (root as Record<string, unknown>)[itemTag];
+    if (Array.isArray(itemNode)) itemNode.forEach(collect);
+    else collect(itemNode);
     return out;
   }
 
