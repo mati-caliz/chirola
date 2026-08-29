@@ -1,3 +1,7 @@
+# Proyecto propio para que un `docker compose up` sin -f nunca reconcilie
+# los containers de produccion, que corren bajo el proyecto `chirola`.
+name: chirola-dev
+
 services:
   db:
     image: postgres:16-alpine
@@ -8,7 +12,7 @@ services:
       POSTGRES_PASSWORD: chirola
       POSTGRES_DB: chirola
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - chirola_pgdata:/var/lib/postgresql/data
 
