@@ -8,7 +8,18 @@
     "node": ">=20"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "@nestjs/core"]
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "@nestjs/core"
+    ],
+    "overrides": {
+      "multer": ">=2.2.0",
+      "lodash": ">=4.18.0",
+      "deepmerge-ts": ">=8.0.0",
+      "fast-uri": ">=3.1.5"
+    }
   },
   "scripts": {
     "api:dev": "pnpm --filter @chirola/api start:dev",
