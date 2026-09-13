@@ -9,13 +9,13 @@
 # (gitignored).
 #
 # El schema se aplica con prisma migrate, NO se crea solo al levantar:
-#   docker compose -f docker-compose.prod.yml --env-file .env run --rm api pnpm prisma migrate deploy
+#   docker compose -f docker-compose.prod.yml --env-file .env run --rm --build api-tools pnpm prisma migrate deploy
 
 name: chirola
 
 services:
   db:
-    image: postgres:16-alpine
+    image: base-images/postgres:16
     container_name: chirola-db
     restart: unless-stopped
     environment:
@@ -45,6 +45,7 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
+      target: runtime
     container_name: chirola-api
     restart: unless-stopped
     env_file: .env
@@ -72,6 +73,24 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Migraciones y scripts de alta (prisma, ts-node): la imagen de api no trae devDependencies.
+  # Siempre con --build, para no correr contra una imagen vieja.
+  api-tools:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: tools
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - chirola-internal
+    restart: "no"
 
 networks:
   chirola-internal:

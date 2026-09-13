@@ -72,7 +72,7 @@ jobs:
 
             # El schema no se crea solo: prisma migrate deploy antes de levantar el código nuevo.
             $COMPOSE build api
-            $COMPOSE run --rm api npx prisma migrate deploy --schema=prisma/schema.prisma
+            $COMPOSE run --rm --build api-tools npx prisma migrate deploy --schema=prisma/schema.prisma
 
             $COMPOSE up -d --build --remove-orphans
             $COMPOSE ps
