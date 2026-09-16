@@ -1,0 +1,26 @@
+# El contexto de build es la raíz del monorepo, así que sin esto viajan 900 MB al daemon
+# en cada build, de los cuales el Dockerfile no usa nada: instala las dependencias adentro.
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.gitignore
+.github
+
+# Los secretos no tienen por qué estar disponibles en ninguna capa del build.
+.env
+.env.*
+!.env.example
+
+docs
+*.md
+docker-compose*.yml
+dev.sh
+dev.ps1
+**/*.log
+**/.vscode
+**/.idea
+**/.DS_Store
