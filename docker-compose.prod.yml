@@ -34,6 +34,7 @@ services:
     deploy:
       resources:
         limits:
+          pids: 512
           memory: 512M
     logging:
       driver: json-file
@@ -67,6 +68,7 @@ services:
     deploy:
       resources:
         limits:
+          pids: 512
           memory: 500M
     logging:
       driver: json-file
@@ -77,6 +79,7 @@ services:
   # Migraciones y scripts de alta (prisma, ts-node): la imagen de api no trae devDependencies.
   # Siempre con --build, para no correr contra una imagen vieja.
   api-tools:
+    pids_limit: 512
     profiles: ["tools"]
     build:
       context: .
