@@ -96,8 +96,10 @@ services:
     restart: "no"
 
 networks:
+  # Acá sólo está la base, que no necesita salir a internet. La API sale por shared-nginx.
   chirola-internal:
     driver: bridge
+    internal: true
   shared-nginx:
     external: true
 
