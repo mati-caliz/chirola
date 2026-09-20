@@ -12,6 +12,20 @@ export interface CertificateCredentials {
   certPem: string;
 
   privateKeyPem: string;
+
+  holderCuit: string | null;
+}
+
+export interface AccessTicketRequest {
+  issuerId: string;
+
+  holderCuit: string;
+
+  environment: string;
+
+  credentials: CertificateCredentials;
+
+  service: ArcaService;
 }
 
 export type ArcaService =

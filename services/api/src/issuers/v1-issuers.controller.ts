@@ -12,9 +12,11 @@ import {
   createIssuerSchema,
   generateCsrSchema,
   matchCertificateSchema,
+  representativeSchema,
   type CreateIssuer,
   type GenerateCsr,
   type MatchCertificate,
+  type Representative,
 } from '@chirola/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
@@ -69,6 +71,17 @@ export class V1IssuersController {
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     return this.salesPoints.listForIssuer(id);
+  }
+
+  @Put(':id/representative')
+  async updateRepresentative(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, id);
+    await this.issuers.updateRepresentative(id, body);
+    return this.issuers.getWithCertificate(id);
   }
 
   @Post(':id/csr')

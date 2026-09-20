@@ -1,16 +1,16 @@
+import { fakeIssuerAuth } from '../issuer-arca/issuer-arca.fixture';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RecipientIvaCondition, type TaxpayerInfo } from '@chirola/shared';
 import { TaxpayersService } from './taxpayers.service';
 import type { PrismaService } from '../prisma/prisma.service';
-import type { CertsService } from '../certs/certs.service';
-import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { PadronService } from '../arca/padron/padron.service';
 
 const issuer = {
   id: 'issuer-1',
   cuit: '20111111112',
   environment: 'homologacion',
+  representativeCuit: null,
 };
 
 const taxpayer: TaxpayerInfo = {
@@ -51,28 +51,13 @@ function build(options: { cached?: CacheRow } = {}) {
   } as unknown as PadronService;
 
   const requestedServices: string[] = [];
-  const wsaa = {
-    getAccessTicket: async (
-      _id: string,
-      _creds: unknown,
-      _environment: string,
-      service: string,
-    ) => {
-      requestedServices.push(service);
-      return { token: 't', sign: 's', expiration: new Date(), generation: new Date() };
-    },
-  } as unknown as WsaaService;
-
-  const certs = {
-    getCredentials: async () => ({ certPem: 'cert', privateKeyPem: 'key' }),
-  } as unknown as CertsService;
 
   const config = {
     get: (_key: string, def: number) => def,
   } as unknown as ConfigService;
 
   return {
-    service: new TaxpayersService(prisma, certs, wsaa, padron, config),
+    service: new TaxpayersService(prisma, fakeIssuerAuth(requestedServices), padron, config),
     lookups,
     upserts,
     requestedServices,

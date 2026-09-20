@@ -1,13 +1,13 @@
+import { fakeIssuerAuth } from '../issuer-arca/issuer-arca.fixture';
 import { ReconciliationService } from './reconciliation.service';
 import type { PrismaService } from '../prisma/prisma.service';
-import type { CertsService } from '../certs/certs.service';
-import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { WsfeService } from '../arca/wsfe/wsfe.service';
 
 const issuer = {
   id: 'issuer-1',
   cuit: '20111111112',
   environment: 'homologacion',
+  representativeCuit: null,
 };
 
 interface Group {
@@ -37,20 +37,8 @@ function build(options: {
     ) => options.lastInArca?.[voucherType] ?? 0,
   } as unknown as WsfeService;
 
-  const wsaa = {
-    getAccessTicket: async () => ({
-      token: 't',
-      sign: 's',
-      expiration: new Date(),
-      generation: new Date(),
-    }),
-  } as unknown as WsaaService;
 
-  const certs = {
-    getCredentials: async () => ({ certPem: 'cert', privateKeyPem: 'key' }),
-  } as unknown as CertsService;
-
-  return new ReconciliationService(prisma, certs, wsaa, wsfe);
+  return new ReconciliationService(prisma, fakeIssuerAuth(), wsfe);
 }
 
 describe('ReconciliationService', () => {

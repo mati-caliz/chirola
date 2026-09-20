@@ -13,6 +13,7 @@ import { ArcaCallOutcome } from '../arca-call-log.service';
 import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from '../arca-soap.util';
 import { wsaaFaultMessage } from './wsaa-fault';
 import {
+  AccessTicketRequest,
   CertificateCredentials,
   ArcaService,
   AccessTicket,
@@ -47,14 +48,11 @@ export class WsaaService {
         );
   }
 
-  async getAccessTicket(
-    issuerId: string,
-    creds: CertificateCredentials,
-    environment: string,
-    service: ArcaService = 'wsfe',
-  ): Promise<AccessTicket> {
+  async getAccessTicket(request: AccessTicketRequest): Promise<AccessTicket> {
+    const { issuerId, holderCuit, environment, credentials, service } = request;
+    const cacheKey = { holderCuit, environment, service };
     const cached = await this.prisma.accessTicketCache.findUnique({
-      where: { issuerId_service: { issuerId, service } },
+      where: { holderCuit_environment_service: cacheKey },
     });
 
     if (
@@ -69,14 +67,19 @@ export class WsaaService {
       };
     }
 
-    const accessTicket = await this.login(issuerId, creds, service, environment);
+    const accessTicket = await this.login(
+      issuerId,
+      credentials,
+      service,
+      environment,
+    );
     await this.prisma.accessTicketCache.upsert({
-      where: { issuerId_service: { issuerId, service } },
-      create: { issuerId, service, ...accessTicket },
+      where: { holderCuit_environment_service: cacheKey },
+      create: { ...cacheKey, ...accessTicket },
       update: { ...accessTicket },
     });
     this.logger.log(
-      `TA nuevo para ${issuerId}:${service}, vence ${accessTicket.expiration.toISOString()}`,
+      `TA nuevo para ${holderCuit}:${environment}:${service}, vence ${accessTicket.expiration.toISOString()}`,
     );
     return accessTicket;
   }

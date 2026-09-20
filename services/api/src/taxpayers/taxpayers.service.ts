@@ -3,11 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import type { TaxpayerAddress, TaxpayerInfo } from '@chirola/shared';
 import type { ArcaIssuer } from '../arca/arca-environment';
+import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { PadronService } from '../arca/padron/padron.service';
-import type { AuthContext } from '../arca/wsfe/wsfe.types';
 
 const CUIT_LENGTH = 11;
 const DEFAULT_CACHE_TTL_DAYS = 30;
@@ -39,8 +37,7 @@ export class TaxpayersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certs: CertsService,
-    private readonly wsaa: WsaaService,
+    private readonly issuerAuth: IssuerAuthService,
     private readonly padron: PadronService,
     config: ConfigService,
   ) {
@@ -66,7 +63,7 @@ export class TaxpayersService {
       };
     }
 
-    const auth = await this.buildAuth(issuer);
+    const auth = await this.issuerAuth.buildAuth(issuer, 'ws_sr_constancia_inscripcion');
     const taxpayer = await this.padron.getTaxpayer(auth, cuit);
 
     await this.prisma.taxpayerCache.upsert({
@@ -91,20 +88,4 @@ export class TaxpayersService {
     return taxpayer;
   }
 
-  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      issuer.environment,
-      'ws_sr_constancia_inscripcion',
-    );
-    return {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-  }
 }

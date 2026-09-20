@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IssuerArcaModule } from '../issuer-arca/issuer-arca.module';
 import { IssuersService } from './issuers.service';
 import { IssuersController } from './issuers.controller';
 import { ArcaParamsService } from './arca-params.service';
@@ -13,7 +14,7 @@ import { ArcaModule } from '../arca/arca.module';
 import { ServiceAuthModule } from '../service-auth/service-auth.module';
 
 @Module({
-  imports: [CertsModule, ArcaModule, ServiceAuthModule],
+  imports: [IssuerArcaModule, CertsModule, ArcaModule, ServiceAuthModule],
   controllers: [
     IssuersController,
     SalesPointsController,

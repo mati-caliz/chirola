@@ -10,15 +10,19 @@ import { z } from 'zod';
 import {
   defaultRecipientIvaCondition,
   issueVoucherSchema,
+  IssuerOnboardingStatus,
   PendingVoucherStatus,
   VoucherStatus,
   TaxTreatment,
   type IssueVoucher,
   type TaxTreatmentType,
 } from '@chirola/shared';
+import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
+import {
+  ArcaConfirmation,
+  IssuerOnboardingService,
+} from '../issuer-arca/issuer-onboarding.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
 import type { ArcaIssuer } from '../arca/arca-environment';
 import type {
@@ -129,7 +133,19 @@ export interface EmissionPlan {
   ivaAmount: number;
   totalAmount: number;
   rates: { id: number; taxableBase: number; amount: number }[];
+  verification: EmissionPlanVerification;
 }
+
+export interface EmissionPlanVerification {
+  onboardingStatus: string;
+  confirmsIssuing: boolean;
+  note: string;
+}
+
+const DRY_RUN_VERIFICATION_NOTE =
+  'El dry-run confirma que el certificado y la autorización de ARCA funcionan, no que el ' +
+  'contribuyente esté habilitado para facturar: ARCA valida más cosas al autorizar un ' +
+  'comprobante que al consultar el último número.';
 
 @Injectable()
 export class VouchersService {
@@ -140,8 +156,8 @@ export class VouchersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certs: CertsService,
-    private readonly wsaa: WsaaService,
+    private readonly issuerAuth: IssuerAuthService,
+    private readonly onboarding: IssuerOnboardingService,
     private readonly wsfe: WsfeService,
     private readonly issuerLock: IssuerLockService,
     private readonly apiClients: ApiClientService,
@@ -366,31 +382,40 @@ export class VouchersService {
     return this.computeEmissionPlan(issuer, input);
   }
 
+  private async describeVerification(
+    issuerId: string,
+  ): Promise<EmissionPlanVerification> {
+    const issuer = await this.prisma.issuer.findUniqueOrThrow({
+      where: { id: issuerId },
+      select: { onboardingStatus: true },
+    });
+    return {
+      onboardingStatus: issuer.onboardingStatus,
+      confirmsIssuing:
+        issuer.onboardingStatus === IssuerOnboardingStatus.ISSUING_CONFIRMED,
+      note: DRY_RUN_VERIFICATION_NOTE,
+    };
+  }
+
   private async computeEmissionPlan(
     issuer: EmissionIssuer,
     input: IssueVoucher,
   ): Promise<EmissionPlan> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
+    const last = await this.onboarding.track(
       issuer.id,
-      credentials,
-      issuer.environment,
-      'wsfe',
-    );
-    const auth: AuthContext = {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-    const last = await this.wsfe.getLastAuthorized(
-      auth,
-      input.salesPoint,
-      input.voucherType,
+      ArcaConfirmation.READ_ONLY,
+      async () => {
+        const auth = await this.issuerAuth.buildAuth(issuer);
+        return this.wsfe.getLastAuthorized(
+          auth,
+          input.salesPoint,
+          input.voucherType,
+        );
+      },
     );
     const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
     return {
+      verification: await this.describeVerification(issuer.id),
       salesPoint: input.salesPoint,
       voucherType: input.voucherType,
       number: last + 1,
@@ -448,11 +473,20 @@ export class VouchersService {
     return this.persistIssuedVoucher(issuer, input, outcome, idempotencyKey);
   }
 
-  private async attemptCae(
+  private attemptCae(
     issuer: EmissionIssuer,
     input: IssueVoucher,
   ): Promise<EmissionOutcome> {
-    const auth = await this.buildAuth(issuer);
+    return this.onboarding.track(issuer.id, ArcaConfirmation.ISSUE, () =>
+      this.requestCae(issuer, input),
+    );
+  }
+
+  private async requestCae(
+    issuer: EmissionIssuer,
+    input: IssueVoucher,
+  ): Promise<EmissionOutcome> {
+    const auth = await this.issuerAuth.buildAuth(issuer);
 
     const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
     const date = new Date();
@@ -791,7 +825,7 @@ export class VouchersService {
       return null;
     }
 
-    const auth = await this.buildAuth(issuer);
+    const auth = await this.issuerAuth.buildAuth(issuer);
     const authorized = await this.wsfe.queryVoucherDetail(
       auth,
       pending.attemptedSalesPoint,
@@ -836,22 +870,6 @@ export class VouchersService {
     return sameTotal && sameRecipient;
   }
 
-  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      issuer.environment,
-      'wsfe',
-    );
-    return {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-  }
 
   private async bumpPending(
     pending: PendingVoucherRow,

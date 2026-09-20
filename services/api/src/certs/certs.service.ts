@@ -4,9 +4,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import * as forge from 'node-forge';
+import {
+  IssuerOnboardingStatus,
+  hasConfirmedDelegation,
+  normalizeCuit,
+} from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { FieldEncryptionService } from '../crypto/field-encryption.service';
 import type { CertificateCredentials } from '../arca/wsaa/wsaa.types';
+import { certificateHolderCuit } from './certificate-subject';
 
 @Injectable()
 export class CertsService {
@@ -21,20 +27,17 @@ export class CertsService {
     certPem: string,
     alias?: string,
   ): Promise<void> {
-    let validUntil: Date | undefined;
-    try {
-      const cert = forge.pki.certificateFromPem(certPem);
-      validUntil = cert.validity.notAfter;
-    } catch {
-      throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
-    }
+    const cert = this.parseCertificate(certPem);
+    const validUntil = cert.validity.notAfter;
+    const holderCuit = await this.assertCertificateHolder(issuerId, cert);
 
     const privateKeyEnc = this.encryption.encrypt(privateKeyPem);
     await this.prisma.certificate.upsert({
       where: { issuerId },
-      create: { issuerId, privateKeyEnc, certPem, alias, validUntil },
-      update: { privateKeyEnc, certPem, alias, validUntil },
+      create: { issuerId, privateKeyEnc, certPem, holderCuit, alias, validUntil },
+      update: { privateKeyEnc, certPem, holderCuit, alias, validUntil },
     });
+    await this.markCertificateLoaded(issuerId);
   }
 
   async generateCsr(
@@ -88,14 +91,8 @@ export class CertsService {
       );
     }
 
-    let validUntil: Date;
-    let cert: forge.pki.Certificate;
-    try {
-      cert = forge.pki.certificateFromPem(certPem);
-      validUntil = cert.validity.notAfter;
-    } catch {
-      throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
-    }
+    const cert = this.parseCertificate(certPem);
+    const validUntil = cert.validity.notAfter;
 
     const privateKeyPem = this.encryption.decrypt(existing.privateKeyEnc);
     if (!this.certMatchesKey(cert, privateKeyPem)) {
@@ -103,10 +100,66 @@ export class CertsService {
         'El certificado no corresponde a la clave privada generada para este emisor.',
       );
     }
+    const holderCuit = await this.assertCertificateHolder(issuerId, cert);
 
     await this.prisma.certificate.update({
       where: { issuerId },
-      data: { certPem, validUntil },
+      data: { certPem, holderCuit, validUntil },
+    });
+    await this.markCertificateLoaded(issuerId);
+  }
+
+  private parseCertificate(certPem: string): forge.pki.Certificate {
+    try {
+      return forge.pki.certificateFromPem(certPem);
+    } catch {
+      throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
+    }
+  }
+
+  private async assertCertificateHolder(
+    issuerId: string,
+    cert: forge.pki.Certificate,
+  ): Promise<string> {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: issuerId },
+      select: { cuit: true, representativeCuit: true },
+    });
+    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+
+    const holderCuit = certificateHolderCuit(cert);
+    if (!holderCuit) {
+      throw new BadRequestException(
+        'El certificado no declara el CUIT de su titular. ' +
+          'No parece un certificado emitido por ARCA.',
+      );
+    }
+
+    const expectedHolderCuit = normalizeCuit(
+      issuer.representativeCuit ?? issuer.cuit,
+    );
+    if (holderCuit !== expectedHolderCuit) {
+      throw new BadRequestException(
+        issuer.representativeCuit
+          ? `El certificado pertenece al CUIT ${holderCuit}, pero el emisor declara ` +
+              `como representante al CUIT ${issuer.representativeCuit}.`
+          : `El certificado pertenece al CUIT ${holderCuit} y el emisor es el CUIT ` +
+              `${issuer.cuit}. Si es un representante que factura en nombre de este ` +
+              'contribuyente, hay que declararlo en el emisor antes de cargar el certificado.',
+      );
+    }
+    return holderCuit;
+  }
+
+  private async markCertificateLoaded(issuerId: string): Promise<void> {
+    const issuer = await this.prisma.issuer.findUniqueOrThrow({
+      where: { id: issuerId },
+      select: { onboardingStatus: true },
+    });
+    if (hasConfirmedDelegation(issuer.onboardingStatus)) return;
+    await this.prisma.issuer.update({
+      where: { id: issuerId },
+      data: { onboardingStatus: IssuerOnboardingStatus.PENDING_DELEGATION },
     });
   }
 
@@ -138,6 +191,22 @@ export class CertsService {
     return {
       certPem: cert.certPem,
       privateKeyPem: this.encryption.decrypt(cert.privateKeyEnc),
+      holderCuit:
+        cert.holderCuit ??
+        (await this.backfillHolderCuit(issuerId, cert.certPem)),
     };
+  }
+
+  private async backfillHolderCuit(
+    issuerId: string,
+    certPem: string,
+  ): Promise<string | null> {
+    const holderCuit = certificateHolderCuit(this.parseCertificate(certPem));
+    if (!holderCuit) return null;
+    await this.prisma.certificate.update({
+      where: { issuerId },
+      data: { holderCuit },
+    });
+    return holderCuit;
   }
 }

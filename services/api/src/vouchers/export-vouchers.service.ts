@@ -6,12 +6,9 @@ import {
   VoucherStatus,
   type IssueExportVoucher,
 } from '@chirola/shared';
+import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfexService } from '../arca/wsfex/wsfex.service';
-import type { ArcaIssuer } from '../arca/arca-environment';
-import type { AuthContext } from '../arca/wsfe/wsfe.types';
 import type { ExportCaeRequest } from '../arca/wsfex/wsfex.types';
 import { buildQrUrl } from './qr.util';
 import { IssuerLockService } from './issuer-lock.service';
@@ -27,8 +24,7 @@ export class ExportVouchersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certs: CertsService,
-    private readonly wsaa: WsaaService,
+    private readonly issuerAuth: IssuerAuthService,
     private readonly wsfex: WsfexService,
     private readonly issuerLock: IssuerLockService,
   ) {}
@@ -45,7 +41,7 @@ export class ExportVouchersService {
     }
 
     return this.issuerLock.runExclusive(issuer.id, async () => {
-      const auth = await this.buildAuth(issuer);
+      const auth = await this.issuerAuth.buildAuth(issuer, EXPORT_SERVICE);
       const [lastNumber, lastRequestId] = await Promise.all([
         this.wsfex.getLastAuthorized(auth, input.salesPoint, input.voucherType),
         this.wsfex.getLastRequestId(auth),
@@ -173,20 +169,4 @@ export class ExportVouchersService {
     });
   }
 
-  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      issuer.environment,
-      EXPORT_SERVICE,
-    );
-    return {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-  }
 }

@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export const CUIT_LENGTH = 11;
+
+export function normalizeCuit(cuit: string): string {
+  return cuit.replace(/\D/g, '');
+}
+
+export function isCuit(value: string): boolean {
+  return normalizeCuit(value).length === CUIT_LENGTH;
+}
+
 export const createIssuerSchema = z.object({
   cuit: z.string().regex(/^\d{11}$/, 'El CUIT debe tener 11 dígitos'),
   legalName: z.string().min(1),
@@ -42,3 +52,12 @@ export type UploadCertificate = z.infer<typeof uploadCertificateSchema>;
 export type GenerateCsr = z.infer<typeof generateCsrSchema>;
 export type MatchCertificate = z.infer<typeof matchCertificateSchema>;
 export type UpdateSalesPoint = z.infer<typeof updateSalesPointSchema>;
+
+export const representativeSchema = z.object({
+  representativeCuit: z
+    .string()
+    .regex(/^\d{11}$/, 'El CUIT debe tener 11 dígitos')
+    .nullable(),
+});
+
+export type Representative = z.infer<typeof representativeSchema>;

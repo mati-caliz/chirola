@@ -5,7 +5,13 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { CreateIssuer, PaymentAccount } from '@chirola/shared';
+import {
+  describeIssuerOnboardingStatus,
+  normalizeCuit,
+  type CreateIssuer,
+  type PaymentAccount,
+  type Representative,
+} from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SERVICE_USER_DOMAIN = 'service.chirola.internal';
@@ -80,21 +86,57 @@ export class IssuersService {
     const issuer = await this.prisma.issuer.findUnique({
       where: { id },
       include: {
-        certificate: { select: { alias: true, validUntil: true, certPem: true } },
+        certificate: {
+          select: {
+            alias: true,
+            validUntil: true,
+            certPem: true,
+            holderCuit: true,
+          },
+        },
       },
     });
     if (!issuer) throw new NotFoundException('Emisor inexistente.');
     const { certificate, ...rest } = issuer;
     return {
       ...rest,
+      onboarding: describeIssuerOnboardingStatus(issuer.onboardingStatus),
       certificate: certificate
         ? {
             alias: certificate.alias,
             validUntil: certificate.validUntil,
+            holderCuit: certificate.holderCuit,
             status: certificate.certPem ? 'ready' : 'pending_certificate',
           }
         : null,
     };
+  }
+
+  async updateRepresentative(id: string, input: Representative) {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id },
+      include: { certificate: { select: { certPem: true, holderCuit: true } } },
+    });
+    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+
+    const loadedHolderCuit = issuer.certificate?.certPem
+      ? issuer.certificate.holderCuit
+      : null;
+    const expectedHolderCuit = normalizeCuit(
+      input.representativeCuit ?? issuer.cuit,
+    );
+    if (loadedHolderCuit && loadedHolderCuit !== expectedHolderCuit) {
+      throw new ConflictException(
+        `El certificado cargado pertenece al CUIT ${loadedHolderCuit} y el cambio lo ` +
+          `dejaría sin corresponder al titular ${expectedHolderCuit}. Primero hay que ` +
+          'cargar el certificado del nuevo titular.',
+      );
+    }
+
+    return this.prisma.issuer.update({
+      where: { id },
+      data: { representativeCuit: input.representativeCuit },
+    });
   }
 
   async create(userId: string, input: CreateIssuer) {

@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ArcaIssuer } from '../arca/arca-environment';
+import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { AuthContext } from '../arca/wsfe/wsfe.types';
 
 export interface NumberingStatus {
   salesPoint: number;
@@ -20,8 +18,7 @@ export class ReconciliationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certs: CertsService,
-    private readonly wsaa: WsaaService,
+    private readonly issuerAuth: IssuerAuthService,
     private readonly wsfe: WsfeService,
   ) {}
 
@@ -40,7 +37,7 @@ export class ReconciliationService {
     });
     const numberById = new Map(salesPoints.map((point) => [point.id, point.number]));
 
-    const auth = await this.buildAuth(issuer);
+    const auth = await this.issuerAuth.buildAuth(issuer);
     const statuses: NumberingStatus[] = [];
 
     for (const group of grouped) {
@@ -73,20 +70,4 @@ export class ReconciliationService {
     return statuses;
   }
 
-  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      issuer.environment,
-      'wsfe',
-    );
-    return {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-  }
 }

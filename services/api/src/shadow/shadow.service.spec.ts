@@ -1,3 +1,4 @@
+import { IssuerOnboardingStatus } from '@chirola/shared';
 import { ShadowService } from './shadow.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { ApiClientService } from '../service-auth/api-client.service';
@@ -41,6 +42,11 @@ function plan(overrides: Partial<EmissionPlan> = {}): EmissionPlan {
     ivaAmount: 210,
     totalAmount: 1210,
     rates: [],
+    verification: {
+      onboardingStatus: IssuerOnboardingStatus.ISSUING_CONFIRMED,
+      confirmsIssuing: true,
+      note: 'nota de verificación',
+    },
     ...overrides,
   };
 }

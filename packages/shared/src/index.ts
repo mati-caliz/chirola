@@ -18,6 +18,7 @@ import {
 
 export * from './auth';
 export * from './issuer';
+export * from './issuer-onboarding';
 export * from './client';
 export * from './purchase-invoice';
 export * from './recipient-iva-condition';

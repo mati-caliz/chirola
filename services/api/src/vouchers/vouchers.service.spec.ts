@@ -1,4 +1,8 @@
 import {
+  fakeIssuerAuth,
+  fakeIssuerOnboarding,
+} from '../issuer-arca/issuer-arca.fixture';
+import {
   PendingVoucherStatus,
   VoucherStatus,
   type IssueVoucher,
@@ -7,8 +11,6 @@ import { VouchersService } from './vouchers.service';
 import { IssuerLockService } from './issuer-lock.service';
 import { ArcaRejectionError } from '../arca/wsfe/arca-errors';
 import type { PrismaService } from '../prisma/prisma.service';
-import type { CertsService } from '../certs/certs.service';
-import type { WsaaService } from '../arca/wsaa/wsaa.service';
 import type { WsfeService } from '../arca/wsfe/wsfe.service';
 import type { ApiClientService } from '../service-auth/api-client.service';
 import type { WebhookService } from '../webhooks/webhook.service';
@@ -160,21 +162,6 @@ function buildHarness() {
     },
   } as unknown as PrismaService;
 
-  const certs = {
-    getCredentials: jest.fn(async () => ({
-      certPem: 'cert',
-      privateKeyPem: 'key',
-    })),
-  } as unknown as CertsService;
-
-  const wsaa = {
-    getAccessTicket: jest.fn(async () => ({
-      token: 't',
-      sign: 's',
-      expiration: new Date(Date.now() + 3_600_000),
-      generation: new Date(),
-    })),
-  } as unknown as WsaaService;
 
   const wsfe = {
     getLastAuthorized: jest.fn(async (_auth, salesPoint: number, voucherType: number) =>
@@ -206,8 +193,8 @@ function buildHarness() {
 
   const service = new VouchersService(
     prisma,
-    certs,
-    wsaa,
+    fakeIssuerAuth(),
+    fakeIssuerOnboarding(),
     wsfe,
     new IssuerLockService(),
     apiClients,
@@ -215,7 +202,7 @@ function buildHarness() {
     config,
   );
 
-  return { service, prisma, certs, wsaa, wsfe, vouchers, pending, webhooks };
+  return { service, prisma, wsfe, vouchers, pending, webhooks };
 }
 
 describe('VouchersService — hardening fiscal (F0)', () => {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IssuerArcaModule } from '../issuer-arca/issuer-arca.module';
 import { VouchersService } from './vouchers.service';
 import { VouchersController } from './vouchers.controller';
 import { IssuerVouchersController } from './issuer-vouchers.controller';
@@ -17,6 +18,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
   imports: [
+    IssuerArcaModule,
     ArcaModule,
     CertsModule,
     IssuersModule,

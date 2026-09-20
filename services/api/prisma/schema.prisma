@@ -39,6 +39,8 @@ model Issuer {
   environment  String       @default("homologacion")
   cbu          String?
   paymentAlias String?
+  representativeCuit String?
+  onboardingStatus   String  @default("PENDING_CERTIFICATE")
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   certificate      Certificate?
@@ -83,6 +85,7 @@ model Certificate {
   privateKeyEnc String
   csrPem        String?
   certPem       String?
+  holderCuit    String?
   alias         String?
   validUntil    DateTime?
   createdAt     DateTime  @default(now())
@@ -240,9 +243,10 @@ model ArcaCallLog {
 }
 
 model AccessTicketCache {
-  id         String   @id @default(cuid())
-  issuerId   String
-  service    String
+  id          String  @id @default(cuid())
+  holderCuit  String
+  environment String
+  service     String
   token      String   @db.Text
   sign       String   @db.Text
   generation DateTime
@@ -250,7 +254,7 @@ model AccessTicketCache {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([issuerId, service])
+  @@unique([holderCuit, environment, service])
 }
 
 model ArcaParamCache {

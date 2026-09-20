@@ -8,9 +8,8 @@ import {
   type ArcaParamTypeName,
 } from '@chirola/shared';
 import type { ArcaIssuer } from '../arca/arca-environment';
+import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
 import { WsfeService } from '../arca/wsfe/wsfe.service';
 import type { AuthContext } from '../arca/wsfe/wsfe.types';
 
@@ -30,8 +29,7 @@ export class ArcaParamCacheService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certs: CertsService,
-    private readonly wsaa: WsaaService,
+    private readonly issuerAuth: IssuerAuthService,
     private readonly wsfe: WsfeService,
     config: ConfigService,
   ) {
@@ -69,7 +67,7 @@ export class ArcaParamCacheService {
     }
 
     try {
-      const auth = await this.buildAuth(issuer);
+      const auth = await this.issuerAuth.buildAuth(issuer);
       const entries = await this.fetcherFor(paramType)(auth);
       await this.prisma.arcaParamCache.upsert({
         where: { issuerId_paramType: { issuerId: issuer.id, paramType } },
@@ -92,20 +90,4 @@ export class ArcaParamCacheService {
     }
   }
 
-  private async buildAuth(issuer: ArcaIssuer): Promise<AuthContext> {
-    const credentials = await this.certs.getCredentials(issuer.id);
-    const accessTicket = await this.wsaa.getAccessTicket(
-      issuer.id,
-      credentials,
-      issuer.environment,
-      'wsfe',
-    );
-    return {
-      issuerId: issuer.id,
-      cuit: issuer.cuit,
-      token: accessTicket.token,
-      sign: accessTicket.sign,
-      environment: issuer.environment,
-    };
-  }
 }

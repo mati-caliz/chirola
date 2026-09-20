@@ -11,7 +11,7 @@ import {
   type ArcaCallRecorder,
 } from '../arca-soap.util';
 import { isProduction } from '../arca-environment';
-import { ArcaRejectionError } from './arca-errors';
+import { ArcaRejectionError, assertNoArcaErrors } from './arca-errors';
 import type {
   ArcaParamEntry,
   AuthContext,
@@ -149,6 +149,7 @@ export class WsfeService {
       this.logContext(auth.issuerId),
     );
     const xml = new ParsedXml(res);
+    assertNoArcaErrors(xml);
     return Number(xml.required('CbteNro'));
   }
 
@@ -519,6 +520,7 @@ export class WsfeService {
 
   private parseCaeResponse(res: string): CaeResult {
     const xml = new ParsedXml(res);
+    assertNoArcaErrors(xml);
     const result = xml.required('Resultado');
     if (result === 'R') {
       throw new ArcaRejectionError(xml.errorCodes(), xml.errors());

@@ -17,10 +17,12 @@ import {
   type PaymentAccount,
   matchCertificateSchema,
   generateCsrSchema,
+  representativeSchema,
   type UploadCertificate,
   type CreateIssuer,
   type MatchCertificate,
   type GenerateCsr,
+  type Representative,
 } from '@chirola/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -125,6 +127,17 @@ export class IssuersController {
     await this.issuers.getFromUser(id, user.sub);
     await this.certs.matchCertificate(id, body.certPem);
     return { ok: true };
+  }
+
+  @Put(':id/representative')
+  async updateRepresentative(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
+  ) {
+    await this.issuers.getFromUser(id, user.sub);
+    await this.issuers.updateRepresentative(id, body);
+    return this.issuers.getWithCertificate(id);
   }
 
   @Post(':id/certificate')

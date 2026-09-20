@@ -21,11 +21,42 @@ Flujo:
 2. **Firmar como CMS/PKCS#7** el LTR con el certificado + clave privada del contribuyente
    (`node-forge`, formato SMIME/CMS en base64).
 3. **`loginCms(cms)`** contra el endpoint WSAA → devuelve `<token>` y `<sign>`.
-4. **Cachear el TA** por `(cuit, service)` hasta `expirationTime`. **Regla de oro:** no pedir
-   un TA nuevo si el actual sigue vigente — ARCA bloquea temporalmente si abusás.
+4. **Cachear el TA** por `(titular del certificado, entorno, service)` hasta `expirationTime`.
+   **Regla de oro:** no pedir un TA nuevo si el actual sigue vigente — ARCA bloquea
+   temporalmente si abusás.
 
-> El TA es por **CUIT del contribuyente**, no por usuario de la app. El vault mapea
-> `usuario → emisor(CUIT) → cert/key` y el TA se cachea a nivel emisor.
+> El TA lo emite ARCA **para el certificado**, no para el emisor. Por eso la caché se
+> indexa por el CUIT del titular del certificado y no por `issuerId`: si un representante
+> factura por varios contribuyentes, pedir un TA por emisor hace que ARCA rechace el
+> segundo login con "el CEE ya posee un TA válido".
+
+### Lo que el TA no trae
+
+El Ticket de Acceso contiene únicamente `source`, `destination`, `uniqueId` y la vigencia.
+**No trae la lista de contribuyentes que delegaron el servicio.** No hay forma de descubrir
+las delegaciones en masa ni de resolverlas dentro de un request: la única manera de saber si
+alguien delegó es intentar una llamada por cada CUIT. Por eso en chirola la relación es
+explícita y se declara al dar de alta el emisor, no se deduce del TA.
+
+### El CUIT del bloque Auth
+
+En el bloque `<Auth>` de WSFEv1 van el `Token` y el `Sign` del TA, pero el campo `Cuit` es el
+**del contribuyente a nombre de quien se emite**, que puede no ser el titular del certificado.
+El error es silencioso: con un solo emisor los dos CUIT coinciden y nunca se nota; con dos,
+las facturas de un contribuyente salen a nombre de otro, con CAE y todo.
+
+chirola lo cubre en tres capas:
+
+- `Issuer.representativeCuit` declara explícitamente cuándo el certificado es de un
+  representante. Si es `null`, el certificado tiene que ser del propio emisor.
+- Al cargar el `.crt` se lee el `serialNumber` del subject (`CUIT xxxxxxxxxxx`) y se compara
+  contra el titular esperado; si no coincide, se rechaza la carga.
+- Antes de cada llamada a ARCA se vuelve a verificar el invariante contra el certificado
+  guardado (`assertCertificateBelongsToIssuer`). Si no coincide, se corta la operación en vez
+  de emitir a nombre de otro.
+
+El script `scripts/audit-certificate-holders.ts` audita todos los emisores de una base y
+devuelve exit code 1 si alguno tiene cargado el certificado de otro CUIT.
 
 ## 2. WSFEv1 — emitir comprobante y obtener CAE
 
@@ -64,6 +95,36 @@ Para self-host, cada contribuyente debe, con su clave fiscal en ARCA:
    emitir a nombre de ese CUIT.
 
 La UX debe guiar paso a paso (probablemente con capturas), porque es el punto de mayor abandono.
+
+### El error 600 significa dos cosas distintas
+
+`ValidacionDeToken: No aparecio CUIT en lista de relaciones` (código 600) aparece tanto cuando
+la delegación no existe como cuando el contribuyente está **inhabilitado para facturar**
+(monotributo dado de baja, deuda, inscripción vencida). La respuesta de ARCA no permite
+distinguirlos.
+
+Por eso `Issuer.onboardingStatus` recuerda hasta dónde llegó cada emisor:
+
+| Estado | Significado |
+| --- | --- |
+| `PENDING_CERTIFICATE` | Todavía no cargó el `.crt`. |
+| `PENDING_DELEGATION` | Certificado cargado; ARCA nunca aceptó una llamada suya. |
+| `DELEGATION_CONFIRMED` | Una consulta de sólo lectura funcionó. |
+| `ISSUING_CONFIRMED` | Obtuvo al menos un CAE. |
+| `BLOCKED_BY_ARCA` | Dio 600 después de haber funcionado. |
+
+Con eso, un 600 en un emisor que nunca llegó a ARCA pide hacer el trámite de delegación, y un
+600 en uno que ya había funcionado apunta a la situación fiscal del contribuyente. Sin este
+estado se le termina diciendo "autorizanos en ARCA" a alguien que ya lo hizo.
+
+### El dry-run no garantiza que se pueda emitir
+
+`POST /v1/vouchers/dry-run` usa `FECompUltimoAutorizado` como sonda de sólo lectura: confirma
+que el certificado y la delegación funcionan sin gastar un comprobante. **No confirma que el
+contribuyente esté habilitado para facturar**: ARCA valida más cosas al autorizar un
+comprobante que al consultar el último número, así que un monotributo dado de baja pasa la
+sonda y falla al emitir. La respuesta del dry-run lo dice en `verification`, donde
+`confirmsIssuing` sólo es `true` cuando el emisor ya obtuvo un CAE.
 
 ## 5. Seguridad
 
