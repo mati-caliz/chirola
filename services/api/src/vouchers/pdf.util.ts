@@ -71,7 +71,7 @@ const ivaCell = (item: PdfItem): string => {
 const RETENTION_NOTICE =
   'COMPROBANTE SUJETO A RETENCIÓN — El receptor actúa como agente de retención de IVA y Ganancias (RG 1575).';
 
-const voucherId = (type: number, salesPoint: number, number: number): string =>
+export const describeVoucher = (type: number, salesPoint: number, number: number): string =>
   `${voucherTypeName[type] ?? `Tipo ${type}`} ${String(salesPoint).padStart(5, '0')}-${String(number).padStart(8, '0')}`;
 
 export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
@@ -98,7 +98,7 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
     doc.fontSize(9).text(`CUIT: ${data.issuer.cuit}`, left, 68);
     doc.text(`Condición IVA: ${data.issuer.ivaCondition}`, left);
 
-    doc.fontSize(11).text(voucherId(data.voucherType, data.salesPoint, data.number), right - 220, 45, {
+    doc.fontSize(11).text(describeVoucher(data.voucherType, data.salesPoint, data.number), right - 220, 45, {
       width: 220,
       align: 'right',
     });
@@ -186,7 +186,7 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
       doc.fontSize(9).text('Comprobantes asociados:', left, y);
       y += 14;
       for (const voucher of data.associatedVouchers) {
-        doc.fontSize(8).text(`• ${voucherId(voucher.type, voucher.salesPoint, voucher.number)}`, left + 10, y);
+        doc.fontSize(8).text(`• ${describeVoucher(voucher.type, voucher.salesPoint, voucher.number)}`, left + 10, y);
         y += 12;
       }
     }

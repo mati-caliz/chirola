@@ -14,26 +14,13 @@ import { isProduction } from '../arca-environment';
 import type { ArcaParamEntry, AuthContext } from '../wsfe/wsfe.types';
 import { WsfexRejectionError } from './wsfex-errors';
 import type { ExportCaeRequest, ExportCaeResult } from './wsfex.types';
+import { parseArcaDate, toArcaDate } from '../arca-date';
 
 const WSFEX_NS = 'http://ar.gov.afip.dif.fexv1/';
 const WSFEX_SERVICE = 'wsfex';
 const NO_ERROR_CODE = '0';
 const REPROCESSED_FLAG = 'S';
 const APPROVED_RESULT = 'A';
-
-function toArcaDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-}
-
-function parseArcaDate(value: string): Date {
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  return new Date(year, month - 1, day);
-}
 
 const num = (value: number): string => value.toFixed(2);
 

@@ -18,11 +18,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.service';
 import { VouchersService } from './vouchers.service';
+import { CreditNoteDraftService } from './credit-note-draft.service';
 
 @Controller('vouchers')
 @UseGuards(JwtAuthGuard)
 export class VouchersController {
-  constructor(private readonly vouchers: VouchersService) {}
+  constructor(
+    private readonly vouchers: VouchersService,
+    private readonly creditNoteDrafts: CreditNoteDraftService,
+  ) {}
 
   @Post()
   issue(
@@ -42,9 +46,22 @@ export class VouchersController {
     return this.vouchers.previewForUser(user.sub, body);
   }
 
+  @Post('dry-run')
+  dryRun(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
+  ) {
+    return this.vouchers.computeEmissionPlanForUser(user.sub, body);
+  }
+
   @Get(':id')
   get(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.vouchers.get(user.sub, id);
+  }
+
+  @Get(':id/credit-note-draft')
+  creditNoteDraft(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.creditNoteDrafts.draftForUser(user.sub, id);
   }
 
   @Get(':id/qr.png')

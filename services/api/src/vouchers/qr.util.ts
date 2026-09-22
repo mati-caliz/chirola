@@ -1,3 +1,4 @@
+import { toLocalIsoDate } from '../arca/arca-date';
 
 export interface QrData {
   date: Date;
@@ -15,17 +16,10 @@ export interface QrData {
 
 const BASE_URL = 'https://www.afip.gob.ar/fe/qr/?p=';
 
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 export function buildQrUrl(data: QrData): string {
   const payload = {
     ver: 1,
-    fecha: toIsoDate(data.date),
+    fecha: toLocalIsoDate(data.date),
     cuit: Number(data.issuerCuit),
     ptoVta: data.salesPoint,
     tipoCmp: data.voucherType,

@@ -5,6 +5,7 @@ import { IssuersController } from './issuers.controller';
 import { ArcaParamsService } from './arca-params.service';
 import { ArcaParamCacheService } from './arca-param-cache.service';
 import { SalesPointsService } from './sales-points.service';
+import { ArcaHealthService } from './arca-health.service';
 import { SalesPointsController } from './sales-points.controller';
 import { ArcaCallsController } from './arca-calls.controller';
 import { V1ParamsController } from './v1-params.controller';
@@ -27,6 +28,7 @@ import { ServiceAuthModule } from '../service-auth/service-auth.module';
     ArcaParamsService,
     ArcaParamCacheService,
     SalesPointsService,
+    ArcaHealthService,
   ],
   exports: [IssuersService],
 })

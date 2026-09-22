@@ -3,6 +3,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 
 interface VoucherRow {
   voucherType: number;
+  exchangeRate?: number;
   items: { ivaRate: number; subtotal: number }[];
 }
 
@@ -115,5 +116,22 @@ describe('IvaPositionService — notas de crédito de compra', () => {
     );
 
     expect(position.totalCredit).toBe(315);
+  });
+});
+
+describe('IvaPositionService — moneda extranjera', () => {
+  it('convierte a pesos el IVA de un comprobante en dólares con su cotización', async () => {
+    const prisma = fakePrisma(
+      [{ voucherType: 1, exchangeRate: 1000, items: [{ ivaRate: 21, subtotal: 121 }] }],
+      [],
+    );
+
+    const position = await new IvaPositionService(prisma).getMonthlyPosition(
+      'issuer-1',
+      2026,
+      7,
+    );
+
+    expect(position.totalDebit).toBe(21000);
   });
 });

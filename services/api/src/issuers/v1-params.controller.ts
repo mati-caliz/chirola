@@ -6,6 +6,7 @@ import type { AuthenticatedApiClient } from '../service-auth/api-client.service'
 import { RateLimitGuard } from '../service-auth/rate-limit.guard';
 import { IssuersService } from './issuers.service';
 import { ArcaParamsService } from './arca-params.service';
+import { ArcaHealthService } from './arca-health.service';
 
 @Controller('v1')
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
@@ -14,6 +15,7 @@ export class V1ParamsController {
     private readonly issuers: IssuersService,
     private readonly params: ArcaParamsService,
     private readonly apiClients: ApiClientService,
+    private readonly arcaHealth: ArcaHealthService,
   ) {}
 
   @Get('sales-points')
@@ -51,6 +53,15 @@ export class V1ParamsController {
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.getExchangeRate(issuer, currencyId);
+  }
+
+  @Get('arca-health')
+  async arcaHealthCheck(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Query('issuerId') issuerId: string,
+  ) {
+    const issuer = await this.resolve(apiClient, issuerId);
+    return this.arcaHealth.check(issuer.environment);
   }
 
   private async resolve(apiClient: AuthenticatedApiClient, issuerId: string) {

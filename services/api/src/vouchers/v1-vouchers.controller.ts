@@ -19,12 +19,16 @@ import { ServiceAuditInterceptor } from '../service-auth/service-audit.intercept
 import { CurrentApiClient } from '../service-auth/current-api-client.decorator';
 import type { AuthenticatedApiClient } from '../service-auth/api-client.service';
 import { VouchersService } from './vouchers.service';
+import { CreditNoteDraftService } from './credit-note-draft.service';
 
 @Controller('v1/vouchers')
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
 @UseInterceptors(ServiceAuditInterceptor)
 export class V1VouchersController {
-  constructor(private readonly vouchers: VouchersService) {}
+  constructor(
+    private readonly vouchers: VouchersService,
+    private readonly creditNoteDrafts: CreditNoteDraftService,
+  ) {}
 
   @Post()
   issue(
@@ -74,6 +78,14 @@ export class V1VouchersController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="voucher-${id}.pdf"`);
     res.end(pdf);
+  }
+
+  @Get(':id/credit-note-draft')
+  creditNoteDraft(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param('id') id: string,
+  ) {
+    return this.creditNoteDrafts.draftForApiClient(apiClient, id);
   }
 
   @Get(':id')

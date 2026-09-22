@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { ShadowCompareInput } from '@chirola/shared';
+import type { EmissionPlan, ShadowCompareInput } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiClientService } from '../service-auth/api-client.service';
-import {
-  VouchersService,
-  type EmissionPlan,
-} from '../vouchers/vouchers.service';
+import { VouchersService } from '../vouchers/vouchers.service';
 import type { AuthenticatedApiClient } from '../service-auth/api-client.service';
 
 const MONEY_TOLERANCE = 0.01;

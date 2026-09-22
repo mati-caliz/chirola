@@ -1,11 +1,8 @@
-import { IssuerOnboardingStatus } from '@chirola/shared';
+import { IssuerOnboardingStatus, type EmissionPlan } from '@chirola/shared';
 import { ShadowService } from './shadow.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { ApiClientService } from '../service-auth/api-client.service';
-import {
-  VouchersService,
-  type EmissionPlan,
-} from '../vouchers/vouchers.service';
+import type { VouchersService } from '../vouchers/vouchers.service';
 import type { ShadowCompareInput } from '@chirola/shared';
 
 const API_CLIENT = { id: 'client-1', name: 'gastronova' };

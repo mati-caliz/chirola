@@ -31,6 +31,11 @@ export * from './tribute-type';
 export * from './arca-params';
 export * from './optional-type';
 export * from './export-voucher';
+export * from './emission-plan';
+export * from './pending-voucher';
+export * from './sales-book';
+export * from './arca-health';
+export * from './push-token';
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: 'RESPONSABLE_INSCRIPTO',
@@ -131,6 +136,12 @@ export const VoucherConcept = {
 export type VoucherConceptType =
   (typeof VoucherConcept)[keyof typeof VoucherConcept];
 
+export const voucherConceptSchema = z.union([
+  z.literal(VoucherConcept.PRODUCTS),
+  z.literal(VoucherConcept.SERVICES),
+  z.literal(VoucherConcept.PRODUCTS_AND_SERVICES),
+]);
+
 export const voucherConceptName: Record<number, string> = {
   1: 'Productos',
   2: 'Servicios',
@@ -172,11 +183,7 @@ export const issueVoucherSchema = z
     issuerId: z.string().min(1),
     salesPoint: z.number().int().positive(),
     voucherType: z.number().int().positive(),
-    concept: z.union([
-      z.literal(VoucherConcept.PRODUCTS),
-      z.literal(VoucherConcept.SERVICES),
-      z.literal(VoucherConcept.PRODUCTS_AND_SERVICES),
-    ]),
+    concept: voucherConceptSchema,
     recipient: z.object({
       docType: z.number().int(),
       docNumber: z.string().min(1),

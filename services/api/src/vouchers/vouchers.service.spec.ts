@@ -17,6 +17,7 @@ import type { WebhookService } from '../webhooks/webhook.service';
 import { WebhookEvent } from '../webhooks/webhook-events';
 import { VoucherQueuedException } from './voucher-queued.exception';
 import { ConfigService } from '@nestjs/config';
+import type { PushNotificationService } from '../notifications/push-notification.service';
 
 interface StoredVoucher {
   id: string;
@@ -127,6 +128,9 @@ function buildHarness() {
         return data;
       }),
     },
+    client: {
+      findUnique: jest.fn(async () => null),
+    },
     salesPoint: {
       upsert: jest.fn(async ({ where }: { where: { issuerId_number: { number: number } } }) => ({
         id: `sp-${where.issuerId_number.number}`,
@@ -186,6 +190,10 @@ function buildHarness() {
     dispatch: jest.fn(async () => undefined),
   } as unknown as WebhookService;
 
+  const push = {
+    notifyIssuerOwner: jest.fn(async () => undefined),
+  } as unknown as PushNotificationService;
+
   const config = {
     get: (key: string, def?: number) =>
       key === 'VOUCHER_RETRY_BASE_MS' ? 0 : def,
@@ -199,10 +207,11 @@ function buildHarness() {
     new IssuerLockService(),
     apiClients,
     webhooks,
+    push,
     config,
   );
 
-  return { service, prisma, wsfe, vouchers, pending, webhooks };
+  return { service, prisma, wsfe, vouchers, pending, webhooks, push };
 }
 
 describe('VouchersService — hardening fiscal (F0)', () => {
@@ -271,7 +280,7 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
   });
 
   it('el retry scheduler emite el CAE de un comprobante encolado y lo desencola', async () => {
-    const { service, wsfe, pending, vouchers, webhooks } = buildHarness();
+    const { service, wsfe, pending, vouchers, webhooks, push } = buildHarness();
     (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
 
     await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
@@ -288,6 +297,10 @@ describe('VouchersService — resiliencia / retry (F2)', () => {
       'issuer-1',
       WebhookEvent.VOUCHER_ISSUED,
       expect.objectContaining({ voucherId: vouchers[0].id }),
+    );
+    expect(push.notifyIssuerOwner).toHaveBeenCalledWith(
+      'issuer-1',
+      expect.objectContaining({ data: { voucherId: vouchers[0].id } }),
     );
   });
 

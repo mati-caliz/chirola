@@ -114,6 +114,9 @@ export class ExportVouchersService {
       data: {
         issuerId,
         salesPointId: salesPoint.id,
+        recipientDocType: FOREIGN_RECIPIENT_DOC_TYPE,
+        recipientDocNumber: input.countryTaxId,
+        recipientName: input.client.legalName,
         voucherType: input.voucherType,
         number: request.number,
         voucherDate: request.date,

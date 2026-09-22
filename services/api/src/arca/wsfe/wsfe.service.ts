@@ -22,11 +22,19 @@ import type {
   ExchangeRateInfo,
   SalesPointInfo,
 } from './wsfe.types';
+import { parseArcaDate, toArcaDate } from '../arca-date';
 
 const WSFEV1_NS = 'http://ar.gov.afip.dif.FEV1/';
 const WSFE_SERVICE = 'wsfe';
 const BLOCKED_FLAG = 'S';
 const EMISSION_TYPE_CAE = 'CAE';
+const SERVER_UP = 'OK';
+
+export interface ArcaServerStatus {
+  appServer: boolean;
+  dbServer: boolean;
+  authServer: boolean;
+}
 
 function collectByTag(root: unknown, tag: string): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
@@ -48,20 +56,6 @@ function collectByTag(root: unknown, tag: string): Record<string, unknown>[] {
   };
   walk(root);
   return out;
-}
-
-function toArcaDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}${m}${day}`;
-}
-
-function parseArcaDate(s: string): Date {
-  const y = Number(s.slice(0, 4));
-  const m = Number(s.slice(4, 6));
-  const d = Number(s.slice(6, 8));
-  return new Date(y, m - 1, d);
 }
 
 const NULL_DATE_MARKERS = ['', 'NULL'];
@@ -119,7 +113,7 @@ export class WsfeService {
     );
   }
 
-  async ping(environment: string): Promise<boolean> {
+  async checkServers(environment: string): Promise<ArcaServerStatus> {
     const soap = this.envelope('<ar:FEDummy/>');
     const res = await callSoap(
       this.wsfeUrl(environment),
@@ -127,7 +121,13 @@ export class WsfeService {
       soap,
       this.logContext(null),
     );
-    return res.includes('OK');
+    const xml = new ParsedXml(res);
+    const isUp = (tag: string) => xml.optional(tag, '') === SERVER_UP;
+    return {
+      appServer: isUp('AppServer'),
+      dbServer: isUp('DbServer'),
+      authServer: isUp('AuthServer'),
+    };
   }
 
   async getLastAuthorized(

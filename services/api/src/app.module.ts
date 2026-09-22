@@ -13,6 +13,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
 import { PurchaseInvoicesModule } from './purchase-invoices/purchase-invoices.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { ShadowModule } from './shadow/shadow.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { HealthController } from './health/health.controller';
     PurchaseInvoicesModule,
     FiscalModule,
     ShadowModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
 })

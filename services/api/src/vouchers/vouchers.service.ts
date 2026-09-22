@@ -8,14 +8,15 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, type PendingVoucher } from '@prisma/client';
 import { z } from 'zod';
 import {
+  associatedVoucherSchema,
   defaultRecipientIvaCondition,
   issueVoucherSchema,
   IssuerOnboardingStatus,
   PendingVoucherStatus,
   VoucherStatus,
-  TaxTreatment,
+  type EmissionPlan,
+  type EmissionPlanVerification,
   type IssueVoucher,
-  type TaxTreatmentType,
 } from '@chirola/shared';
 import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
 import {
@@ -44,12 +45,18 @@ import {
 } from '../service-auth/api-client.service';
 import { WebhookService } from '../webhooks/webhook.service';
 import { WebhookEvent } from '../webhooks/webhook-events';
+import { PushNotificationService } from '../notifications/push-notification.service';
+import {
+  queuedVoucherAuthorizedMessage,
+  queuedVoucherFailedMessage,
+} from '../notifications/push-messages';
 import { IssuerLockService } from './issuer-lock.service';
 import { VoucherQueuedException } from './voucher-queued.exception';
 import { CaeAttemptError } from './cae-attempt.error';
 import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf, type TributePdf } from './pdf.util';
+import { parseTaxTreatment } from './stored-tax-treatment';
 
 interface CaeWithNumber {
   result: CaeResult;
@@ -82,20 +89,16 @@ const storedTributesSchema = z.array(
   z.object({ description: z.string(), amount: z.number() }),
 );
 
-const storedTaxTreatmentSchema = z.enum([
-  TaxTreatment.TAXED,
-  TaxTreatment.EXEMPT,
-  TaxTreatment.UNTAXED,
-]);
+const storedAssociatedVouchersSchema = z.array(associatedVoucherSchema);
 
 function parseStoredTributes(stored: Prisma.JsonValue | null): TributePdf[] {
   const parsed = storedTributesSchema.safeParse(stored);
   return parsed.success ? parsed.data : [];
 }
 
-function parseTaxTreatment(stored: string): TaxTreatmentType {
-  const parsed = storedTaxTreatmentSchema.safeParse(stored);
-  return parsed.success ? parsed.data : TaxTreatment.TAXED;
+function parseStoredAssociatedVouchers(stored: Prisma.JsonValue | null) {
+  const parsed = storedAssociatedVouchersSchema.safeParse(stored);
+  return parsed.success ? parsed.data : [];
 }
 
 function parseIsoDate(iso: string): Date {
@@ -125,23 +128,6 @@ export interface IssuedVoucher {
   qrData: string;
 }
 
-export interface EmissionPlan {
-  salesPoint: number;
-  voucherType: number;
-  number: number;
-  netAmount: number;
-  ivaAmount: number;
-  totalAmount: number;
-  rates: { id: number; taxableBase: number; amount: number }[];
-  verification: EmissionPlanVerification;
-}
-
-export interface EmissionPlanVerification {
-  onboardingStatus: string;
-  confirmsIssuing: boolean;
-  note: string;
-}
-
 const DRY_RUN_VERIFICATION_NOTE =
   'El dry-run confirma que el certificado y la autorización de ARCA funcionan, no que el ' +
   'contribuyente esté habilitado para facturar: ARCA valida más cosas al autorizar un ' +
@@ -162,6 +148,7 @@ export class VouchersService {
     private readonly issuerLock: IssuerLockService,
     private readonly apiClients: ApiClientService,
     private readonly webhooks: WebhookService,
+    private readonly push: PushNotificationService,
     config: ConfigService,
   ) {
     this.maxRetries = config.get<number>('VOUCHER_MAX_RETRIES', DEFAULT_MAX_RETRIES);
@@ -301,13 +288,7 @@ export class VouchersService {
           ? { from: voucher.serviceFrom, to: voucher.serviceTo }
           : null,
       paymentDueDate: voucher.paymentDueDate,
-      associatedVouchers: Array.isArray(voucher.associatedVouchers)
-        ? (voucher.associatedVouchers as unknown as {
-            type: number;
-            salesPoint: number;
-            number: number;
-          }[])
-        : [],
+      associatedVouchers: parseStoredAssociatedVouchers(voucher.associatedVouchers),
       qrPng,
     });
   }
@@ -366,6 +347,22 @@ export class VouchersService {
   ): Promise<VoucherAmounts> {
     await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
     return calculateAmounts(input.voucherType, input.items, input.tributes);
+  }
+
+  async computeEmissionPlanForUser(
+    userId: string,
+    input: IssueVoucher,
+  ): Promise<EmissionPlan> {
+    const issuer = await this.prisma.issuer.findUnique({
+      where: { id: input.issuerId },
+    });
+    if (!issuer) {
+      throw new NotFoundException('Emisor inexistente.');
+    }
+    if (issuer.userId !== userId) {
+      throw new ForbiddenException('El emisor no pertenece al usuario.');
+    }
+    return this.computeEmissionPlan(issuer, input);
   }
 
   async computeEmissionPlanForApiClient(
@@ -553,10 +550,25 @@ export class VouchersService {
       update: {},
     });
 
+    const client = await this.prisma.client.findUnique({
+      where: {
+        issuerId_docType_docNumber: {
+          issuerId: issuer.id,
+          docType: input.recipient.docType,
+          docNumber: input.recipient.docNumber,
+        },
+      },
+      select: { id: true, legalName: true },
+    });
+
     const voucher = await this.prisma.voucher.create({
       data: {
         issuerId: issuer.id,
         salesPointId: salesPoint.id,
+        clientId: client?.id ?? null,
+        recipientDocType: input.recipient.docType,
+        recipientDocNumber: input.recipient.docNumber,
+        recipientName: input.recipient.legalName ?? client?.legalName ?? null,
         voucherType: input.voucherType,
         number,
         voucherDate: date,
@@ -806,13 +818,14 @@ export class VouchersService {
         }
         return;
       }
-      await this.persistIssuedVoucher(
+      const issued = await this.persistIssuedVoucher(
         issuer,
         input,
         outcome,
         pending.idempotencyKey ?? undefined,
       );
       await this.prisma.pendingVoucher.delete({ where: { id: pending.id } });
+      void this.push.notifyIssuerOwner(issuer.id, queuedVoucherAuthorizedMessage(issued));
     });
   }
 
@@ -905,6 +918,10 @@ export class VouchersService {
     });
     this.logger.error(
       `Comprobante encolado ${pending.id} falló definitivamente: ${reason}`,
+    );
+    void this.push.notifyIssuerOwner(
+      pending.issuerId,
+      queuedVoucherFailedMessage(pending.id, reason),
     );
     void this.webhooks.dispatch(pending.issuerId, WebhookEvent.VOUCHER_FAILED, {
       pendingVoucherId: pending.id,

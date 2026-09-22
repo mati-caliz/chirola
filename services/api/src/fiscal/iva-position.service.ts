@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import {
-  authorizedVoucherStatuses,
-  discriminatesIva,
-  isCreditNote,
-  voucherLetter,
-} from '@chirola/shared';
+import { authorizedVoucherStatuses, isCreditNote } from '@chirola/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { breakDownVoucherTaxes, round2, voucherSign } from './voucher-tax-breakdown';
 
 const RATE_21 = 21;
 const RATE_105 = 10.5;
@@ -25,10 +21,6 @@ export interface IvaPosition {
   totalDebit: number;
   totalCredit: number;
   balance: number;
-}
-
-function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 @Injectable()
@@ -85,18 +77,9 @@ export class IvaPositionService {
 
     const debitByRate = new Map<number, number>();
     for (const voucher of vouchers) {
-      const { voucherType } = voucher;
-      if (!discriminatesIva(voucherType) && voucherLetter(voucherType) !== 'B') {
-        continue;
-      }
-      const sign = isCreditNote(voucherType) ? -1 : 1;
-      for (const item of voucher.items) {
-        const rate = Number(item.ivaRate);
-        if (rate === 0) {
-          continue;
-        }
-        const gross = Number(item.subtotal);
-        const iva = gross - gross / (1 + rate / 100);
+      const sign = voucherSign(voucher.voucherType);
+      const { ivaByRate } = breakDownVoucherTaxes(voucher);
+      for (const [rate, iva] of ivaByRate) {
         debitByRate.set(rate, (debitByRate.get(rate) ?? 0) + sign * iva);
       }
     }

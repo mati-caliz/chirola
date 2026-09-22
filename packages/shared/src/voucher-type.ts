@@ -160,3 +160,24 @@ const exportVoucherTypes: readonly number[] = [
 export function isExportVoucher(voucherType: number): boolean {
   return exportVoucherTypes.includes(voucherType);
 }
+
+const creditNoteTypeByVoucherType: Readonly<Record<number, number>> = {
+  [VoucherType.FACTURA_A]: VoucherType.NOTA_CREDITO_A,
+  [VoucherType.NOTA_DEBITO_A]: VoucherType.NOTA_CREDITO_A,
+  [VoucherType.FACTURA_B]: VoucherType.NOTA_CREDITO_B,
+  [VoucherType.NOTA_DEBITO_B]: VoucherType.NOTA_CREDITO_B,
+  [VoucherType.FACTURA_C]: VoucherType.NOTA_CREDITO_C,
+  [VoucherType.NOTA_DEBITO_C]: VoucherType.NOTA_CREDITO_C,
+  [VoucherType.FACTURA_M]: VoucherType.NOTA_CREDITO_M,
+  [VoucherType.NOTA_DEBITO_M]: VoucherType.NOTA_CREDITO_M,
+  [VoucherType.FCE_FACTURA_A]: VoucherType.FCE_NOTA_CREDITO_A,
+  [VoucherType.FCE_NOTA_DEBITO_A]: VoucherType.FCE_NOTA_CREDITO_A,
+  [VoucherType.FCE_FACTURA_B]: VoucherType.FCE_NOTA_CREDITO_B,
+  [VoucherType.FCE_NOTA_DEBITO_B]: VoucherType.FCE_NOTA_CREDITO_B,
+  [VoucherType.FCE_FACTURA_C]: VoucherType.FCE_NOTA_CREDITO_C,
+  [VoucherType.FCE_NOTA_DEBITO_C]: VoucherType.FCE_NOTA_CREDITO_C,
+};
+
+export function creditNoteTypeFor(voucherType: number): number | null {
+  return creditNoteTypeByVoucherType[voucherType] ?? null;
+}

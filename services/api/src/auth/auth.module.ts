@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { CredentialsRateLimitGuard, RefreshRateLimitGuard } from './auth-rate-limit.guards';
 
 @Global()
 @Module({
@@ -18,7 +19,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, CredentialsRateLimitGuard, RefreshRateLimitGuard],
   exports: [JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

@@ -32,6 +32,7 @@ import { IssuersService } from './issuers.service';
 import { CertsService } from '../certs/certs.service';
 import { ArcaParamsService } from './arca-params.service';
 import { ArcaParamCacheService } from './arca-param-cache.service';
+import { ArcaHealthService } from './arca-health.service';
 
 @Controller('issuers')
 @UseGuards(JwtAuthGuard)
@@ -41,6 +42,7 @@ export class IssuersController {
     private readonly certs: CertsService,
     private readonly params: ArcaParamsService,
     private readonly paramCache: ArcaParamCacheService,
+    private readonly arcaHealth: ArcaHealthService,
   ) {}
 
   @Get(':id/params/:paramType')
@@ -52,6 +54,12 @@ export class IssuersController {
   ) {
     const issuer = await this.issuers.getFromUser(id, user.sub);
     return this.paramCache.get(issuer, paramType);
+  }
+
+  @Get(':id/arca-health')
+  async arcaHealthCheck(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    const issuer = await this.issuers.getFromUser(id, user.sub);
+    return this.arcaHealth.check(issuer.environment);
   }
 
   @Get(':id/currencies')

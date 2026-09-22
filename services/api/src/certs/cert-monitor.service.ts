@@ -4,6 +4,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookService } from '../webhooks/webhook.service';
 import { WebhookEvent } from '../webhooks/webhook-events';
+import { PushNotificationService } from '../notifications/push-notification.service';
+import {
+  CERTIFICATE_EXPIRY_PUSH_DAYS,
+  certificateExpiringMessage,
+} from '../notifications/push-messages';
 
 const DEFAULT_WARNING_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -16,6 +21,7 @@ export class CertMonitorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhookService,
+    private readonly push: PushNotificationService,
     config: ConfigService,
   ) {
     this.warningDays = config.get<number>(
@@ -50,6 +56,12 @@ export class CertMonitorService {
           daysToExpiry,
         },
       );
+      if (CERTIFICATE_EXPIRY_PUSH_DAYS.includes(daysToExpiry)) {
+        await this.push.notifyIssuerOwner(
+          certificate.issuerId,
+          certificateExpiringMessage(certificate.issuerId, daysToExpiry),
+        );
+      }
     }
   }
 }
