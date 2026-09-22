@@ -2,6 +2,8 @@ import type {
   ArcaHealth,
   ArcaParam,
   ArcaParamTypeName,
+  DraftAmounts,
+  DraftAmountsInput,
   EmissionPlan,
   PendingVoucherSummary,
   PushTokenInput,
@@ -256,3 +258,6 @@ export const registerPushToken = (body: PushTokenInput) =>
 
 export const removePushToken = (token: string) =>
   apiFetch<void>('/push-tokens', { method: 'DELETE', body: { token } });
+
+export const calculateDraftAmounts = (body: DraftAmountsInput) =>
+  apiFetch<DraftAmounts>('/vouchers/amounts', { method: 'POST', body });

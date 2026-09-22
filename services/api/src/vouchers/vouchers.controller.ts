@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Res,
@@ -10,7 +12,9 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
+  draftAmountsSchema,
   issueVoucherSchema,
+  type DraftAmountsInput,
   type IssueVoucher,
 } from '@chirola/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -19,6 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.service';
 import { VouchersService } from './vouchers.service';
 import { CreditNoteDraftService } from './credit-note-draft.service';
+import { DraftAmountsService } from './draft-amounts.service';
 
 @Controller('vouchers')
 @UseGuards(JwtAuthGuard)
@@ -26,6 +31,7 @@ export class VouchersController {
   constructor(
     private readonly vouchers: VouchersService,
     private readonly creditNoteDrafts: CreditNoteDraftService,
+    private readonly draftAmounts: DraftAmountsService,
   ) {}
 
   @Post()
@@ -44,6 +50,12 @@ export class VouchersController {
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
   ) {
     return this.vouchers.previewForUser(user.sub, body);
+  }
+
+  @Post('amounts')
+  @HttpCode(HttpStatus.OK)
+  amounts(@Body(new ZodValidationPipe(draftAmountsSchema)) body: DraftAmountsInput) {
+    return this.draftAmounts.calculate(body);
   }
 
   @Post('dry-run')

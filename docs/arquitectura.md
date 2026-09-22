@@ -146,7 +146,9 @@ Un dump anterior a la rotación sólo se lee con la clave vieja. El backup offsi
 `POST /api/v1/vouchers/dry-run` consulta `FECompUltimoAutorizado` contra ARCA real y devuelve el
 próximo número sin generar ningún comprobante fiscal. Es la forma de validar un certificado
 productivo sin consumir numeración. La app usa `POST /api/vouchers/dry-run` para mostrar el
-número y el total antes de confirmar. Si falla, igual deja emitir, porque el número lo asigna
+número y el total antes de confirmar, y `POST /api/vouchers/amounts` para el total en vivo
+mientras se cargan ítems: acepta un borrador sin descripciones ni receptor, así que el total
+aparece antes de que el comprobante sea emitible. Si falla, igual deja emitir, porque el número lo asigna
 ARCA al autorizar.
 
 `GET /issuers/:id/arca-health` pregunta `FEDummy` y cachea la respuesta un minuto por entorno,

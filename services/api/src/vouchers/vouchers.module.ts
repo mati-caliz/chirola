@@ -14,6 +14,7 @@ import { PendingVouchersService } from './pending-vouchers.service';
 import { PendingVouchersController } from './pending-vouchers.controller';
 import { V1PendingVouchersController } from './v1-pending-vouchers.controller';
 import { CreditNoteDraftService } from './credit-note-draft.service';
+import { DraftAmountsService } from './draft-amounts.service';
 import { ArcaModule } from '../arca/arca.module';
 import { CertsModule } from '../certs/certs.module';
 import { IssuersModule } from '../issuers/issuers.module';
@@ -48,6 +49,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ExportVouchersService,
     PendingVouchersService,
     CreditNoteDraftService,
+    DraftAmountsService,
   ],
   exports: [VouchersService],
 })

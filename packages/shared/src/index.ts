@@ -94,6 +94,42 @@ export const taxTreatmentName: Record<TaxTreatmentType, string> = {
   UNTAXED: 'No gravado',
 };
 
+const taxTreatmentSchema = z
+  .enum([TaxTreatment.TAXED, TaxTreatment.EXEMPT, TaxTreatment.UNTAXED])
+  .default(TaxTreatment.TAXED);
+
+export const draftAmountsSchema = z.object({
+  voucherType: z.number().int().positive(),
+  items: z.array(
+    z.object({
+      quantity: z.number().nonnegative(),
+      unitPrice: z.number().nonnegative(),
+      ivaRate: z.number().refine((rate) => (ivaRates as readonly number[]).includes(rate)),
+      taxTreatment: taxTreatmentSchema,
+    }),
+  ),
+  tributes: z
+    .array(
+      z.object({
+        id: z.number().int().positive(),
+        taxableBase: z.number().nonnegative(),
+        rate: z.number().nonnegative(),
+      }),
+    )
+    .default([]),
+});
+
+export type DraftAmountsInput = z.infer<typeof draftAmountsSchema>;
+
+export interface DraftAmounts {
+  netAmount: number;
+  ivaAmount: number;
+  exemptAmount: number;
+  untaxedAmount: number;
+  tributeAmount: number;
+  totalAmount: number;
+}
+
 export const itemSchema = z
   .object({
     description: z.string().min(1),
@@ -103,9 +139,7 @@ export const itemSchema = z
       message: 'Alícuota de IVA no soportada',
     }),
 
-    taxTreatment: z
-      .enum([TaxTreatment.TAXED, TaxTreatment.EXEMPT, TaxTreatment.UNTAXED])
-      .default(TaxTreatment.TAXED),
+    taxTreatment: taxTreatmentSchema,
   })
   .superRefine((item, ctx) => {
     if (item.taxTreatment !== TaxTreatment.TAXED && item.ivaRate !== 0) {

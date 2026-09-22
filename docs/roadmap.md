@@ -4,7 +4,7 @@ Lo que falta. El alcance actual está en [`arquitectura.md`](arquitectura.md) y 
 protocolo en [`arca-ampliacion.md`](arca-ampliacion.md); acá no se repite.
 
 El producto está completo del lado del código. Lo que queda depende de cuentas externas o de
-probar en un teléfono, más una deuda de la pantalla de emisión.
+probar en un teléfono.
 
 ## Del dueño
 
@@ -15,10 +15,3 @@ probar en un teléfono, más una deuda de la pantalla de emisión.
 - **Correr la app en un teléfono** contra el backend, apuntando `EXPO_PUBLIC_API_URL` a la LAN.
   Pasa `tsc`, `eslint` y el bundle de Metro, pero la red, el compositor de mail y las hojas de
   compartir nunca se probaron de verdad.
-
-## Deuda
-
-- 🟢 **La pantalla de emisión calcula los totales en el cliente** y pasa las 800 líneas. La
-  confirmación ya usa el `dry-run` del backend, pero el total en vivo mientras se cargan ítems se
-  calcula en la app. Falta mostrarlo con `POST /vouchers/preview`, con debounce, y partir la
-  pantalla en secciones (receptor, ítems, tributos, período).
