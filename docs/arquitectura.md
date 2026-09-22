@@ -1,137 +1,108 @@
 # Arquitectura de Chirola
 
-## Visión
+App mobile para operar ARCA de forma simple, empezando por facturación electrónica. El backend
+intermedio es obligatorio por dos razones: custodia los certificados —que nunca pueden viajar al
+teléfono— y ARCA expone SOAP, que no es algo que se consuma desde un cliente móvil.
 
-App mobile multiplataforma para operar ARCA de forma simple, empezando por facturación
-electrónica. Backend intermedio obligatorio por seguridad (custodia de certificados) y porque
-ARCA expone SOAP, no una API apta para consumir desde un cliente móvil.
+Chirola es además el **backend fiscal de otras apps propias**: respondi y gastronova emiten a
+través de su API v1 en vez de reimplementar WSAA y WSFEv1 cada una.
 
 ## Componentes
 
-### `apps/mobile` — Expo + React Native (TypeScript)
-- Navegación, auth de usuario (JWT contra el backend).
-- Onboarding del certificado (guía + upload del `.crt`).
-- ABM de clientes/receptores.
-- Formulario de emisión (tipo de comprobante, receptor, ítems, IVA) → CAE + PDF/QR.
-- Listado e historial de comprobantes.
+### `apps/mobile` — Expo + React Native
+
+Expo SDK 57 con expo-router, navegación por grupos `(auth)` y `(app)` con guard de sesión en el
+layout raíz. Los datos van con React Query, los tokens en `expo-secure-store` y el cliente
+(`lib/api.ts`) rota el refresh token solo ante un 401. La base se configura con
+`EXPO_PUBLIC_API_URL`.
+
+Las pantallas cubren el ciclo entero: login y registro, alta y detalle de emisores, onboarding
+del certificado (genera el CSR, lo copia y empareja el `.crt`), ABM de clientes, emisión con
+ítems e IVA, y el detalle con CAE, QR y descarga del PDF.
 
 ### `services/api` — NestJS + Prisma + PostgreSQL
-Módulos:
-- `auth` — usuarios de la app (registro/login, JWT + refresh tokens rotativos, logout).
-- `issuers` — datos del contribuyente (CUIT, condición IVA, puntos de venta).
-- `certs` — vault cifrado; generación de CSR; carga del `.crt`.
-- `arca/wsaa` — LTR + firma CMS + cache del TA.
-- `arca/wsfe` — cliente SOAP de WSFEv1 (emisión, numeración, params).
-- `vouchers` — dominio de facturación, persistencia, numeración, PDF + QR.
-- `clients` — ABM de receptores por emisor (rutas anidadas `/issuers/:issuerId/clients`).
+
+| Módulo | Qué hace |
+| :--- | :--- |
+| `auth` | usuarios de la app: JWT de acceso corto y refresh token opaco rotativo |
+| `issuers` | el contribuyente: CUIT, condición frente al IVA, puntos de venta |
+| `certs` | el vault cifrado, la generación del CSR y el emparejamiento del `.crt` |
+| `arca/wsaa` | login ticket, firma CMS y cache del TA |
+| `arca/wsfe` | el cliente SOAP de WSFEv1 |
+| `arca/padron` | consulta de contribuyentes por CUIT |
+| `vouchers` | el dominio fiscal: numeración, emisión, persistencia auditada, PDF y QR |
+| `clients` | receptores por emisor, en rutas anidadas bajo `/issuers/:issuerId/clients` |
 
 ### `packages/shared` — TypeScript + Zod
-Tipos y validaciones compartidas (payloads de emisión, enums de tipos de comprobante/IVA/doc)
-para tener una sola fuente de verdad entre front y back.
 
-## Datos (modelo inicial, Prisma)
-`User`, `Issuer` (1 user → N emisores/CUIT), `Certificate` (por emisor, cifrado),
-`SalesPoint`, `Client`, `Voucher` (con CAE, QR, estado ARCA), `VoucherItem`.
+Los tipos y las validaciones que comparten front y back: payloads de emisión, enums de tipos de
+comprobante, de IVA y de documento. Se definen una sola vez acá.
 
-## Roadmap
+## Modelo de datos
 
-| Fase | Objetivo | Entregable verificable | Estado |
-|------|----------|------------------------|--------|
-| **0** | Scaffolding | Monorepo levanta: `pnpm install`, Postgres en Docker, api arranca. | ✅ Hecho |
-| **1** | WSAA homologación | Backend obtiene y cachea un TA válido con cert de testing. | 🟡 Código listo, sin probar contra ARCA (falta cert homolog.) |
-| **2** | Emitir Factura C | `FECAESolicitar` devuelve CAE en homologación. | 🟡 Flujo completo cableado y verificado local; falta CAE real |
-| **3** | A/B + IVA + NC/ND | Comprobantes discriminando IVA y notas de crédito/débito. | ✅ A/B con IVA discriminado + NC/ND con `CbtesAsoc` |
-| **4** | App end-to-end | Emitir desde el celular contra el backend y ver el CAE. | ✅ App Expo (`apps/mobile`): login → emisores → cert → clientes → emisión → CAE/PDF/QR |
-| **5** | PDF + QR | Comprobante en PDF con QR válido de ARCA. | ✅ QR PNG (`qrcode`) + PDF (`pdfkit`) con QR embebido |
-| **6** | Producción | Onboarding de certs reales y pasaje a endpoints de producción. | ⬜ Pendiente |
+`User`, `Issuer` (un usuario tiene N emisores, uno por CUIT), `Certificate` (por emisor,
+cifrado), `SalesPoint`, `Client`, `Voucher` (con CAE, QR y estado de ARCA) y `VoucherItem`.
+Para el lado servicio: `ApiClient` (un consumidor con su key), `ApiClientIssuer` (a qué emisores
+accede) y `ServiceAuditLog`.
 
-### Backend ya implementado (Fases 1–3 parcial)
-`auth` (JWT + scrypt), `issuers`, `certs` (vault AES-256-GCM), `arca/wsaa`, `arca/wsfe`
-(WSFEv1: CAE, numeración, IVA por alícuota), `vouchers` (orquesta la emisión + QR +
-persistencia auditada, con ownership por usuario). 11 tests unitarios en verde.
+## Las decisiones que conviene conocer
 
-### Onboarding de certificados (implementado)
-`certs` genera el par de claves + CSR en el backend y empareja luego el `.crt` de ARCA:
-- `POST /issuers/:id/csr` → genera clave RSA 2048 + CSR con el subject que exige ARCA
-  (`C=AR, O=<razón social>, CN=<alias>, serialNumber=CUIT <cuit>`), guarda la clave privada
-  cifrada y devuelve el CSR en PEM. La clave privada nunca sale del backend.
-- `PUT /issuers/:id/certificate` → empareja el `.crt` descargado de ARCA con la clave ya
-  guardada, validando que la clave pública del cert coincida con la del par generado.
-- `POST /issuers/:id/certificate` → flujo manual (subir clave+cert propios), como antes.
+### El entorno de ARCA es por emisor, no global
 
-### Alta de emisores desde un API client (implementado)
-El onboarding de certificados descrito arriba vivía sólo detrás de `JwtAuthGuard`, o sea la
-superficie de la app mobile. Un consumidor de la API (respondi) no tenía forma de dar de alta a
-un contribuyente. `V1IssuersController` expone el mismo ciclo bajo `ServiceAuthGuard`:
-`POST /v1/issuers`, `GET /v1/issuers`, `GET /v1/issuers/:id`, `POST /v1/issuers/:id/csr` y
-`PUT /v1/issuers/:id/certificate`.
+`Issuer.environment` es lo que decide si se habla con homologación o con producción, y viaja por
+`AuthContext.environment`. Antes se leía una variable global `ARCA_ENV`, así que toda la
+instancia apuntaba a un solo lado: un certificado productivo contra el WSAA de homologación
+falla con `cms.cert.untrusted`, que parece un problema del certificado y no lo es. Los emisores
+de prueba conviven con los productivos.
 
-**Propiedad del emisor:** `Issuer.userId` es obligatorio y apunta a `User`, pero un `ApiClient` no
-es un usuario. En vez de hacer nullable esa relación y reescribir el aislamiento en todos los
-queries, cada `ApiClient` tiene un **usuario de servicio** implícito
-(`<apiClientId>@service.chirola.internal`) que se crea solo la primera vez y es dueño de los
-emisores dados de alta por API. Ese usuario no puede loguearse: su `password` no tiene el formato
-`scrypt$salt$hash` que exige `verifyPassword`, así que la comparación siempre falla. Como efecto
-secundario, el `@@unique([userId, cuit, environment])` que ya existía pasa a garantizar un emisor
-por CUIT y entorno para cada API client, sin agregar constraints nuevas.
+### El certificado se genera acá, pero el trámite es humano
 
-El paso de ARCA sigue siendo manual e inevitable: el CSR se genera acá, pero alguien tiene que
-llevarlo al sitio de ARCA y volver con el `.crt` firmado. Ninguna API puede saltear ese trámite.
+`POST /issuers/:id/csr` genera la clave RSA 2048 y el CSR con el subject exacto que exige ARCA
+(`C=AR, O=<razón social>, CN=<alias>, serialNumber=CUIT <cuit>`), y guarda la clave privada
+cifrada: **nunca sale del backend**. `PUT /issuers/:id/certificate` empareja el `.crt` que
+devuelve ARCA, validando que la clave pública coincida con la del par generado.
 
-### Lo próximo para avanzar
-1. **Cerrar Fase 1/2 de verdad:** con el onboarding ya listo, falta la parte externa del
-   usuario: subir el CSR a ARCA, descargar el `.crt`, asociar `wsfe` en "Administrador de
-   Relaciones" y registrar el punto de venta. Recién ahí se prueba `POST /vouchers` end-to-end.
-2. **Probar la app en un dispositivo/emulador** apuntando `EXPO_PUBLIC_API_URL` al backend de
-   la LAN, y pulir UX (loading/errores, selección de cliente al facturar).
+Lo que ninguna API puede saltear: alguien tiene que subir el CSR al sitio de ARCA, descargar el
+`.crt`, asociar el servicio `wsfe` en el Administrador de Relaciones y registrar el punto de
+venta.
 
-### App mobile (Fase 4, implementada)
-Expo (SDK 57) + expo-router en `apps/mobile` (`@chirola/mobile`). Navegación por grupos
-`(auth)` / `(app)` con guard de sesión en el layout raíz. Estado de datos con React Query;
-tokens en `expo-secure-store`; cliente API (`lib/api.ts`) con `Authorization: Bearer` y
-**rotación automática del refresh token** en 401. Reutiliza los schemas de `@chirola/shared`.
-Pantallas: login/registro → lista/alta de emisores → detalle → onboarding de certificado
-(genera CSR, lo copia, empareja el `.crt`) → ABM de clientes → emisión de comprobante
-(ítems + IVA + receptor) → detalle con CAE, QR (PNG del backend) y descarga/compartir del PDF
-(`expo-file-system` + `expo-sharing`). Base URL configurable con `EXPO_PUBLIC_API_URL`
-(default `http://localhost:3000/api`). Verificado: `tsc --noEmit`, `eslint` y bundle de Metro
-(`expo export`, 1664 módulos) en verde. Falta correrla en un device real contra el backend.
+### Un API client no es un usuario
 
-### Auth: refresh tokens + logout (implementado)
-- Access token JWT de corta duración (`JWT_ACCESS_TTL`, default `1h`).
-- Refresh token opaco (base64url) guardado **hasheado** (sha256) en `RefreshToken`,
-  con vencimiento (`REFRESH_TOKEN_TTL_DAYS`, default 30 días).
-- `POST /auth/refresh` rota el token: revoca el usado y emite un par nuevo (reuso → 401).
-- `POST /auth/logout` revoca el refresh token (idempotente).
-- `register`/`login` ahora devuelven `{ token, refreshToken, user }`.
+`Issuer.userId` es obligatorio, pero un `ApiClient` no puede ser un `User`. Cada API client tiene
+entonces un **usuario de servicio** implícito (`<apiClientId>@service.chirola.internal`) que se
+crea solo la primera vez y es dueño de los emisores dados de alta por API. No puede loguearse:
+su `password` no tiene el formato `scrypt$salt$hash` que exige `verifyPassword`, así que la
+comparación siempre falla. Como efecto secundario, el `@@unique([userId, cuit, environment])`
+que ya existía garantiza un emisor por CUIT y entorno para cada API client, sin constraints
+nuevas.
 
-### Módulo `clients` (implementado)
-ABM de receptores por emisor, con rutas anidadas y ownership vía `IssuersService`:
-`POST/GET /issuers/:issuerId/clients`, `GET/PATCH/DELETE /issuers/:issuerId/clients/:id`.
-Unique `(issuerId, docType, docNumber)` → 409 en duplicados; validación de CUIT/CUIL (11 dígitos)
-en `@chirola/shared`. Aislamiento entre usuarios verificado (otro user → 403).
+### Emitir tiene tres desenlaces, no dos
 
-### PDF + QR PNG (Fase 5, implementado)
-- `vouchers/qr-image.util.ts` — `renderQrPng` (lib `qrcode`) sobre la URL del QR;
-  `recipientFromQr` decodifica el receptor del payload canónico de AFIP.
-- `vouchers/pdf.util.ts` — `renderVoucherPdf` (lib `pdfkit`): A4 con letra A/B/C,
-  emisor, receptor, tabla de ítems (formato es-AR), totales, comprobantes asociados, CAE +
-  vencimiento y el QR embebido.
-- Endpoints: `GET /vouchers/:id/qr.png` (image/png) y `GET /vouchers/:id/pdf`
-  (application/pdf). El Content-Type se fija recién con el buffer listo para que los errores
-  sigan devolviendo JSON.
+Éxito, `ArcaRejectionError` (rechazo real de ARCA) y `VoucherQueuedException`, que sale como HTTP
+503 con `status: "PENDIENTE"` y un `pendingVoucherId`. **El tercero no es un error**: significa
+encolado, y `VoucherRetryScheduler` reintenta. Tratarlo como fallo lleva a refacturar algo que ya
+se emitió. La emisión toma un lock por emisor para que dos pedidos simultáneos no consuman dos
+números, y es idempotente por clave de request.
 
-### Notas de crédito/débito (Fase 3, implementado)
-Las NC/ND (tipos 2/3/7/8/12/13) aceptan `associatedVouchers` en el payload de emisión y
-se serializan como `<ar:CbtesAsoc>` en WSFEv1 (después de `CondicionIVAReceptorId`, antes de
-`Iva`, según el orden del XSD). El schema exige al menos un asociado para NC/ND (400 si falta).
-Cada `CbteAsoc` lleva `Tipo/PtoVta/Nro` y, opcionalmente, `Cuit` y `CbteFch`. Los asociados se
-persisten en `Voucher.associatedVouchers` (JSON) para auditoría.
+### Notas de crédito y débito
 
-## Decisiones tomadas
-- Mobile: **Expo/React Native**.
-- Backend: **Node.js + TypeScript (NestJS)**.
-- ARCA auth: **self-host WSAA** (control total, sin terceros).
-- MVP: **facturación completa** (A/B/C + notas de crédito/débito).
+Las NC/ND aceptan `associatedVouchers` y se serializan como `<ar:CbtesAsoc>`, que en el XSD de
+WSFEv1 va **después** de `CondicionIVAReceptorId` y **antes** de `Iva`: fuera de ese orden ARCA
+rechaza el XML. El schema exige al menos un asociado, y los asociados se persisten en
+`Voucher.associatedVouchers` para auditoría.
 
-Ver detalle de la integración fiscal en [`arca-integracion.md`](arca-integracion.md).
+### Auth
+
+Access token JWT corto (`JWT_ACCESS_TTL`, por defecto 1 h) y refresh token opaco guardado
+hasheado con sha256 (`REFRESH_TOKEN_TTL_DAYS`, 30 días). `POST /auth/refresh` **rota**: revoca el
+usado y emite un par nuevo, así que reusar uno viejo da 401. `POST /auth/logout` es idempotente.
+
+## Verificar sin emitir
+
+`POST /api/v1/vouchers/dry-run` consulta `FECompUltimoAutorizado` contra ARCA real y devuelve el
+próximo número sin generar ningún comprobante fiscal. Es la forma de validar un certificado
+productivo sin consumir numeración.
+
+El detalle del protocolo está en [`arca-integracion.md`](arca-integracion.md) y la cobertura
+actual de WSFEv1 en [`arca-ampliacion.md`](arca-ampliacion.md). Lo que falta, en
+[`roadmap.md`](roadmap.md).
