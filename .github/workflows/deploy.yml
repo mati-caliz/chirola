@@ -1,9 +1,9 @@
 name: Deploy
 
+# Sin disparador por push: el deploy se hace local en el VPS con docker compose.
+# Cada corrida acá gastaba minutos de Actions para, casi siempre, entrar por SSH y
+# descubrir que el repo del box ya estaba en el commit pusheado y no rebuildear nada.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
