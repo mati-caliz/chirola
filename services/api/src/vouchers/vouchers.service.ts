@@ -206,6 +206,8 @@ export class VouchersService {
         status: true,
         cae: true,
         totalAmount: true,
+        currency: true,
+        recipientName: true,
         salesPoint: { select: { number: true } },
         client: { select: { legalName: true, docNumber: true } },
       },

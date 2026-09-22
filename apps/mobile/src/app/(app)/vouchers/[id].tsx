@@ -1,27 +1,16 @@
-import { useState } from 'react';
-import { Eye, Share2 } from 'lucide-react-native';
 import { ScrollView, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { documentTypeName, voucherTypeName } from '@chirola/shared';
+import { documentTypeName, isAuthorizedStatus, LOCAL_CURRENCY, voucherTypeName } from '@chirola/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Amount, Banner, Button, Card, Divider, Loading, StatusBadge } from '@/components/ds';
+import { Amount, Banner, Card, Divider, Loading, StatusBadge } from '@/components/ds';
 import { apiFetchBase64 } from '@/lib/api';
 import { getVoucher, type VoucherDetail } from '@/lib/resources';
 import { formatCurrency, formatDate, formatVoucherNumber } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
-import { type StatusKey } from '@/theme/tokens';
-
-function toStatusKey(status: string, hasCae: boolean): StatusKey {
-  const value = status.toLowerCase();
-  if (value.includes('observ')) return 'observado';
-  if (hasCae) return 'aprobado';
-  if (value.includes('rechaz') || value.includes('reject')) return 'rechazado';
-  return 'pendiente';
-}
+import { voucherStatusKey } from '@/lib/voucher-status';
+import { VoucherActions } from '@/components/vouchers/VoucherActions';
 
 function observationsText(data: VoucherDetail): string {
   const observations = data.arcaObservations ?? [];
@@ -36,43 +25,18 @@ function observationsText(data: VoucherDetail): string {
 export default function VoucherDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const { data, isLoading, isError } = useQuery({
     queryKey: ['voucher', id],
     queryFn: () => getVoucher(id),
   });
 
-  const authorized = Boolean(data?.cae);
+  const authorized = Boolean(data?.cae) && isAuthorizedStatus(data?.status ?? '');
 
   const { data: qrBase64 } = useQuery({
     queryKey: ['voucher-qr', id],
     queryFn: () => apiFetchBase64(`/vouchers/${id}/qr.png`),
     enabled: authorized,
   });
-
-  const downloadPdf = async () => {
-    setError(null);
-    setDownloading(true);
-    try {
-      const base64 = await apiFetchBase64(`/vouchers/${id}/pdf`);
-      const file = new File(Paths.cache, `voucher-${id}.pdf`);
-      try {
-        file.write(base64, { encoding: 'base64' });
-      } catch {
-        file.delete();
-        file.write(base64, { encoding: 'base64' });
-      }
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo generar el PDF.');
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   if (isLoading) return <Loading />;
   if (isError || !data) {
@@ -90,8 +54,11 @@ export default function VoucherDetailScreen() {
 
   const name = voucherTypeName[data.voucherType] ?? `Tipo ${data.voucherType}`;
   const number = formatVoucherNumber(data.salesPoint.number, data.number);
-  const status = toStatusKey(data.status, authorized);
-  const clientName = data.client?.legalName ?? 'Consumidor final';
+  const status = voucherStatusKey(data.status);
+  const clientName = data.recipientName ?? data.client?.legalName ?? 'Consumidor final';
+  const recipientDocType = data.recipientDocType ?? data.client?.docType ?? null;
+  const recipientDocNumber = data.recipientDocNumber ?? data.client?.docNumber ?? null;
+  const money = (value: string) => formatCurrency(Number(value), data.currency);
 
   return (
     <>
@@ -108,7 +75,7 @@ export default function VoucherDetailScreen() {
                 {clientName} · {formatDate(data.voucherDate)}
               </Text>
               <View style={{ marginVertical: 10 }}>
-                <Amount value={formatCurrency(Number(data.totalAmount))} size="xl" />
+                <Amount value={money(data.totalAmount)} size="xl" />
               </View>
               {authorized && qrBase64 ? (
                 <Image
@@ -151,18 +118,21 @@ export default function VoucherDetailScreen() {
                   {Number(item.quantity)} × {item.description}
                 </Text>
                 <Text style={{ fontFamily: theme.font.monoRegular, fontSize: theme.fontSize.callout, color: theme.colors.textPrimary }}>
-                  {formatCurrency(Number(item.subtotal))}
+                  {money(item.subtotal)}
                 </Text>
               </View>
             ))}
             <Divider />
             <View style={{ height: 8 }} />
-            <TotalRow label="Neto" value={formatCurrency(Number(data.netAmount))} />
-            <TotalRow label="IVA" value={formatCurrency(Number(data.ivaAmount))} />
-            <TotalRow label="Total" value={formatCurrency(Number(data.totalAmount))} bold />
+            <TotalRow label="Neto" value={money(data.netAmount)} />
+            <TotalRow label="IVA" value={money(data.ivaAmount)} />
+            <TotalRow label="Total" value={money(data.totalAmount)} bold />
+            {data.currency !== LOCAL_CURRENCY ? (
+              <TotalRow label="Cotización" value={Number(data.exchangeRate).toLocaleString('es-AR')} />
+            ) : null}
           </Card>
 
-          {data.client ? (
+          {recipientDocNumber ? (
             <Card>
               <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.micro, letterSpacing: 0.66, textTransform: 'uppercase', color: theme.colors.textTertiary, marginBottom: 8 }}>
                 Receptor
@@ -171,27 +141,17 @@ export default function VoucherDetailScreen() {
                 {clientName}
               </Text>
               <Text style={{ fontFamily: theme.font.monoRegular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary }}>
-                {documentTypeName[data.client.docType] ?? data.client.docType} {data.client.docNumber}
+                {recipientDocType === null ? '' : (documentTypeName[recipientDocType] ?? recipientDocType)} {recipientDocNumber}
               </Text>
+              {data.client?.email ? (
+                <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary }}>
+                  {data.client.email}
+                </Text>
+              ) : null}
             </Card>
           ) : null}
 
-          {error ? <Banner kind="error" title="No se pudo generar el PDF" body={error} /> : null}
-
-          {authorized ? (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Button variant="secondary" full loading={downloading} icon={<Share2 size={18} color={theme.colors.actionSecondaryText} strokeWidth={2} />} onPress={downloadPdf}>
-                  Enviar
-                </Button>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button variant="secondary" full icon={<Eye size={18} color={theme.colors.actionSecondaryText} strokeWidth={2} />} onPress={downloadPdf}>
-                  Ver PDF
-                </Button>
-              </View>
-            </View>
-          ) : null}
+          {authorized ? <VoucherActions voucher={data} /> : null}
         </ScrollView>
       </SafeAreaView>
     </>

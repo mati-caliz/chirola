@@ -8,6 +8,7 @@ import { getIvaPosition, getVencimientos, type VencimientoStatus } from '@/lib/r
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 import { type StatusKey } from '@/theme/tokens';
+import { SalesBookCard } from '@/components/fiscal/SalesBookCard';
 
 const now = new Date();
 const currentYear = now.getFullYear();
@@ -93,6 +94,8 @@ export default function FiscalScreen() {
             <PositionRow label="IVA crédito (compras)" value={formatCurrency(position.data.totalCredit)} theme={theme} />
           </Card>
         ) : null}
+
+        <SalesBookCard issuerId={activeIssuerId} year={currentYear} month={currentMonth} monthLabel={monthLabel} />
 
         <View style={{ marginTop: 4 }}>
           <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.micro, letterSpacing: 0.66, textTransform: 'uppercase', color: theme.colors.textTertiary, marginBottom: 8 }}>

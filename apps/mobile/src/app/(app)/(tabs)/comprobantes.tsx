@@ -11,6 +11,8 @@ import { listVouchers, type VoucherSummary } from '@/lib/resources';
 import { formatCurrency, formatDate, formatVoucherNumber } from '@/lib/format';
 import { useTheme } from '@/hooks/use-theme';
 import { type StatusKey } from '@/theme/tokens';
+import { voucherStatusKey } from '@/lib/voucher-status';
+import { PendingVouchersSection } from '@/components/vouchers/PendingVouchersSection';
 
 const filters: { id: 'todos' | StatusKey; label: string }[] = [
   { id: 'todos', label: 'Todos' },
@@ -19,13 +21,8 @@ const filters: { id: 'todos' | StatusKey; label: string }[] = [
   { id: 'rechazado', label: 'Rechazados' },
 ];
 
-function toStatusKey(status: string, hasCae: boolean): StatusKey {
-  if (hasCae) return 'aprobado';
-  const value = status.toLowerCase();
-  if (value.includes('rechaz') || value.includes('reject')) return 'rechazado';
-  if (value.includes('observ')) return 'observado';
-  return 'pendiente';
-}
+const recipientLabel = (voucher: VoucherSummary) =>
+  voucher.recipientName ?? voucher.client?.legalName ?? voucher.client?.docNumber ?? 'Consumidor final';
 
 export default function ComprobantesScreen() {
   const theme = useTheme();
@@ -43,12 +40,11 @@ export default function ComprobantesScreen() {
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (data ?? []).filter((voucher) => {
-      const status = toStatusKey(voucher.status, Boolean(voucher.cae));
+      const status = voucherStatusKey(voucher.status);
       if (filter !== 'todos' && status !== filter) return false;
       if (!query) return true;
       const number = formatVoucherNumber(voucher.salesPoint.number, voucher.number);
-      const client = voucher.client?.legalName ?? voucher.client?.docNumber ?? '';
-      return number.includes(query) || client.toLowerCase().includes(query);
+      return number.includes(query) || recipientLabel(voucher).toLowerCase().includes(query);
     });
   }, [data, filter, search]);
 
@@ -90,15 +86,20 @@ export default function ComprobantesScreen() {
           />
         </View>
       ) : rows.length === 0 ? (
-        <EmptyState
-          icon={(p) => <FileText {...p} strokeWidth={1.75} />}
-          title={data && data.length > 0 ? 'Sin resultados' : 'Todavía no hay comprobantes'}
-          body={
-            data && data.length > 0
-              ? 'Probá con otro filtro o búsqueda.'
-              : 'Cuando emitas una factura, la vas a ver acá con su estado y CAE.'
-          }
-        />
+        <>
+          <View style={{ paddingHorizontal: theme.spacing.screenPad, paddingTop: theme.spacing.stackGap }}>
+            <PendingVouchersSection issuerId={activeIssuerId} />
+          </View>
+          <EmptyState
+            icon={(p) => <FileText {...p} strokeWidth={1.75} />}
+            title={data && data.length > 0 ? 'Sin resultados' : 'Todavía no hay comprobantes'}
+            body={
+              data && data.length > 0
+                ? 'Probá con otro filtro o búsqueda.'
+                : 'Cuando emitas una factura, la vas a ver acá con su estado y CAE.'
+            }
+          />
+        </>
       ) : (
         <FlatList
           data={rows}
@@ -107,6 +108,7 @@ export default function ComprobantesScreen() {
           showsVerticalScrollIndicator={false}
           refreshing={isRefetching}
           onRefresh={refetch}
+          ListHeaderComponent={<PendingVouchersSection issuerId={activeIssuerId} />}
           renderItem={({ item }) => (
             <VoucherRow voucher={item} onPress={() => router.push(`/(app)/vouchers/${item.id}`)} />
           )}
@@ -120,8 +122,8 @@ const VoucherRow = ({ voucher, onPress }: { voucher: VoucherSummary; onPress: ()
   const theme = useTheme();
   const name = voucherTypeName[voucher.voucherType] ?? `Tipo ${voucher.voucherType}`;
   const number = formatVoucherNumber(voucher.salesPoint.number, voucher.number);
-  const status = toStatusKey(voucher.status, Boolean(voucher.cae));
-  const client = voucher.client?.legalName ?? voucher.client?.docNumber ?? 'Consumidor final';
+  const status = voucherStatusKey(voucher.status);
+  const client = recipientLabel(voucher);
   return (
     <Card onPress={onPress}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -137,7 +139,7 @@ const VoucherRow = ({ voucher, onPress }: { voucher: VoucherSummary; onPress: ()
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 6 }}>
-          <Amount value={formatCurrency(Number(voucher.totalAmount))} size="sm" />
+          <Amount value={formatCurrency(Number(voucher.totalAmount), voucher.currency)} size="sm" />
           <StatusBadge status={status} size="sm" />
         </View>
       </View>

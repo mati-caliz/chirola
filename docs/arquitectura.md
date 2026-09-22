@@ -11,14 +11,19 @@ través de su API v1 en vez de reimplementar WSAA y WSFEv1 cada una.
 
 ### `apps/mobile` — Expo + React Native
 
-Expo SDK 57 con expo-router, navegación por grupos `(auth)` y `(app)` con guard de sesión en el
+Expo SDK 54 con expo-router, navegación por grupos `(auth)` y `(app)` con guard de sesión en el
 layout raíz. Los datos van con React Query, los tokens en `expo-secure-store` y el cliente
 (`lib/api.ts`) rota el refresh token solo ante un 401. La base se configura con
 `EXPO_PUBLIC_API_URL`.
 
 Las pantallas cubren el ciclo entero: login y registro, alta y detalle de emisores, onboarding
 del certificado (genera el CSR, lo copia y empareja el `.crt`), ABM de clientes, emisión con
-ítems e IVA, y el detalle con CAE, QR y descarga del PDF.
+ítems e IVA, el detalle con CAE y QR, el envío del PDF por mail o por cualquier app, la nota de
+crédito desde el detalle, la cola de comprobantes sin CAE y el Libro IVA Ventas del mes.
+
+El mail sale del teléfono con `expo-mail-composer`, desde la cuenta de quien factura, y no
+desde un servidor de Chirola: el comprobante lo manda el emisor, y así no hay SMTP propio que
+mantener ni reputación de dominio que cuidar.
 
 ### `services/api` — NestJS + Prisma + PostgreSQL
 
@@ -32,6 +37,8 @@ del certificado (genera el CSR, lo copia y empareja el `.crt`), ABM de clientes,
 | `arca/padron` | consulta de contribuyentes por CUIT |
 | `vouchers` | el dominio fiscal: numeración, emisión, persistencia auditada, PDF y QR |
 | `clients` | receptores por emisor, en rutas anidadas bajo `/issuers/:issuerId/clients` |
+| `fiscal` | posición de IVA, vencimientos y Libro IVA Ventas (JSON y CSV) |
+| `notifications` | tokens de push por usuario y envío por el servicio de Expo |
 
 ### `packages/shared` — TypeScript + Zod
 
@@ -42,6 +49,9 @@ comprobante, de IVA y de documento. Se definen una sola vez acá.
 
 `User`, `Issuer` (un usuario tiene N emisores, uno por CUIT), `Certificate` (por emisor,
 cifrado), `SalesPoint`, `Client`, `Voucher` (con CAE, QR y estado de ARCA) y `VoucherItem`.
+`Voucher` guarda el documento y el nombre del receptor tal como se emitió, y se vincula con el
+`Client` del mismo documento si existe; los comprobantes anteriores a 2026-09-22 no tienen esas
+columnas y el receptor se lee del QR.
 Para el lado servicio: `ApiClient` (un consumidor con su key), `ApiClientIssuer` (a qué emisores
 accede) y `ServiceAuditLog`.
 
@@ -84,6 +94,12 @@ encolado, y `VoucherRetryScheduler` reintenta. Tratarlo como fallo lleva a refac
 se emitió. La emisión toma un lock por emisor para que dos pedidos simultáneos no consuman dos
 números, y es idempotente por clave de request.
 
+Lo encolado se ve en `GET /issuers/:issuerId/pending-vouchers`. Sólo un comprobante `FAILED` se
+puede reintentar o descartar: uno `PENDING` puede estar en pleno reintento y ya tener CAE en
+ARCA, y descartarlo dejaría un comprobante autorizado sin registrar. El reintento manual pasa
+por el mismo camino que el automático, que primero consulta si ARCA ya había autorizado el
+número intentado.
+
 ### Notas de crédito y débito
 
 Las NC/ND aceptan `associatedVouchers` y se serializan como `<ar:CbtesAsoc>`, que en el XSD de
@@ -91,17 +107,50 @@ WSFEv1 va **después** de `CondicionIVAReceptorId` y **antes** de `Iva`: fuera d
 rechaza el XML. El schema exige al menos un asociado, y los asociados se persisten en
 `Voucher.associatedVouchers` para auditoría.
 
+`GET /vouchers/:id/credit-note-draft` arma en el backend la NC de la misma letra con el asociado,
+el receptor y los ítems del original. Los otros tributos no se copian: se guardan como
+descripción e importe, sin la base ni la alícuota que pide la emisión.
+
 ### Auth
 
 Access token JWT corto (`JWT_ACCESS_TTL`, por defecto 1 h) y refresh token opaco guardado
 hasheado con sha256 (`REFRESH_TOKEN_TTL_DAYS`, 30 días). `POST /auth/refresh` **rota**: revoca el
 usado y emite un par nuevo, así que reusar uno viejo da 401. `POST /auth/logout` es idempotente.
 
+`register` y `login` cortan con 429 después de 10 intentos por email cada 15 minutos, y
+`refresh` después de 60 por IP. Se cuenta por email porque la API no tiene ruta pública y la IP
+que ve es la del contenedor que llama. Si se publica detrás de `proxy-nginx`, hay que definir
+`TRUST_PROXY=172.19.0.254`, que es la IP fija del proxy en `shared-nginx`. Confiar en toda la
+subred no sirve, porque cualquier otro contenedor de esa red podría falsificar
+`X-Forwarded-For`.
+
+### Rotar `CERT_ENCRYPTION_KEY`
+
+La clave cifra las claves privadas de los certificados. Para cambiarla:
+
+1. Generar la nueva con `openssl rand -base64 32` y agregarla al `.env` como
+   `CERT_ENCRYPTION_KEY_NEW`, sin tocar la actual.
+2. Frenar la API (`docker compose -f docker-compose.prod.yml stop api`): mientras corre con la
+   clave vieja, no puede leer lo que ya se recifró.
+3. Simular: `run --rm --build api-tools ./node_modules/.bin/ts-node scripts/rotate-cert-encryption-key.ts`.
+   Descifra cada clave con la actual y la recifra con la nueva, sin escribir.
+4. Aplicar con `--apply`, que escribe todo en una sola transacción.
+5. En el `.env`, reemplazar `CERT_ENCRYPTION_KEY` por el valor nuevo, borrar
+   `CERT_ENCRYPTION_KEY_NEW` y levantar la API.
+
+Un dump anterior a la rotación sólo se lee con la clave vieja. El backup offsite guarda el
+`.env` de cada día junto con su dump, así que una restauración usa la clave de ese mismo día.
+
 ## Verificar sin emitir
 
 `POST /api/v1/vouchers/dry-run` consulta `FECompUltimoAutorizado` contra ARCA real y devuelve el
 próximo número sin generar ningún comprobante fiscal. Es la forma de validar un certificado
-productivo sin consumir numeración.
+productivo sin consumir numeración. La app usa `POST /api/vouchers/dry-run` para mostrar el
+número y el total antes de confirmar. Si falla, igual deja emitir, porque el número lo asigna
+ARCA al autorizar.
+
+`GET /issuers/:id/arca-health` pregunta `FEDummy` y cachea la respuesta un minuto por entorno,
+para que abrir la pantalla de emisión no le pegue a ARCA cada vez.
 
 El detalle del protocolo está en [`arca-integracion.md`](arca-integracion.md) y la cobertura
 actual de WSFEv1 en [`arca-ampliacion.md`](arca-ampliacion.md). Lo que falta, en

@@ -1,13 +1,18 @@
 import type {
+  ArcaHealth,
   ArcaParam,
   ArcaParamTypeName,
+  EmissionPlan,
+  PendingVoucherSummary,
+  PushTokenInput,
+  SalesBook,
   UpdateClient,
   CreateClient,
   CreateIssuer,
   IssueVoucher,
   TaxpayerInfo,
 } from '@chirola/shared';
-import { apiFetch } from './api';
+import { apiFetch, apiFetchBase64 } from './api';
 
 export interface Issuer {
   id: string;
@@ -59,6 +64,7 @@ export interface VoucherObservation {
 
 export interface VoucherDetail {
   id: string;
+  issuerId: string;
   voucherType: number;
   number: number;
   voucherDate: string;
@@ -67,11 +73,15 @@ export interface VoucherDetail {
   ivaAmount: string;
   totalAmount: string;
   currency: string;
+  exchangeRate: string;
   status: string;
   cae: string | null;
   caeExpiration: string | null;
   qrData: string | null;
   arcaObservations: VoucherObservation[] | null;
+  recipientDocType: number | null;
+  recipientDocNumber: string | null;
+  recipientName: string | null;
   items: VoucherItem[];
   salesPoint: { number: number };
   issuer: { legalName: string; cuit: string };
@@ -86,6 +96,8 @@ export interface VoucherSummary {
   status: string;
   cae: string | null;
   totalAmount: string;
+  currency: string;
+  recipientName: string | null;
   salesPoint: { number: number };
   client: { legalName: string | null; docNumber: string } | null;
 }
@@ -211,3 +223,36 @@ export const issueVoucher = (body: IssueVoucher) =>
 
 export const getVoucher = (id: string) =>
   apiFetch<VoucherDetail>(`/vouchers/${id}`);
+
+export const dryRunVoucher = (body: IssueVoucher) =>
+  apiFetch<EmissionPlan>('/vouchers/dry-run', { method: 'POST', body });
+
+export const getCreditNoteDraft = (voucherId: string) =>
+  apiFetch<IssueVoucher>(`/vouchers/${voucherId}/credit-note-draft`);
+
+export const listPendingVouchers = (issuerId: string) =>
+  apiFetch<PendingVoucherSummary[]>(`/issuers/${issuerId}/pending-vouchers`);
+
+export const retryPendingVoucher = (issuerId: string, id: string) =>
+  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}/retry`, { method: 'POST' });
+
+export const discardPendingVoucher = (issuerId: string, id: string) =>
+  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}`, { method: 'DELETE' });
+
+const periodQuery = (issuerId: string, year: number, month: number) =>
+  `issuerId=${issuerId}&year=${year}&month=${month}`;
+
+export const getSalesBook = (issuerId: string, year: number, month: number) =>
+  apiFetch<SalesBook>(`/fiscal/sales-book?${periodQuery(issuerId, year, month)}`);
+
+export const downloadSalesBookCsv = (issuerId: string, year: number, month: number) =>
+  apiFetchBase64(`/fiscal/sales-book/csv?${periodQuery(issuerId, year, month)}`);
+
+export const getArcaHealth = (issuerId: string) =>
+  apiFetch<ArcaHealth>(`/issuers/${issuerId}/arca-health`);
+
+export const registerPushToken = (body: PushTokenInput) =>
+  apiFetch<void>('/push-tokens', { method: 'POST', body });
+
+export const removePushToken = (token: string) =>
+  apiFetch<void>('/push-tokens', { method: 'DELETE', body: { token } });

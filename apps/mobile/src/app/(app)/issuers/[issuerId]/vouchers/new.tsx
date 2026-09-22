@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArcaParamType,
   discriminatesIva,
@@ -24,6 +24,8 @@ import {
   VoucherConcept,
   VoucherType,
   voucherTypeName,
+  type IssueVoucher,
+  type Item,
   type TaxTreatmentType,
   type TransmissionTypeName,
   type VoucherConceptType,
@@ -39,10 +41,18 @@ import {
   Chip,
   Input,
   ListItem,
+  Loading,
   Segmented,
   Select,
 } from '@/components/ds';
+import { ArcaHealthBanner } from '@/components/vouchers/ArcaHealthBanner';
+import { ConfirmEmissionSheet } from '@/components/vouchers/ConfirmEmissionSheet';
+import { QueuedEmissionScreen } from '@/components/vouchers/QueuedEmissionScreen';
+import { pendingVouchersQueryKey } from '@/components/vouchers/PendingVouchersSection';
+import { ApiError } from '@/lib/api';
 import {
+  dryRunVoucher,
+  getCreditNoteDraft,
   getExchangeRate,
   issueVoucher,
   listArcaParams,
@@ -81,6 +91,17 @@ const newItem = (): ItemForm => ({
   ivaRate: DEFAULT_IVA_RATE,
   taxTreatment: TaxTreatment.TAXED,
 });
+
+const toItemForm = (item: Item): ItemForm => ({
+  description: item.description,
+  quantity: String(item.quantity),
+  unitPrice: String(item.unitPrice),
+  ivaRate: item.ivaRate,
+  taxTreatment: item.taxTreatment,
+});
+
+const HTTP_SERVICE_UNAVAILABLE = 503;
+const CREDIT_NOTE_HINT = 'Anula el comprobante original';
 
 const newTribute = (): TributeForm => ({
   id: TributeType.PROVINCIAL,
@@ -149,28 +170,74 @@ const round2 = (value: number): number =>
 
 export default function NewVoucherScreen() {
   const theme = useTheme();
-  const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
-  const router = useRouter();
+  const { issuerId, creditNoteFor } = useLocalSearchParams<{
+    issuerId: string;
+    creditNoteFor?: string;
+  }>();
+  const draft = useQuery({
+    queryKey: ['credit-note-draft', creditNoteFor],
+    queryFn: () => getCreditNoteDraft(creditNoteFor as string),
+    enabled: Boolean(creditNoteFor),
+  });
 
-  const [voucherType, setVoucherType] = useState<number>(VoucherType.FACTURA_B);
-  const [salesPoint, setSalesPoint] = useState('1');
-  const [concept, setConcept] = useState<VoucherConceptType>(VoucherConcept.PRODUCTS);
-  const [servicePeriod, setServicePeriod] = useState(currentMonthPeriod);
-  const [paymentDueDate, setPaymentDueDate] = useState(todayIso);
+  if (!creditNoteFor) {
+    return <VoucherForm issuerId={issuerId} draft={null} />;
+  }
+  if (draft.isLoading) {
+    return <Loading />;
+  }
+  if (!draft.data) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp, padding: 20 }}>
+        <Stack.Screen options={{ title: 'Nota de crédito' }} />
+        <Banner
+          kind="error"
+          title="No se puede anular este comprobante"
+          body={draft.error?.message ?? 'No pudimos armar la nota de crédito.'}
+        />
+      </SafeAreaView>
+    );
+  }
+  return <VoucherForm issuerId={issuerId} draft={draft.data} />;
+}
+
+function VoucherForm({ issuerId, draft }: { issuerId: string; draft: IssueVoucher | null }) {
+  const theme = useTheme();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [voucherType, setVoucherType] = useState<number>(
+    draft?.voucherType ?? VoucherType.FACTURA_B,
+  );
+  const [salesPoint, setSalesPoint] = useState(draft ? String(draft.salesPoint) : '1');
+  const [concept, setConcept] = useState<VoucherConceptType>(
+    draft?.concept ?? VoucherConcept.PRODUCTS,
+  );
+  const [servicePeriod, setServicePeriod] = useState(
+    () => draft?.servicePeriod ?? currentMonthPeriod(),
+  );
+  const [paymentDueDate, setPaymentDueDate] = useState(() => draft?.paymentDueDate ?? todayIso());
   const [transmissionType, setTransmissionType] = useState<TransmissionTypeName>(
     TransmissionType.OPEN_CIRCULATION,
   );
-  const [docType, setDocType] = useState<number>(DocumentType.CONSUMIDOR_FINAL);
-  const [docNumber, setDocNumber] = useState('0');
-  const [legalName, setLegalName] = useState('');
+  const [docType, setDocType] = useState<number>(
+    draft?.recipient.docType ?? DocumentType.CONSUMIDOR_FINAL,
+  );
+  const [docNumber, setDocNumber] = useState(draft?.recipient.docNumber ?? '0');
+  const [legalName, setLegalName] = useState(draft?.recipient.legalName ?? '');
   const [recipientIvaConditionId, setRecipientIvaConditionId] = useState<number | null>(
     null,
   );
-  const [currency, setCurrency] = useState(LOCAL_CURRENCY);
-  const [exchangeRate, setExchangeRate] = useState(String(LOCAL_EXCHANGE_RATE));
-  const [items, setItems] = useState<ItemForm[]>([newItem()]);
+  const [currency, setCurrency] = useState(draft?.currency ?? LOCAL_CURRENCY);
+  const [exchangeRate, setExchangeRate] = useState(
+    String(draft?.exchangeRate ?? LOCAL_EXCHANGE_RATE),
+  );
+  const [items, setItems] = useState<ItemForm[]>(() =>
+    draft ? draft.items.map(toItemForm) : [newItem()],
+  );
   const [tributes, setTributes] = useState<TributeForm[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
   const [sheet, setSheet] = useState<'tipo' | 'pdv' | 'moneda' | 'confirm' | null>(null);
 
   const { data: clients } = useQuery({
@@ -195,12 +262,22 @@ export default function NewVoucherScreen() {
 
   const mutation = useMutation({
     mutationFn: issueVoucher,
-    onSuccess: (res) => router.replace(`/(app)/vouchers/${res.id}`),
+    onSuccess: (res) => {
+      void queryClient.invalidateQueries({ queryKey: ['vouchers', issuerId] });
+      router.replace(`/(app)/vouchers/${res.id}`);
+    },
     onError: (e) => {
       setSheet(null);
+      if (e instanceof ApiError && e.status === HTTP_SERVICE_UNAVAILABLE) {
+        void queryClient.invalidateQueries({ queryKey: pendingVouchersQueryKey(issuerId) });
+        setQueued(true);
+        return;
+      }
       setError(e instanceof Error ? e.message : 'No se pudo emitir el comprobante.');
     },
   });
+
+  const emissionPlan = useMutation({ mutationFn: dryRunVoucher });
 
   const exchangeRateLookup = useMutation({
     mutationFn: (currencyId: string) => getExchangeRate(issuerId, currencyId),
@@ -221,6 +298,15 @@ export default function NewVoucherScreen() {
   });
 
   const voucherTypeOptions = useMemo(() => {
+    if (draft) {
+      return [
+        {
+          value: draft.voucherType,
+          label: voucherTypeName[draft.voucherType],
+          hint: CREDIT_NOTE_HINT,
+        },
+      ];
+    }
     const enabledIds = new Set((enabledVoucherTypes ?? []).map((param) => param.id));
     const available = issuableInvoiceTypes.filter((type) => enabledIds.has(type));
     const types = available.length > 0 ? available : DEFAULT_INVOICE_TYPES;
@@ -229,7 +315,7 @@ export default function NewVoucherScreen() {
       label: voucherTypeName[type],
       hint: voucherTypeHint[type],
     }));
-  }, [enabledVoucherTypes]);
+  }, [enabledVoucherTypes, draft]);
 
   useEffect(() => {
     if (!voucherTypeOptions.some((option) => option.value === voucherType)) {
@@ -358,6 +444,7 @@ export default function NewVoucherScreen() {
     servicePeriod: needsServicePeriod ? servicePeriod : undefined,
     paymentDueDate: needsPaymentDueDate ? paymentDueDate : undefined,
     transmissionType: isFce ? transmissionType : undefined,
+    associatedVouchers: draft?.associatedVouchers,
     currency,
     exchangeRate: Number(exchangeRate),
   });
@@ -369,6 +456,8 @@ export default function NewVoucherScreen() {
       setError(parsed.error.issues[0]?.message ?? 'Revisá los datos de la factura.');
       return;
     }
+    emissionPlan.reset();
+    emissionPlan.mutate(parsed.data);
     setSheet('confirm');
   };
 
@@ -381,6 +470,15 @@ export default function NewVoucherScreen() {
     }
     mutation.mutate(parsed.data);
   };
+
+  if (queued) {
+    return (
+      <QueuedEmissionScreen
+        onSeeVouchers={() => router.replace('/(app)/(tabs)/comprobantes')}
+        onExit={() => router.back()}
+      />
+    );
+  }
 
   if (mutation.isPending) {
     return (
@@ -427,8 +525,16 @@ export default function NewVoucherScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={['bottom']}>
-      <Stack.Screen options={{ title: 'Emitir comprobante' }} />
+      <Stack.Screen options={{ title: draft ? 'Nota de crédito' : 'Emitir comprobante' }} />
       <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} showsVerticalScrollIndicator={false}>
+        <ArcaHealthBanner issuerId={issuerId} />
+        {draft ? (
+          <Banner
+            kind="info"
+            title="Anulás un comprobante con esta nota de crédito"
+            body="Los datos vienen del original. Si la anulación es parcial, ajustá los ítems antes de emitir."
+          />
+        ) : null}
         <Select
           label="Tipo de comprobante"
           value={selectedType?.label}
@@ -726,28 +832,17 @@ export default function NewVoucherScreen() {
         ))}
       </BottomSheet>
 
-      <BottomSheet open={sheet === 'confirm'} title="Revisá antes de emitir" onClose={() => setSheet(null)}>
-        <View style={{ backgroundColor: theme.colors.surfaceBrandSubtle, borderRadius: theme.radius.md, padding: 16, alignItems: 'center', marginBottom: 14 }}>
-          <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.callout, color: theme.colors.textSecondary }}>
-            Vas a emitir
-          </Text>
-          <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.subhead, color: theme.colors.textPrimary, marginTop: 2 }}>
-            {selectedType?.label}
-          </Text>
-          <View style={{ marginTop: 8 }}>
-            <Amount value={formatCurrency(totals.total)} size="xl" />
-          </View>
-          <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary, marginTop: 6 }}>
-            a {clientLabel} · IVA incluido
-          </Text>
-        </View>
-        <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary, marginBottom: 12 }}>
-          Una vez emitida es un documento legal: si hay un error, después se corrige con una Nota de Crédito.
-        </Text>
-        <Button variant="primary" full onPress={emit}>
-          Confirmar y emitir
-        </Button>
-      </BottomSheet>
+      <ConfirmEmissionSheet
+        open={sheet === 'confirm'}
+        typeLabel={selectedType?.label}
+        clientLabel={clientLabel}
+        currency={currency}
+        plan={emissionPlan.data}
+        planLoading={emissionPlan.isPending}
+        planError={emissionPlan.error?.message ?? null}
+        onClose={() => setSheet(null)}
+        onConfirm={emit}
+      />
     </SafeAreaView>
   );
 }

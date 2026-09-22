@@ -17,6 +17,7 @@ import {
   setSession,
   setUnauthorizedHandler,
 } from './api';
+import { unregisterPushNotifications } from './push-notifications';
 
 interface AuthState {
   user: AuthUser | null;
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    await unregisterPushNotifications().catch(() => undefined);
     await logoutRequest();
     await clearSession();
     setUser(null);

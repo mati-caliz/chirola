@@ -7,6 +7,7 @@ export const preferenceKeys = {
   colorSchemeOverride: 'colorSchemeOverride',
   onboardingSeen: 'onboardingSeen',
   biometricLock: 'biometricLock',
+  pushToken: 'pushToken',
 } as const;
 
 export type PreferenceKey = (typeof preferenceKeys)[keyof typeof preferenceKeys];
