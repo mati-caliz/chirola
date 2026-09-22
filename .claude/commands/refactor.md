@@ -26,10 +26,10 @@ Leé los archivos y buscá las categorías que apliquen.
 
 ### Backend (NestJS)
 
-- **Controllers con lógica**: deben sólo mapear HTTP → servicio (extraer `emisorId` del usuario y
+- **Controllers con lógica**: deben sólo mapear HTTP → servicio (extraer `issuerId` del usuario y
   delegar). Sin cálculos, defaulteo ni validaciones de negocio.
-- **Aislamiento por emisor**: queries Prisma sin filtro por `emisorId`, o que confían en un
-  `emisorId` que viene del cliente en vez del contexto autenticado.
+- **Aislamiento por emisor**: queries Prisma sin filtro por `issuerId`, o que confían en un
+  `issuerId` que viene del cliente en vez del contexto autenticado.
 - **Lógica fiscal duplicada**: cálculo de totales/IVA, armado de payloads ARCA o parsing SOAP
   repetido entre servicios; extraer a un helper.
 - **Manejo de errores ARCA**: strings hardcodeados en vez de mapear los códigos de error de
@@ -82,7 +82,7 @@ nada sin confirmación.
 
 ## Reglas
 
-- Seguí `CLAUDE.md`: sin comentarios, sin `any`, sin `var`, nombres completos, scope de `emisorId`.
+- Seguí `CLAUDE.md`: sin comentarios, sin `any`, sin `var`, nombres completos, scope de `issuerId`.
 - Si un cambio requiere una decisión de diseño, marcalo como **[decisión requerida]** y explicá
   las opciones en vez de asumir.
 - No rompas tests: si un refactor cambia interfaces, actualizá los tests.

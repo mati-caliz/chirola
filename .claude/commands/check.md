@@ -63,4 +63,4 @@ pnpm --filter @chirola/api test
 - **Type error en Prisma**: regenerar el cliente con `pnpm --filter @chirola/api prisma:generate`
   si tocaste el schema.
 - **Import de `@chirola/shared` roto**: reconstruir shared con `pnpm --filter @chirola/shared build`.
-- **Test fiscal fallando**: leé el stack, verificá los códigos ARCA y el scope de `emisorId`.
+- **Test fiscal fallando**: leé el stack, verificá los códigos ARCA y el scope de `issuerId`.

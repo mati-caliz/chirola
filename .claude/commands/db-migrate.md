@@ -17,7 +17,7 @@ Modificá `services/api/prisma/schema.prisma` con el cambio (nuevo modelo, campo
 relación). Consideraciones del proyecto:
 
 - **Aislamiento por emisor**: todo modelo con datos de un contribuyente lleva
-  `emisorId String` + relación al `Emisor` e idealmente índice por `emisorId`. Sin esto se rompe
+  `issuerId String` + relación a `Issuer` e idealmente índice por `issuerId`. Sin esto se rompe
   el scope multi-emisor.
 - Timestamps: `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`.
 - IDs: seguí la convención existente en el schema (no mezcles estrategias de ID).
@@ -29,14 +29,14 @@ relación). Consideraciones del proyecto:
 pnpm --filter @chirola/api prisma:migrate
 ```
 
-`prisma migrate dev` pide un nombre descriptivo en snake_case (ej: `add_index_clientes_emisor`),
+`prisma migrate dev` pide un nombre descriptivo en snake_case (ej: `add_index_clients_issuer`),
 crea el SQL en `prisma/migrations/`, lo aplica a la base local y regenera el Prisma Client.
 
 ### 4. Verificar
 
 - El Prisma Client tipado refleja el cambio (`prisma:generate` corre solo dentro de `migrate dev`).
 - Corré `cd services/api && npx tsc --noEmit` para confirmar que el código sigue compilando.
-- Si hay servicios afectados, actualizalos manteniendo el scope de `emisorId`.
+- Si hay servicios afectados, actualizalos manteniendo el scope de `issuerId`.
 
 ## Cuándo usarlo
 

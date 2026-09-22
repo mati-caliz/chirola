@@ -34,7 +34,7 @@ pnpm -r test
 - Tests Jest en `services/api`, nombre `*.spec.ts` al lado del archivo bajo test.
 - Los servicios que hablan con ARCA (WSAA/WSFEv1) se testean con SOAP mockeado — no pegarle a
   homologación en unit tests.
-- Todo test de datos de un contribuyente debe ejercitar el scope de `emisorId`.
+- Todo test de datos de un contribuyente debe ejercitar el scope de `issuerId`.
 - Los cálculos fiscales (totales, IVA, CbtesAsoc en notas de crédito/débito) deben tener
   cobertura: son la lógica de negocio crítica.
 

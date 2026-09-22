@@ -31,9 +31,9 @@ El backend es el vault: las `.key`/`.crt`/`.p12` de los contribuyentes son lo m√
 
 ### B. Aislamiento por emisor (CR√çTICO)
 
-- Queries Prisma sin filtro por `emisorId` (`findUnique`/`findFirst`/`update`/`delete` que no
+- Queries Prisma sin filtro por `issuerId` (`findUnique`/`findFirst`/`update`/`delete` que no
   scopean al emisor autenticado).
-- Endpoints que aceptan `emisorId` como input del cliente en vez de tomarlo del JWT/contexto.
+- Endpoints que aceptan `issuerId` como input del cliente en vez de tomarlo del JWT/contexto.
 - IDOR: un usuario accediendo a comprobantes, clientes o certificados de otro emisor.
 - Certificado o CUIT de un emisor usado para emitir en nombre de otro.
 
