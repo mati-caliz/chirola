@@ -131,6 +131,28 @@ export function discriminatesIva(voucherType: number): boolean {
   return ivaDiscriminatingLetters.includes(voucherLetter(voucherType));
 }
 
+const voucherTypesReportingIvaToArca: readonly number[] = [
+  VoucherType.FACTURA_A,
+  VoucherType.NOTA_DEBITO_A,
+  VoucherType.NOTA_CREDITO_A,
+  VoucherType.FACTURA_B,
+  VoucherType.NOTA_DEBITO_B,
+  VoucherType.NOTA_CREDITO_B,
+  VoucherType.FACTURA_M,
+  VoucherType.NOTA_DEBITO_M,
+  VoucherType.NOTA_CREDITO_M,
+  VoucherType.FCE_FACTURA_A,
+  VoucherType.FCE_NOTA_DEBITO_A,
+  VoucherType.FCE_NOTA_CREDITO_A,
+  VoucherType.FCE_FACTURA_B,
+  VoucherType.FCE_NOTA_DEBITO_B,
+  VoucherType.FCE_NOTA_CREDITO_B,
+];
+
+export function reportsIvaToArca(voucherType: number): boolean {
+  return voucherTypesReportingIvaToArca.includes(voucherType);
+}
+
 const retentionAgentTypes: readonly number[] = [
   VoucherType.FACTURA_M,
   VoucherType.NOTA_DEBITO_M,

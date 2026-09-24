@@ -33,6 +33,17 @@ describe('calculateAmounts', () => {
     expect(r.netAmount + r.ivaAmount).toBeCloseTo(r.totalAmount, 2);
   });
 
+  it('Factura B: informa neto e IVA a ARCA aunque no los discrimine al cliente', () => {
+    const r = calculateAmounts(VoucherType.FACTURA_B, [
+      taxed({ description: 'Servicio' }),
+    ]);
+
+    expect(r.totalAmount).toBe(1210);
+    expect(r.netAmount).toBe(1000);
+    expect(r.ivaAmount).toBe(210);
+    expect(r.rates).toEqual([{ id: 5, taxableBase: 1000, amount: 210 }]);
+  });
+
   it('Factura A con múltiples alícuotas: agrupa y cuadra', () => {
     const r = calculateAmounts(VoucherType.FACTURA_A, [
       taxed({ description: 'Item 21' }),
