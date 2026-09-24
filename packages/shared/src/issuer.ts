@@ -10,11 +10,27 @@ export function isCuit(value: string): boolean {
   return normalizeCuit(value).length === CUIT_LENGTH;
 }
 
+export const COMMERCIAL_ADDRESS_MAX_LENGTH = 200;
+
+const commercialAddressField = z
+  .string()
+  .trim()
+  .min(1, 'El domicilio comercial no puede quedar vacío')
+  .max(
+    COMMERCIAL_ADDRESS_MAX_LENGTH,
+    `El domicilio comercial admite hasta ${COMMERCIAL_ADDRESS_MAX_LENGTH} caracteres`,
+  );
+
 export const createIssuerSchema = z.object({
   cuit: z.string().regex(/^\d{11}$/, 'El CUIT debe tener 11 dígitos'),
   legalName: z.string().min(1),
   ivaCondition: z.enum(['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO']),
   environment: z.enum(['homologacion', 'produccion']).default('homologacion'),
+  commercialAddress: commercialAddressField.optional(),
+});
+
+export const commercialAddressSchema = z.object({
+  commercialAddress: commercialAddressField.nullable(),
 });
 
 export const paymentAccountSchema = z.object({
@@ -48,6 +64,7 @@ export const updateSalesPointSchema = z.object({
 
 export type CreateIssuer = z.infer<typeof createIssuerSchema>;
 export type PaymentAccount = z.infer<typeof paymentAccountSchema>;
+export type CommercialAddress = z.infer<typeof commercialAddressSchema>;
 export type UploadCertificate = z.infer<typeof uploadCertificateSchema>;
 export type GenerateCsr = z.infer<typeof generateCsrSchema>;
 export type MatchCertificate = z.infer<typeof matchCertificateSchema>;

@@ -57,6 +57,7 @@ import { buildQrUrl } from './qr.util';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
 import { renderVoucherPdf, type TributePdf } from './pdf.util';
 import { parseTaxTreatment } from './stored-tax-treatment';
+import { buildFiscalTransparency } from './fiscal-transparency';
 
 interface CaeWithNumber {
   result: CaeResult;
@@ -86,14 +87,24 @@ type EmissionIssuer = ArcaIssuer & {
 };
 
 const storedTributesSchema = z.array(
-  z.object({ description: z.string(), amount: z.number() }),
+  z.object({
+    id: z.number().int().positive().optional(),
+    description: z.string(),
+    amount: z.number(),
+  }),
 );
+
+type StoredTribute = z.infer<typeof storedTributesSchema>[number];
 
 const storedAssociatedVouchersSchema = z.array(associatedVoucherSchema);
 
-function parseStoredTributes(stored: Prisma.JsonValue | null): TributePdf[] {
+function parseStoredTributes(stored: Prisma.JsonValue | null): StoredTribute[] {
   const parsed = storedTributesSchema.safeParse(stored);
   return parsed.success ? parsed.data : [];
+}
+
+function toTributePdf(tribute: StoredTribute): TributePdf {
+  return { description: tribute.description, amount: tribute.amount };
 }
 
 function parseStoredAssociatedVouchers(stored: Prisma.JsonValue | null) {
@@ -257,9 +268,20 @@ export class VouchersService {
       );
     }
     const qrPng = await renderQrPng(voucher.qrData);
+    const tributes = parseStoredTributes(voucher.tributes);
+    const items = voucher.items.map((it) => ({
+      description: it.description,
+      quantity: Number(it.quantity),
+      unitPrice: Number(it.unitPrice),
+      ivaRate: Number(it.ivaRate),
+      taxTreatment: parseTaxTreatment(it.taxTreatment),
+      subtotal: Number(it.subtotal),
+    }));
+    const ivaAmount = Number(voucher.ivaAmount);
     return renderVoucherPdf({
       issuer: {
         legalName: voucher.issuer.legalName,
+        commercialAddress: voucher.issuer.commercialAddress,
         cuit: voucher.issuer.cuit,
         ivaCondition: voucher.issuer.ivaCondition,
       },
@@ -270,27 +292,26 @@ export class VouchersService {
       date: voucher.voucherDate,
       currency: voucher.currency,
       netAmount: Number(voucher.netAmount),
-      ivaAmount: Number(voucher.ivaAmount),
+      ivaAmount,
       exemptAmount: Number(voucher.exemptAmount),
       untaxedAmount: Number(voucher.untaxedAmount),
       totalAmount: Number(voucher.totalAmount),
-      tributes: parseStoredTributes(voucher.tributes),
+      tributes: tributes.map(toTributePdf),
       cae: voucher.cae,
       caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
-      items: voucher.items.map((it) => ({
-        description: it.description,
-        quantity: Number(it.quantity),
-        unitPrice: Number(it.unitPrice),
-        ivaRate: Number(it.ivaRate),
-        taxTreatment: parseTaxTreatment(it.taxTreatment),
-        subtotal: Number(it.subtotal),
-      })),
+      items,
       servicePeriod:
         voucher.serviceFrom && voucher.serviceTo
           ? { from: voucher.serviceFrom, to: voucher.serviceTo }
           : null,
       paymentDueDate: voucher.paymentDueDate,
       associatedVouchers: parseStoredAssociatedVouchers(voucher.associatedVouchers),
+      fiscalTransparency: buildFiscalTransparency({
+        voucherType: voucher.voucherType,
+        ivaAmount,
+        items,
+        tributes,
+      }),
       qrPng,
     });
   }

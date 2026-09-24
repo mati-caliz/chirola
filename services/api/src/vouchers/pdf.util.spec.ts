@@ -1,6 +1,11 @@
 import { TaxTreatment } from '@chirola/shared';
 import { renderQrPng, recipientFromQr } from './qr-image.util';
-import { renderVoucherPdf, type VoucherPdfData } from './pdf.util';
+import {
+  fiscalTransparencyLines,
+  issuerDetailLines,
+  renderVoucherPdf,
+  type VoucherPdfData,
+} from './pdf.util';
 import { buildQrUrl } from './qr.util';
 
 const qrUrl = buildQrUrl({
@@ -39,7 +44,12 @@ describe('qr-image util', () => {
 describe('pdf util', () => {
   function data(overrides: Partial<VoucherPdfData> = {}): VoucherPdfData {
     return {
-      issuer: { legalName: 'Acme SA', cuit: '20111111112', ivaCondition: 'RESPONSABLE_INSCRIPTO' },
+      issuer: {
+        legalName: 'Acme SA',
+        commercialAddress: null,
+        cuit: '20111111112',
+        ivaCondition: 'RESPONSABLE_INSCRIPTO',
+      },
       recipient: { docType: 80, docNumber: '30707153745' },
       voucherType: 8,
       salesPoint: 1,
@@ -67,6 +77,7 @@ describe('pdf util', () => {
       associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }],
       servicePeriod: null,
       paymentDueDate: null,
+      fiscalTransparency: null,
       qrPng: Buffer.alloc(0),
       ...overrides,
     };
@@ -121,5 +132,60 @@ describe('pdf util', () => {
       }),
     );
     expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  it('renderiza el domicilio comercial y la leyenda de transparencia fiscal', async () => {
+    const qrPng = await renderQrPng(qrUrl);
+    const pdf = await renderVoucherPdf(
+      data({
+        qrPng,
+        voucherType: 6,
+        issuer: {
+          legalName: 'Acme SA',
+          commercialAddress: 'Av. Corrientes 1234, CABA',
+          cuit: '20111111112',
+          ivaCondition: 'RESPONSABLE_INSCRIPTO',
+        },
+        fiscalTransparency: { containedIva: 21, otherNationalIndirectTaxes: 0 },
+      }),
+    );
+    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+});
+
+describe('issuerDetailLines', () => {
+  const issuer = {
+    legalName: 'Acme SA',
+    cuit: '20111111112',
+    ivaCondition: 'RESPONSABLE_INSCRIPTO',
+  };
+
+  it('pone el domicilio comercial debajo de la razón social cuando existe', () => {
+    expect(
+      issuerDetailLines({ ...issuer, commercialAddress: 'Av. Corrientes 1234, CABA' }),
+    ).toEqual([
+      'Domicilio comercial: Av. Corrientes 1234, CABA',
+      'CUIT: 20111111112',
+      'Condición IVA: RESPONSABLE_INSCRIPTO',
+    ]);
+  });
+
+  it('omite el domicilio comercial cuando el emisor no lo cargó', () => {
+    expect(issuerDetailLines({ ...issuer, commercialAddress: null })).toEqual([
+      'CUIT: 20111111112',
+      'Condición IVA: RESPONSABLE_INSCRIPTO',
+    ]);
+  });
+});
+
+describe('fiscalTransparencyLines', () => {
+  it('arma la leyenda de la Ley 27.743 con los importes en formato argentino', () => {
+    expect(
+      fiscalTransparencyLines({ containedIva: 1234.5, otherNationalIndirectTaxes: 0 }),
+    ).toEqual([
+      'Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)',
+      'IVA Contenido: $ 1.234,50',
+      'Otros Impuestos Nacionales Indirectos: $ 0,00',
+    ]);
   });
 });

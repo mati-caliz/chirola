@@ -9,10 +9,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
+  commercialAddressSchema,
   createIssuerSchema,
   generateCsrSchema,
   matchCertificateSchema,
   representativeSchema,
+  type CommercialAddress,
   type CreateIssuer,
   type GenerateCsr,
   type MatchCertificate,
@@ -81,6 +83,17 @@ export class V1IssuersController {
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     await this.issuers.updateRepresentative(id, body);
+    return this.issuers.getWithCertificate(id);
+  }
+
+  @Put(':id/commercial-address')
+  async updateCommercialAddress(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
+  ) {
+    await this.apiClients.assertIssuerGranted(apiClient.id, id);
+    await this.issuers.updateCommercialAddress(id, body);
     return this.issuers.getWithCertificate(id);
   }
 

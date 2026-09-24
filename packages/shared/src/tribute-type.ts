@@ -13,3 +13,12 @@ export const tributeTypeName: Record<number, string> = {
   4: 'Impuestos internos',
   99: 'Otros',
 };
+
+const nationalIndirectTributeTypes: readonly number[] = [
+  TributeType.NATIONAL,
+  TributeType.INTERNAL,
+];
+
+export function isNationalIndirectTribute(tributeType: number): boolean {
+  return nationalIndirectTributeTypes.includes(tributeType);
+}

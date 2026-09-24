@@ -33,8 +33,20 @@ export interface ServicePeriodPdf {
   to: Date;
 }
 
+export interface IssuerPdf {
+  legalName: string;
+  commercialAddress: string | null;
+  cuit: string;
+  ivaCondition: string;
+}
+
+export interface FiscalTransparencyPdf {
+  containedIva: number;
+  otherNationalIndirectTaxes: number;
+}
+
 export interface VoucherPdfData {
-  issuer: { legalName: string; cuit: string; ivaCondition: string };
+  issuer: IssuerPdf;
   recipient: { docType: number; docNumber: string } | null;
   voucherType: number;
   salesPoint: number;
@@ -53,6 +65,7 @@ export interface VoucherPdfData {
   associatedVouchers: AssociatedVoucherPdf[];
   servicePeriod: ServicePeriodPdf | null;
   paymentDueDate: Date | null;
+  fiscalTransparency: FiscalTransparencyPdf | null;
   qrPng: Buffer;
 }
 
@@ -70,6 +83,23 @@ const ivaCell = (item: PdfItem): string => {
 
 const RETENTION_NOTICE =
   'COMPROBANTE SUJETO A RETENCIÓN — El receptor actúa como agente de retención de IVA y Ganancias (RG 1575).';
+
+const ISSUER_DETAILS_TOP = 66;
+
+const FISCAL_TRANSPARENCY_TITLE =
+  'Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)';
+
+export const issuerDetailLines = (issuer: IssuerPdf): string[] => [
+  ...(issuer.commercialAddress ? [`Domicilio comercial: ${issuer.commercialAddress}`] : []),
+  `CUIT: ${issuer.cuit}`,
+  `Condición IVA: ${issuer.ivaCondition}`,
+];
+
+export const fiscalTransparencyLines = (transparency: FiscalTransparencyPdf): string[] => [
+  FISCAL_TRANSPARENCY_TITLE,
+  `IVA Contenido: $ ${money(transparency.containedIva)}`,
+  `Otros Impuestos Nacionales Indirectos: $ ${money(transparency.otherNationalIndirectTaxes)}`,
+];
 
 export const describeVoucher = (type: number, salesPoint: number, number: number): string =>
   `${voucherTypeName[type] ?? `Tipo ${type}`} ${String(salesPoint).padStart(5, '0')}-${String(number).padStart(8, '0')}`;
@@ -95,8 +125,10 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
     });
 
     doc.fontSize(16).text(data.issuer.legalName, left, 45);
-    doc.fontSize(9).text(`CUIT: ${data.issuer.cuit}`, left, 68);
-    doc.text(`Condición IVA: ${data.issuer.ivaCondition}`, left);
+    doc.fontSize(9);
+    for (const [index, line] of issuerDetailLines(data.issuer).entries()) {
+      doc.text(line, left, index === 0 ? ISSUER_DETAILS_TOP : undefined, { width: width / 2 - 35 });
+    }
 
     doc.fontSize(11).text(describeVoucher(data.voucherType, data.salesPoint, data.number), right - 220, 45, {
       width: 220,
@@ -188,6 +220,17 @@ export function renderVoucherPdf(data: VoucherPdfData): Promise<Buffer> {
       for (const voucher of data.associatedVouchers) {
         doc.fontSize(8).text(`• ${describeVoucher(voucher.type, voucher.salesPoint, voucher.number)}`, left + 10, y);
         y += 12;
+      }
+    }
+
+    if (data.fiscalTransparency) {
+      y += 12;
+      const [title, ...details] = fiscalTransparencyLines(data.fiscalTransparency);
+      doc.fontSize(8).text(title, left, y, { width, underline: true });
+      y += 12;
+      for (const detail of details) {
+        doc.fontSize(8).text(detail, left, y, { width });
+        y += 11;
       }
     }
 

@@ -15,6 +15,8 @@ import {
   createIssuerSchema,
   paymentAccountSchema,
   type PaymentAccount,
+  commercialAddressSchema,
+  type CommercialAddress,
   matchCertificateSchema,
   generateCsrSchema,
   representativeSchema,
@@ -103,6 +105,17 @@ export class IssuersController {
   ) {
     const issuer = await this.issuers.getFromUser(id, user.sub);
     return this.issuers.updatePaymentAccount(issuer.id, body);
+  }
+
+  @Put(':id/commercial-address')
+  async updateCommercialAddress(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
+  ) {
+    await this.issuers.getFromUser(id, user.sub);
+    await this.issuers.updateCommercialAddress(id, body);
+    return this.issuers.getWithCertificate(id);
   }
 
   @Get()

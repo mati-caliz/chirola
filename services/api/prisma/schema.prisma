@@ -48,6 +48,7 @@ model Issuer {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   cuit         String
   legalName    String
+  commercialAddress String?
   ivaCondition String
   environment  String       @default("homologacion")
   cbu          String?

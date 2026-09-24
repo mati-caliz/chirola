@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import {
   describeIssuerOnboardingStatus,
   normalizeCuit,
+  type CommercialAddress,
   type CreateIssuer,
   type PaymentAccount,
   type Representative,
@@ -49,6 +50,7 @@ export class IssuersService {
             userId,
             cuit: input.cuit,
             legalName: input.legalName,
+            commercialAddress: input.commercialAddress ?? null,
             ivaCondition: input.ivaCondition,
             environment: input.environment,
           },
@@ -100,6 +102,7 @@ export class IssuersService {
     const { certificate, ...rest } = issuer;
     return {
       ...rest,
+      certificateValidUntil: certificate?.certPem ? certificate.validUntil : null,
       onboarding: describeIssuerOnboardingStatus(issuer.onboardingStatus),
       certificate: certificate
         ? {
@@ -145,6 +148,7 @@ export class IssuersService {
         userId,
         cuit: input.cuit,
         legalName: input.legalName,
+        commercialAddress: input.commercialAddress ?? null,
         ivaCondition: input.ivaCondition,
         environment: input.environment,
       },
@@ -155,6 +159,13 @@ export class IssuersService {
     return this.prisma.issuer.update({
       where: { id },
       data: { cbu: input.cbu, paymentAlias: input.paymentAlias ?? null },
+    });
+  }
+
+  async updateCommercialAddress(id: string, input: CommercialAddress) {
+    return this.prisma.issuer.update({
+      where: { id },
+      data: { commercialAddress: input.commercialAddress },
     });
   }
 

@@ -141,6 +141,16 @@ export function requiresRetentionNotice(voucherType: number): boolean {
   return retentionAgentTypes.includes(voucherType);
 }
 
+const fiscalTransparencyTypes: readonly number[] = [
+  VoucherType.FACTURA_B,
+  VoucherType.NOTA_DEBITO_B,
+  VoucherType.NOTA_CREDITO_B,
+];
+
+export function requiresFiscalTransparencyNotice(voucherType: number): boolean {
+  return fiscalTransparencyTypes.includes(voucherType);
+}
+
 export const issuableInvoiceTypes: readonly number[] = [
   VoucherType.FACTURA_A,
   VoucherType.FACTURA_B,
