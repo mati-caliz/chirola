@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { Link } from 'expo-router';
-import { registerSchema } from '@chirola/shared';
-import { brandColor, Button, ErrorText, Screen, Subtitle, TextField, Title } from '@/components/ui';
-import { useAuth } from '@/lib/auth-context';
-import { useTheme } from '@/hooks/use-theme';
+import { useState } from "react";
+import { Text, View } from "react-native";
+import { Link } from "expo-router";
+import { registerSchema } from "@chirola/shared";
+import { brandColor, Button, ErrorText, Screen, Subtitle, TextField, Title } from "@/components/ui";
+import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/hooks/use-theme";
 
 export default function RegisterScreen() {
   const theme = useTheme();
   const { register } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -18,14 +18,14 @@ export default function RegisterScreen() {
     setError(null);
     const parsed = registerSchema.safeParse({ email, password });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos.');
+      setError(parsed.error.issues[0]?.message ?? "Datos inválidos.");
       return;
     }
     setSubmitting(true);
     try {
       await register(parsed.data.email, parsed.data.password);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo crear la cuenta.');
+      setError(e instanceof Error ? e.message : "No se pudo crear la cuenta.");
     } finally {
       setSubmitting(false);
     }
@@ -34,7 +34,13 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <View style={{ gap: 4, marginTop: 40 }}>
-        <Text style={{ fontFamily: theme.font.extrabold, fontSize: theme.fontSize.heading, color: theme.colors.textBrand }}>
+        <Text
+          style={{
+            fontFamily: theme.font.extrabold,
+            fontSize: theme.fontSize.heading,
+            color: theme.colors.textBrand,
+          }}
+        >
           Chirola
         </Text>
         <Title>Crear cuenta</Title>
@@ -58,10 +64,10 @@ export default function RegisterScreen() {
       />
       <ErrorText>{error}</ErrorText>
       <Button title="Crear cuenta" onPress={onSubmit} loading={submitting} />
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+      <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
         <Subtitle>¿Ya tenés cuenta?</Subtitle>
         <Link href="/(auth)/login" replace>
-          <Text style={{ color: brandColor, fontWeight: '600' }}>Iniciá sesión</Text>
+          <Text style={{ color: brandColor, fontWeight: "600" }}>Iniciá sesión</Text>
         </Link>
       </View>
     </Screen>

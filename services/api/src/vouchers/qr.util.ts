@@ -1,4 +1,4 @@
-import { toLocalIsoDate } from '../arca/arca-date';
+import { toLocalIsoDate } from "../arca/arca-date";
 
 export interface QrData {
   date: Date;
@@ -14,7 +14,7 @@ export interface QrData {
   cae: string;
 }
 
-const BASE_URL = 'https://www.afip.gob.ar/fe/qr/?p=';
+const BASE_URL = "https://www.afip.gob.ar/fe/qr/?p=";
 
 export function buildQrUrl(data: QrData): string {
   const payload = {
@@ -28,10 +28,10 @@ export function buildQrUrl(data: QrData): string {
     moneda: data.currency,
     ctz: data.exchangeRate,
     tipoDocRec: data.recipientDocType,
-    nroDocRec: Number(data.recipientDocNumber.replace(/-/g, '')),
-    tipoCodAut: 'E',
+    nroDocRec: Number(data.recipientDocNumber.replace(/-/g, "")),
+    tipoCodAut: "E",
     codAut: Number(data.cae),
   };
-  const base64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
+  const base64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
   return BASE_URL + base64;
 }

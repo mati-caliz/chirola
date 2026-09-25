@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { CertsService } from './certs.service';
-import { CertMonitorService } from './cert-monitor.service';
-import { WebhooksModule } from '../webhooks/webhooks.module';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { Module } from "@nestjs/common";
+import { CertsService } from "./certs.service";
+import { CertMonitorService } from "./cert-monitor.service";
+import { WebhooksModule } from "../webhooks/webhooks.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [WebhooksModule, NotificationsModule],

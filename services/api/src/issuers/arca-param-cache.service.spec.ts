@@ -1,20 +1,20 @@
-import { fakeIssuerAuth } from '../issuer-arca/issuer-arca.fixture';
-import { ConfigService } from '@nestjs/config';
-import { ArcaParamType, localArcaParams, type ArcaParam } from '@chirola/shared';
-import { ArcaParamCacheService } from './arca-param-cache.service';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { WsfeService } from '../arca/wsfe/wsfe.service';
+import { fakeIssuerAuth } from "../issuer-arca/issuer-arca.fixture";
+import { ConfigService } from "@nestjs/config";
+import { ArcaParamType, localArcaParams, type ArcaParam } from "@chirola/shared";
+import { ArcaParamCacheService } from "./arca-param-cache.service";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { WsfeService } from "../arca/wsfe/wsfe.service";
 
 const issuer = {
-  id: 'issuer-1',
-  cuit: '20111111112',
-  environment: 'homologacion',
+  id: "issuer-1",
+  cuit: "20111111112",
+  environment: "homologacion",
   representativeCuit: null,
 };
 
 const fromArca: ArcaParam[] = [
-  { id: 1, description: 'Impuestos nacionales' },
-  { id: 2, description: 'Impuestos provinciales' },
+  { id: 1, description: "Impuestos nacionales" },
+  { id: 2, description: "Impuestos provinciales" },
 ];
 
 interface CacheRow {
@@ -38,11 +38,10 @@ function build(options: { cached?: CacheRow; arcaFails?: boolean } = {}) {
   const wsfe = {
     getTributeTypes: async () => {
       arcaCalls += 1;
-      if (options.arcaFails) throw new Error('ARCA caído');
+      if (options.arcaFails) throw new Error("ARCA caído");
       return fromArca;
     },
   } as unknown as WsfeService;
-
 
   const config = {
     get: (_key: string, def: number) => def,
@@ -55,8 +54,8 @@ function build(options: { cached?: CacheRow; arcaFails?: boolean } = {}) {
   };
 }
 
-describe('ArcaParamCacheService', () => {
-  it('consulta ARCA y guarda en caché cuando no hay nada', async () => {
+describe("ArcaParamCacheService", () => {
+  it("consulta ARCA y guarda en caché cuando no hay nada", async () => {
     const { service, upserts } = build();
 
     const result = await service.get(issuer, ArcaParamType.TRIBUTE_TYPES);
@@ -65,7 +64,7 @@ describe('ArcaParamCacheService', () => {
     expect(upserts).toEqual([fromArca]);
   });
 
-  it('usa la caché vigente sin llamar a ARCA', async () => {
+  it("usa la caché vigente sin llamar a ARCA", async () => {
     const { service, arcaCalls } = build({
       cached: { entries: fromArca, fetchedAt: new Date() },
     });
@@ -76,10 +75,10 @@ describe('ArcaParamCacheService', () => {
     expect(result).toEqual(fromArca);
   });
 
-  it('refresca cuando la caché venció', async () => {
+  it("refresca cuando la caché venció", async () => {
     const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const { service, arcaCalls } = build({
-      cached: { entries: [{ id: 9, description: 'viejo' }], fetchedAt: longAgo },
+      cached: { entries: [{ id: 9, description: "viejo" }], fetchedAt: longAgo },
     });
 
     const result = await service.get(issuer, ArcaParamType.TRIBUTE_TYPES);
@@ -88,9 +87,9 @@ describe('ArcaParamCacheService', () => {
     expect(result).toEqual(fromArca);
   });
 
-  it('cae a la caché vencida si ARCA no responde', async () => {
+  it("cae a la caché vencida si ARCA no responde", async () => {
     const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const stale = [{ id: 9, description: 'viejo pero servible' }];
+    const stale = [{ id: 9, description: "viejo pero servible" }];
     const { service } = build({
       cached: { entries: stale, fetchedAt: longAgo },
       arcaFails: true,
@@ -101,7 +100,7 @@ describe('ArcaParamCacheService', () => {
     expect(result).toEqual(stale);
   });
 
-  it('cae a los valores locales si ARCA falla y no hay caché', async () => {
+  it("cae a los valores locales si ARCA falla y no hay caché", async () => {
     const { service } = build({ arcaFails: true });
 
     const result = await service.get(issuer, ArcaParamType.TRIBUTE_TYPES);
@@ -109,7 +108,7 @@ describe('ArcaParamCacheService', () => {
     expect(result).toEqual(localArcaParams.TRIBUTE_TYPES);
   });
 
-  it('ignora una caché con forma inesperada y consulta ARCA', async () => {
+  it("ignora una caché con forma inesperada y consulta ARCA", async () => {
     const { service, arcaCalls } = build({
       cached: { entries: { roto: true }, fetchedAt: new Date() },
     });

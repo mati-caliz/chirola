@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   authorizedVoucherStatuses,
   voucherTypeName,
   type SalesBook,
   type SalesBookEntry,
   type SalesBookTotals,
-} from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import { recipientFromQr } from '../vouchers/qr-image.util';
+} from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { recipientFromQr } from "../vouchers/qr-image.util";
 import {
   breakDownVoucherTaxes,
   round2,
@@ -15,7 +15,7 @@ import {
   voucherSign,
   type Numeric,
   type TaxBreakdownItem,
-} from './voucher-tax-breakdown';
+} from "./voucher-tax-breakdown";
 
 export interface SalesBookVoucherRow {
   id: string;
@@ -59,8 +59,7 @@ function toEntry(voucher: SalesBookVoucherRow): SalesBookEntry {
     voucherTypeName: voucherTypeName[voucher.voucherType] ?? String(voucher.voucherType),
     salesPoint: voucher.salesPoint.number,
     number: voucher.number,
-    recipientDocType:
-      voucher.recipientDocType ?? voucher.client?.docType ?? qrRecipient?.docType ?? null,
+    recipientDocType: voucher.recipientDocType ?? voucher.client?.docType ?? qrRecipient?.docType ?? null,
     recipientDocNumber:
       voucher.recipientDocNumber ?? voucher.client?.docNumber ?? qrRecipient?.docNumber ?? null,
     recipientName: voucher.recipientName ?? voucher.client?.legalName ?? null,
@@ -91,11 +90,7 @@ function sumEntries(entries: SalesBookEntry[]): SalesBookTotals {
   };
 }
 
-export function buildSalesBook(
-  year: number,
-  month: number,
-  vouchers: SalesBookVoucherRow[],
-): SalesBook {
+export function buildSalesBook(year: number, month: number, vouchers: SalesBookVoucherRow[]): SalesBook {
   const entries = vouchers.map(toEntry);
   return { year, month, entries, totals: sumEntries(entries) };
 }
@@ -113,7 +108,7 @@ export class SalesBookService {
         voucherDate: { gte: from, lt: to },
       },
       include: { items: true, salesPoint: true, client: true },
-      orderBy: [{ voucherDate: 'asc' }, { voucherType: 'asc' }, { number: 'asc' }],
+      orderBy: [{ voucherDate: "asc" }, { voucherType: "asc" }, { number: "asc" }],
     });
     return buildSalesBook(year, month, vouchers);
   }

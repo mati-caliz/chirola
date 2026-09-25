@@ -1,4 +1,3 @@
-
 export interface AccessTicket {
   token: string;
   sign: string;
@@ -8,7 +7,6 @@ export interface AccessTicket {
 }
 
 export interface CertificateCredentials {
-
   certPem: string;
 
   privateKeyPem: string;
@@ -28,8 +26,4 @@ export interface AccessTicketRequest {
   service: ArcaService;
 }
 
-export type ArcaService =
-  | 'wsfe'
-  | 'wsfex'
-  | 'ws_sr_padron_a13'
-  | 'ws_sr_constancia_inscripcion';
+export type ArcaService = "wsfe" | "wsfex" | "ws_sr_padron_a13" | "ws_sr_constancia_inscripcion";

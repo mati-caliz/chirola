@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { WebhookService } from './webhook.service';
+import { Module } from "@nestjs/common";
+import { WebhookService } from "./webhook.service";
 
 @Module({
   providers: [WebhookService],

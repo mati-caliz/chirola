@@ -1,23 +1,16 @@
-import {
-  fakeIssuerAuth,
-  fakeIssuerOnboarding,
-} from '../issuer-arca/issuer-arca.fixture';
-import {
-  PendingVoucherStatus,
-  VoucherStatus,
-  type IssueVoucher,
-} from '@chirola/shared';
-import { VouchersService } from './vouchers.service';
-import { IssuerLockService } from './issuer-lock.service';
-import { ArcaRejectionError } from '../arca/wsfe/arca-errors';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { ApiClientService } from '../service-auth/api-client.service';
-import type { WebhookService } from '../webhooks/webhook.service';
-import { WebhookEvent } from '../webhooks/webhook-events';
-import { VoucherQueuedException } from './voucher-queued.exception';
-import { ConfigService } from '@nestjs/config';
-import type { PushNotificationService } from '../notifications/push-notification.service';
+import { fakeIssuerAuth, fakeIssuerOnboarding } from "../issuer-arca/issuer-arca.fixture";
+import { PendingVoucherStatus, VoucherStatus, type IssueVoucher } from "@chirola/shared";
+import { VouchersService } from "./vouchers.service";
+import { IssuerLockService } from "./issuer-lock.service";
+import { ArcaRejectionError } from "../arca/wsfe/arca-errors";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { WsfeService } from "../arca/wsfe/wsfe.service";
+import type { ApiClientService } from "../service-auth/api-client.service";
+import type { WebhookService } from "../webhooks/webhook.service";
+import { WebhookEvent } from "../webhooks/webhook-events";
+import { VoucherQueuedException } from "./voucher-queued.exception";
+import { ConfigService } from "@nestjs/config";
+import type { PushNotificationService } from "../notifications/push-notification.service";
 
 interface StoredVoucher {
   id: string;
@@ -37,7 +30,7 @@ interface StoredVoucher {
   salesPoint: { number: number };
 }
 
-const ISSUER = { id: 'issuer-1', userId: 'user-1', cuit: '20111111112' };
+const ISSUER = { id: "issuer-1", userId: "user-1", cuit: "20111111112" };
 
 function buildInput(overrides: Partial<IssueVoucher> = {}): IssueVoucher {
   return {
@@ -45,10 +38,10 @@ function buildInput(overrides: Partial<IssueVoucher> = {}): IssueVoucher {
     salesPoint: 1,
     voucherType: 11,
     concept: 1,
-    currency: 'PES',
+    currency: "PES",
     exchangeRate: 1,
-    recipient: { docType: 99, docNumber: '0', ivaConditionId: 5 },
-    items: [{ description: 'Item', quantity: 1, unitPrice: 100, ivaRate: 0 }],
+    recipient: { docType: 99, docNumber: "0", ivaConditionId: 5 },
+    items: [{ description: "Item", quantity: 1, unitPrice: 100, ivaRate: 0 }],
     ...overrides,
   } as IssueVoucher;
 }
@@ -68,8 +61,7 @@ interface PendingRow {
 
 function buildHarness() {
   const vouchers: StoredVoucher[] = [];
-  const idempotency: { issuerId: string; key: string; voucherId: string }[] =
-    [];
+  const idempotency: { issuerId: string; key: string; voucherId: string }[] = [];
   const pending: PendingRow[] = [];
   let sequence = 0;
 
@@ -78,14 +70,19 @@ function buildHarness() {
       findUnique: jest.fn(async () => ISSUER),
     },
     pendingVoucher: {
-      findUnique: jest.fn(async ({ where }: { where: { issuerId_idempotencyKey: { issuerId: string; idempotencyKey: string } } }) =>
-        pending.find(
-          (row) =>
-            row.issuerId === where.issuerId_idempotencyKey.issuerId &&
-            row.idempotencyKey === where.issuerId_idempotencyKey.idempotencyKey,
-        ) ?? null,
+      findUnique: jest.fn(
+        async ({
+          where,
+        }: {
+          where: { issuerId_idempotencyKey: { issuerId: string; idempotencyKey: string } };
+        }) =>
+          pending.find(
+            (row) =>
+              row.issuerId === where.issuerId_idempotencyKey.issuerId &&
+              row.idempotencyKey === where.issuerId_idempotencyKey.idempotencyKey,
+          ) ?? null,
       ),
-      create: jest.fn(async ({ data }: { data: Omit<PendingRow, 'id' | 'status' | 'retryCount'> }) => {
+      create: jest.fn(async ({ data }: { data: Omit<PendingRow, "id" | "status" | "retryCount"> }) => {
         const row: PendingRow = {
           id: `pending-${pending.length + 1}`,
           status: PendingVoucherStatus.PENDING,
@@ -99,9 +96,7 @@ function buildHarness() {
       }),
       findMany: jest.fn(async () =>
         pending.filter(
-          (row) =>
-            row.status === PendingVoucherStatus.PENDING &&
-            row.nextRetryAt.getTime() <= Date.now(),
+          (row) => row.status === PendingVoucherStatus.PENDING && row.nextRetryAt.getTime() <= Date.now(),
         ),
       ),
       update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<PendingRow> }) => {
@@ -116,12 +111,12 @@ function buildHarness() {
       }),
     },
     idempotencyRecord: {
-      findUnique: jest.fn(async ({ where }: { where: { issuerId_key: { issuerId: string; key: string } } }) =>
-        idempotency.find(
-          (record) =>
-            record.issuerId === where.issuerId_key.issuerId &&
-            record.key === where.issuerId_key.key,
-        ) ?? null,
+      findUnique: jest.fn(
+        async ({ where }: { where: { issuerId_key: { issuerId: string; key: string } } }) =>
+          idempotency.find(
+            (record) =>
+              record.issuerId === where.issuerId_key.issuerId && record.key === where.issuerId_key.key,
+          ) ?? null,
       ),
       create: jest.fn(async ({ data }: { data: { issuerId: string; key: string; voucherId: string } }) => {
         idempotency.push(data);
@@ -137,8 +132,9 @@ function buildHarness() {
       })),
     },
     voucher: {
-      findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
-        vouchers.find((voucher) => voucher.id === where.id) ?? null,
+      findUnique: jest.fn(
+        async ({ where }: { where: { id: string } }) =>
+          vouchers.find((voucher) => voucher.id === where.id) ?? null,
       ),
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         sequence += 1;
@@ -156,8 +152,7 @@ function buildHarness() {
           caeExpiration: (data.caeExpiration as Date) ?? null,
           qrData: (data.qrData as string) ?? null,
           status: data.status as string,
-          arcaObservations:
-            (data.arcaObservations as { code: string; message: string }[]) ?? null,
+          arcaObservations: (data.arcaObservations as { code: string; message: string }[]) ?? null,
           salesPoint: { number: 1 },
         };
         vouchers.push(stored);
@@ -166,7 +161,6 @@ function buildHarness() {
     },
   } as unknown as PrismaService;
 
-
   const wsfe = {
     getLastAuthorized: jest.fn(async (_auth, salesPoint: number, voucherType: number) =>
       vouchers
@@ -174,8 +168,8 @@ function buildHarness() {
         .reduce((max, v) => Math.max(max, v.number), 0),
     ),
     requestCae: jest.fn(async () => ({
-      cae: '74000000000001',
-      caeVto: new Date('2026-07-22'),
+      cae: "74000000000001",
+      caeVto: new Date("2026-07-22"),
       observations: [],
     })),
     queryVoucher: jest.fn(async () => null),
@@ -195,8 +189,7 @@ function buildHarness() {
   } as unknown as PushNotificationService;
 
   const config = {
-    get: (key: string, def?: number) =>
-      key === 'VOUCHER_RETRY_BASE_MS' ? 0 : def,
+    get: (key: string, def?: number) => (key === "VOUCHER_RETRY_BASE_MS" ? 0 : def),
   } as unknown as ConfigService;
 
   const service = new VouchersService(
@@ -214,163 +207,151 @@ function buildHarness() {
   return { service, prisma, wsfe, vouchers, pending, webhooks, push };
 }
 
-describe('VouchersService — hardening fiscal (F0)', () => {
-  it('idempotency: la misma key no reemite y devuelve el mismo comprobante', async () => {
+describe("VouchersService — hardening fiscal (F0)", () => {
+  it("idempotency: la misma key no reemite y devuelve el mismo comprobante", async () => {
     const { service, wsfe } = buildHarness();
 
-    const first = await service.issue('user-1', buildInput(), 'key-abc');
-    const second = await service.issue('user-1', buildInput(), 'key-abc');
+    const first = await service.issue("user-1", buildInput(), "key-abc");
+    const second = await service.issue("user-1", buildInput(), "key-abc");
 
     expect(second.id).toBe(first.id);
     expect(wsfe.requestCae).toHaveBeenCalledTimes(1);
   });
 
-  it('concurrencia: dos emisiones simultáneas del mismo emisor no colisionan de número', async () => {
+  it("concurrencia: dos emisiones simultáneas del mismo emisor no colisionan de número", async () => {
     const { service } = buildHarness();
 
     const [a, b] = await Promise.all([
-      service.issue('user-1', buildInput()),
-      service.issue('user-1', buildInput()),
+      service.issue("user-1", buildInput()),
+      service.issue("user-1", buildInput()),
     ]);
 
     expect([a.number, b.number].sort()).toEqual([1, 2]);
   });
 
-  it('recuperación de duplicado: si ARCA reporta 10016 recupera el CAE ya emitido', async () => {
+  it("recuperación de duplicado: si ARCA reporta 10016 recupera el CAE ya emitido", async () => {
     const { service, wsfe } = buildHarness();
 
     (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(
-      new ArcaRejectionError(['10016'], ['(10016) comprobante duplicado']),
+      new ArcaRejectionError(["10016"], ["(10016) comprobante duplicado"]),
     );
     (wsfe.queryVoucher as jest.Mock).mockResolvedValueOnce({
-      cae: '74000000000099',
-      caeVto: new Date('2026-07-22'),
+      cae: "74000000000099",
+      caeVto: new Date("2026-07-22"),
       observations: [],
     });
 
-    const result = await service.issue('user-1', buildInput());
+    const result = await service.issue("user-1", buildInput());
 
-    expect(result.cae).toBe('74000000000099');
+    expect(result.cae).toBe("74000000000099");
     expect(wsfe.queryVoucher).toHaveBeenCalledTimes(1);
   });
 
-  it('rechazo no-duplicado se propaga como error', async () => {
+  it("rechazo no-duplicado se propaga como error", async () => {
     const { service, wsfe } = buildHarness();
 
     (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(
-      new ArcaRejectionError(['10015'], ['(10015) dato inválido']),
+      new ArcaRejectionError(["10015"], ["(10015) dato inválido"]),
     );
 
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      ArcaRejectionError,
-    );
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(ArcaRejectionError);
   });
 });
 
-describe('VouchersService — resiliencia / retry (F2)', () => {
-  it('error transitorio de ARCA encola el comprobante y responde 503', async () => {
+describe("VouchersService — resiliencia / retry (F2)", () => {
+  it("error transitorio de ARCA encola el comprobante y responde 503", async () => {
     const { service, wsfe, pending } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
 
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
     expect(pending).toHaveLength(1);
     expect(pending[0].status).toBe(PendingVoucherStatus.PENDING);
   });
 
-  it('el retry scheduler emite el CAE de un comprobante encolado y lo desencola', async () => {
+  it("el retry scheduler emite el CAE de un comprobante encolado y lo desencola", async () => {
     const { service, wsfe, pending, vouchers, webhooks, push } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
 
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
     expect(pending).toHaveLength(1);
 
     await service.retryPendingVouchers();
 
     expect(pending).toHaveLength(0);
     expect(vouchers).toHaveLength(1);
-    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].cae).toBe("74000000000001");
     expect(webhooks.dispatch).toHaveBeenCalledWith(
-      'issuer-1',
+      "issuer-1",
       WebhookEvent.VOUCHER_ISSUED,
       expect.objectContaining({ voucherId: vouchers[0].id }),
     );
     expect(push.notifyIssuerOwner).toHaveBeenCalledWith(
-      'issuer-1',
+      "issuer-1",
       expect.objectContaining({ data: { voucherId: vouchers[0].id } }),
     );
   });
 
-  it('idempotency: reintentar el POST mientras está encolado devuelve 503, sin duplicar la cola', async () => {
+  it("idempotency: reintentar el POST mientras está encolado devuelve 503, sin duplicar la cola", async () => {
     const { service, wsfe, pending } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
 
-    await expect(
-      service.issue('user-1', buildInput(), 'key-1'),
-    ).rejects.toBeInstanceOf(VoucherQueuedException);
-    await expect(
-      service.issue('user-1', buildInput(), 'key-1'),
-    ).rejects.toBeInstanceOf(VoucherQueuedException);
+    await expect(service.issue("user-1", buildInput(), "key-1")).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
+    await expect(service.issue("user-1", buildInput(), "key-1")).rejects.toBeInstanceOf(
+      VoucherQueuedException,
+    );
 
     expect(pending).toHaveLength(1);
   });
 
-  it('rechazo permanente durante el retry marca ERROR y notifica voucher.failed', async () => {
+  it("rechazo permanente durante el retry marca ERROR y notifica voucher.failed", async () => {
     const { service, wsfe, pending, webhooks } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(
-      new ArcaRejectionError(['10015'], ['(10015) dato inválido']),
+      new ArcaRejectionError(["10015"], ["(10015) dato inválido"]),
     );
     await service.retryPendingVouchers();
 
     expect(pending[0].status).toBe(PendingVoucherStatus.FAILED);
     expect(webhooks.dispatch).toHaveBeenCalledWith(
-      'issuer-1',
+      "issuer-1",
       WebhookEvent.VOUCHER_FAILED,
       expect.objectContaining({ permanent: true }),
     );
   });
 });
 
-describe('VouchersService — reconciliación (D.1)', () => {
+describe("VouchersService — reconciliación (D.1)", () => {
   const authorizedInArca = {
     cae: {
-      cae: '74000000000077',
-      caeVto: new Date('2026-07-22'),
+      cae: "74000000000077",
+      caeVto: new Date("2026-07-22"),
       observations: [],
     },
     number: 1,
     totalAmount: 100,
     recipientDocType: 99,
-    recipientDocNumber: '0',
-    date: new Date('2026-07-12'),
+    recipientDocNumber: "0",
+    date: new Date("2026-07-12"),
   };
 
-  it('guarda el número intentado al encolar por error de red', async () => {
+  it("guarda el número intentado al encolar por error de red", async () => {
     const { service, wsfe, pending } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
 
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     expect(pending[0].attemptedNumber).toBe(1);
     expect(pending[0].attemptedSalesPoint).toBe(1);
   });
 
-  it('adopta el CAE ya otorgado en vez de emitir un duplicado', async () => {
+  it("adopta el CAE ya otorgado en vez de emitir un duplicado", async () => {
     const { service, wsfe, pending, vouchers } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce(authorizedInArca);
     (wsfe.requestCae as jest.Mock).mockClear();
@@ -380,30 +361,26 @@ describe('VouchersService — reconciliación (D.1)', () => {
     expect(wsfe.requestCae).not.toHaveBeenCalled();
     expect(pending).toHaveLength(0);
     expect(vouchers).toHaveLength(1);
-    expect(vouchers[0].cae).toBe('74000000000077');
+    expect(vouchers[0].cae).toBe("74000000000077");
     expect(vouchers[0].status).toBe(VoucherStatus.RECOVERED);
   });
 
-  it('emite normalmente si ARCA no tiene ese número autorizado', async () => {
+  it("emite normalmente si ARCA no tiene ese número autorizado", async () => {
     const { service, wsfe, vouchers } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     await service.retryPendingVouchers();
 
     expect(vouchers).toHaveLength(1);
-    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].cae).toBe("74000000000001");
     expect(vouchers[0].status).toBe(VoucherStatus.APPROVED);
   });
 
-  it('no adopta un comprobante de ARCA cuyo total no coincide', async () => {
+  it("no adopta un comprobante de ARCA cuyo total no coincide", async () => {
     const { service, wsfe, vouchers } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce({
       ...authorizedInArca,
@@ -413,59 +390,57 @@ describe('VouchersService — reconciliación (D.1)', () => {
     await service.retryPendingVouchers();
 
     expect(wsfe.requestCae).toHaveBeenCalled();
-    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].cae).toBe("74000000000001");
   });
 
-  it('no adopta un comprobante de ARCA emitido a otro receptor', async () => {
+  it("no adopta un comprobante de ARCA emitido a otro receptor", async () => {
     const { service, wsfe, vouchers } = buildHarness();
-    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error('ARCA timeout'));
-    await expect(service.issue('user-1', buildInput())).rejects.toBeInstanceOf(
-      VoucherQueuedException,
-    );
+    (wsfe.requestCae as jest.Mock).mockRejectedValueOnce(new Error("ARCA timeout"));
+    await expect(service.issue("user-1", buildInput())).rejects.toBeInstanceOf(VoucherQueuedException);
 
     (wsfe.queryVoucherDetail as jest.Mock).mockResolvedValueOnce({
       ...authorizedInArca,
       recipientDocType: 80,
-      recipientDocNumber: '30707153745',
+      recipientDocNumber: "30707153745",
     });
 
     await service.retryPendingVouchers();
 
     expect(wsfe.requestCae).toHaveBeenCalled();
-    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].cae).toBe("74000000000001");
   });
 });
 
-describe('VouchersService — observaciones de ARCA', () => {
+describe("VouchersService — observaciones de ARCA", () => {
   const observed = {
-    cae: '74000000000001',
-    caeVto: new Date('2026-07-22'),
-    observations: [{ code: '10013', message: 'Fecha fuera de rango' }],
+    cae: "74000000000001",
+    caeVto: new Date("2026-07-22"),
+    observations: [{ code: "10013", message: "Fecha fuera de rango" }],
   };
 
-  it('marca el comprobante como observado y guarda el aviso', async () => {
+  it("marca el comprobante como observado y guarda el aviso", async () => {
     const { service, wsfe, vouchers } = buildHarness();
     (wsfe.requestCae as jest.Mock).mockResolvedValueOnce(observed);
 
-    await service.issue('user-1', buildInput());
+    await service.issue("user-1", buildInput());
 
     expect(vouchers[0].status).toBe(VoucherStatus.OBSERVED);
     expect(vouchers[0].arcaObservations).toEqual(observed.observations);
   });
 
-  it('el comprobante observado sigue teniendo CAE válido', async () => {
+  it("el comprobante observado sigue teniendo CAE válido", async () => {
     const { service, wsfe, vouchers } = buildHarness();
     (wsfe.requestCae as jest.Mock).mockResolvedValueOnce(observed);
 
-    await service.issue('user-1', buildInput());
+    await service.issue("user-1", buildInput());
 
-    expect(vouchers[0].cae).toBe('74000000000001');
+    expect(vouchers[0].cae).toBe("74000000000001");
   });
 
-  it('no guarda observaciones cuando ARCA no devuelve ninguna', async () => {
+  it("no guarda observaciones cuando ARCA no devuelve ninguna", async () => {
     const { service, vouchers } = buildHarness();
 
-    await service.issue('user-1', buildInput());
+    await service.issue("user-1", buildInput());
 
     expect(vouchers[0].status).toBe(VoucherStatus.APPROVED);
     expect(vouchers[0].arcaObservations).toBeNull();

@@ -1,4 +1,4 @@
-import { isCreditNote, TaxTreatment, voucherLetter } from '@chirola/shared';
+import { isCreditNote, TaxTreatment, voucherLetter } from "@chirola/shared";
 
 export type Numeric = number | { toString(): string };
 
@@ -21,8 +21,8 @@ export interface VoucherTaxBreakdown {
   ivaByRate: Map<number, number>;
 }
 
-const IVA_BEARING_LETTERS: readonly string[] = ['A', 'B', 'M'];
-const EXPORT_LETTER = 'E';
+const IVA_BEARING_LETTERS: readonly string[] = ["A", "B", "M"];
+const EXPORT_LETTER = "E";
 const LOCAL_EXCHANGE_RATE = 1;
 
 export function round2(value: number): number {
@@ -38,8 +38,7 @@ export function voucherSign(voucherType: number): number {
 }
 
 export function toPesos(voucher: TaxBreakdownVoucher, amount: number): number {
-  const rate =
-    voucher.exchangeRate === undefined ? LOCAL_EXCHANGE_RATE : Number(voucher.exchangeRate);
+  const rate = voucher.exchangeRate === undefined ? LOCAL_EXCHANGE_RATE : Number(voucher.exchangeRate);
   return amount * rate;
 }
 

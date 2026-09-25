@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus } from "@nestjs/common";
 
 const MS_PER_SECOND = 1000;
 const MAX_TRACKED_KEYS = 10_000;
@@ -46,7 +46,7 @@ function tooManyRequests(retryAfterSeconds: number): HttpException {
   return new HttpException(
     {
       statusCode: HttpStatus.TOO_MANY_REQUESTS,
-      message: 'Límite de solicitudes excedido.',
+      message: "Límite de solicitudes excedido.",
       retryAfterSeconds,
     },
     HttpStatus.TOO_MANY_REQUESTS,

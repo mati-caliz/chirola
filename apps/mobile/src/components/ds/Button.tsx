@@ -1,9 +1,9 @@
-import { type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { useTheme, type Theme } from '@/hooks/use-theme';
+import { type ReactNode } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { useTheme, type Theme } from "@/hooks/use-theme";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonSize = "sm" | "md" | "lg";
 
 const sizes: Record<ButtonSize, { height: number; paddingHorizontal: number; fontSize: number }> = {
   sm: { height: 40, paddingHorizontal: 16, fontSize: 14 },
@@ -14,11 +14,15 @@ const sizes: Record<ButtonSize, { height: number; paddingHorizontal: number; fon
 function variantColors(theme: Theme, variant: ButtonVariant) {
   const { colors } = theme;
   switch (variant) {
-    case 'secondary':
-      return { bg: colors.actionSecondary, press: colors.actionSecondaryPress, fg: colors.actionSecondaryText };
-    case 'ghost':
-      return { bg: 'transparent', press: colors.bgSunken, fg: colors.textBrand };
-    case 'danger':
+    case "secondary":
+      return {
+        bg: colors.actionSecondary,
+        press: colors.actionSecondaryPress,
+        fg: colors.actionSecondaryText,
+      };
+    case "ghost":
+      return { bg: "transparent", press: colors.bgSunken, fg: colors.textBrand };
+    case "danger":
       return { bg: colors.actionDanger, press: colors.actionDangerPress, fg: colors.textInverse };
     default:
       return { bg: colors.actionPrimary, press: colors.actionPrimaryPress, fg: colors.actionPrimaryText };
@@ -27,8 +31,8 @@ function variantColors(theme: Theme, variant: ButtonVariant) {
 
 export const Button = ({
   children,
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   full = false,
   disabled = false,
   loading = false,
@@ -58,7 +62,7 @@ export const Button = ({
           height: s.height,
           paddingHorizontal: s.paddingHorizontal,
           borderRadius: theme.radius.pill,
-          alignSelf: full ? 'stretch' : 'flex-start',
+          alignSelf: full ? "stretch" : "flex-start",
           backgroundColor: pressed && !isDisabled ? press : bg,
           opacity: isDisabled ? 0.45 : 1,
           transform: pressed && !isDisabled ? [{ scale: 0.97 }] : [{ scale: 1 }],
@@ -78,5 +82,5 @@ export const Button = ({
 };
 
 const styles = StyleSheet.create({
-  base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  base: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
 });

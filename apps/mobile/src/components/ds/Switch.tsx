@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useEffect, useRef } from "react";
+import { Animated, Pressable } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 const TRACK_WIDTH = 52;
 const TRACK_HEIGHT = 32;
@@ -41,7 +41,7 @@ export const Switch = ({
         height: TRACK_HEIGHT,
         borderRadius: TRACK_HEIGHT / 2,
         padding: 3,
-        justifyContent: 'center',
+        justifyContent: "center",
         opacity: disabled ? 0.45 : 1,
         backgroundColor: checked ? theme.colors.actionPrimary : theme.colors.borderStrong,
       }}
@@ -51,7 +51,7 @@ export const Switch = ({
           width: THUMB_SIZE,
           height: THUMB_SIZE,
           borderRadius: THUMB_SIZE / 2,
-          backgroundColor: '#ffffff',
+          backgroundColor: "#ffffff",
           transform: [{ translateX: position.interpolate({ inputRange: [0, 1], outputRange: [0, TRAVEL] }) }],
           ...theme.shadow.card,
         }}

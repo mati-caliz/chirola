@@ -1,17 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import { redactArcaXml, truncateXml } from './arca-call-redaction';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../prisma/prisma.service";
+import { redactArcaXml, truncateXml } from "./arca-call-redaction";
 
 export const ArcaCallOutcome = {
-  SUCCESS: 'SUCCESS',
-  REJECTED: 'REJECTED',
-  FAULT: 'FAULT',
-  NETWORK_ERROR: 'NETWORK_ERROR',
+  SUCCESS: "SUCCESS",
+  REJECTED: "REJECTED",
+  FAULT: "FAULT",
+  NETWORK_ERROR: "NETWORK_ERROR",
 } as const;
 
-export type ArcaCallOutcomeName =
-  (typeof ArcaCallOutcome)[keyof typeof ArcaCallOutcome];
+export type ArcaCallOutcomeName = (typeof ArcaCallOutcome)[keyof typeof ArcaCallOutcome];
 
 export interface ArcaCallQuery {
   operation?: string;
@@ -56,9 +55,7 @@ export class ArcaCallLogService {
           httpStatus: entry.httpStatus,
           durationMs: entry.durationMs,
           outcome: entry.outcome,
-          errorCodes: entry.errorCodes?.length
-            ? entry.errorCodes.join(',')
-            : null,
+          errorCodes: entry.errorCodes?.length ? entry.errorCodes.join(",") : null,
           requestXml: this.sanitize(entry.requestXml),
           responseXml: this.sanitize(entry.responseXml),
         },
@@ -79,7 +76,7 @@ export class ArcaCallLogService {
         operation: query.operation,
         outcome: query.outcome,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: Math.min(query.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
       select: {
         id: true,
@@ -99,17 +96,14 @@ export class ArcaCallLogService {
       where: { id: callId, issuerId },
     });
     if (!call) {
-      throw new NotFoundException('Llamada a ARCA inexistente.');
+      throw new NotFoundException("Llamada a ARCA inexistente.");
     }
     return call;
   }
 
   async purgeExpired(): Promise<number> {
     const retentionDays = Number(
-      this.config.get<string>(
-        'ARCA_CALL_LOG_RETENTION_DAYS',
-        String(DEFAULT_RETENTION_DAYS),
-      ),
+      this.config.get<string>("ARCA_CALL_LOG_RETENTION_DAYS", String(DEFAULT_RETENTION_DAYS)),
     );
     const cutoff = new Date(Date.now() - retentionDays * MILLISECONDS_PER_DAY);
     const { count } = await this.prisma.arcaCallLog.deleteMany({

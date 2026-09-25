@@ -12,8 +12,8 @@ import {
   type DraftAmountsInput,
   type Item,
   type TaxTreatmentType,
-} from '@chirola/shared';
-import { toIsoDate } from '@/lib/format';
+} from "@chirola/shared";
+import { toIsoDate } from "@/lib/format";
 
 export interface ItemForm {
   description: string;
@@ -32,35 +32,31 @@ export interface TributeForm {
 
 export const DEFAULT_IVA_RATE = 21;
 export const NO_IVA_RATE = 0;
-export const SELECTABLE_CURRENCIES = [LOCAL_CURRENCY, 'DOL', 'EUR'];
-export const CREDIT_NOTE_HINT = 'Anula el comprobante original';
+export const SELECTABLE_CURRENCIES = [LOCAL_CURRENCY, "DOL", "EUR"];
+export const CREDIT_NOTE_HINT = "Anula el comprobante original";
 
-export const DEFAULT_INVOICE_TYPES = [
-  VoucherType.FACTURA_B,
-  VoucherType.FACTURA_A,
-  VoucherType.FACTURA_C,
-];
+export const DEFAULT_INVOICE_TYPES = [VoucherType.FACTURA_B, VoucherType.FACTURA_A, VoucherType.FACTURA_C];
 
 export const voucherTypeHint: Record<number, string> = {
-  [VoucherType.FACTURA_A]: 'Para responsables inscriptos (discrimina IVA)',
-  [VoucherType.FACTURA_B]: 'Para consumidores finales y monotributistas',
-  [VoucherType.FACTURA_C]: 'La tuya si sos monotributista',
-  [VoucherType.FACTURA_M]: 'Si ARCA todavía no te habilitó la A',
-  [VoucherType.FCE_FACTURA_A]: 'Crédito electrónico MiPyME, cobrás por CBU',
-  [VoucherType.FCE_FACTURA_B]: 'Crédito electrónico MiPyME, cobrás por CBU',
-  [VoucherType.FCE_FACTURA_C]: 'Crédito electrónico MiPyME, cobrás por CBU',
+  [VoucherType.FACTURA_A]: "Para responsables inscriptos (discrimina IVA)",
+  [VoucherType.FACTURA_B]: "Para consumidores finales y monotributistas",
+  [VoucherType.FACTURA_C]: "La tuya si sos monotributista",
+  [VoucherType.FACTURA_M]: "Si ARCA todavía no te habilitó la A",
+  [VoucherType.FCE_FACTURA_A]: "Crédito electrónico MiPyME, cobrás por CBU",
+  [VoucherType.FCE_FACTURA_B]: "Crédito electrónico MiPyME, cobrás por CBU",
+  [VoucherType.FCE_FACTURA_C]: "Crédito electrónico MiPyME, cobrás por CBU",
 };
 
 export const conceptOptions = [
-  { value: VoucherConcept.PRODUCTS, label: 'Productos' },
-  { value: VoucherConcept.SERVICES, label: 'Servicios' },
-  { value: VoucherConcept.PRODUCTS_AND_SERVICES, label: 'Ambos' },
+  { value: VoucherConcept.PRODUCTS, label: "Productos" },
+  { value: VoucherConcept.SERVICES, label: "Servicios" },
+  { value: VoucherConcept.PRODUCTS_AND_SERVICES, label: "Ambos" },
 ];
 
 export const docTypeOptions = [
-  { value: DocumentType.CUIT, label: 'CUIT' },
-  { value: DocumentType.DNI, label: 'DNI' },
-  { value: DocumentType.CONSUMIDOR_FINAL, label: 'Cons. Final' },
+  { value: DocumentType.CUIT, label: "CUIT" },
+  { value: DocumentType.DNI, label: "DNI" },
+  { value: DocumentType.CONSUMIDOR_FINAL, label: "Cons. Final" },
 ];
 
 export const taxTreatmentOptions = [
@@ -81,9 +77,9 @@ export const transmissionOptions = [
 ];
 
 export const newItem = (): ItemForm => ({
-  description: '',
-  quantity: '1',
-  unitPrice: '',
+  description: "",
+  quantity: "1",
+  unitPrice: "",
   ivaRate: DEFAULT_IVA_RATE,
   taxTreatment: TaxTreatment.TAXED,
 });
@@ -98,9 +94,9 @@ export const toItemForm = (item: Item): ItemForm => ({
 
 export const newTribute = (): TributeForm => ({
   id: TributeType.PROVINCIAL,
-  description: '',
-  taxableBase: '',
-  rate: '',
+  description: "",
+  taxableBase: "",
+  rate: "",
 });
 
 export const currentMonthPeriod = () => {
@@ -113,7 +109,7 @@ export const currentMonthPeriod = () => {
 
 export const todayIso = () => toIsoDate(new Date());
 
-const toNumber = (value: string): number => (value.trim() === '' ? 0 : Number(value));
+const toNumber = (value: string): number => (value.trim() === "" ? 0 : Number(value));
 
 export function toDraftAmountsInput(
   voucherType: number,

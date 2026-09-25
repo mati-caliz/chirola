@@ -1,28 +1,26 @@
 export const FiscalObligation = {
-  IVA_DDJJ: 'IVA_DDJJ',
-  CARGAS_SOCIALES: 'CARGAS_SOCIALES',
-  LIBRO_IVA_DIGITAL: 'LIBRO_IVA_DIGITAL',
-  MONOTRIBUTO: 'MONOTRIBUTO',
+  IVA_DDJJ: "IVA_DDJJ",
+  CARGAS_SOCIALES: "CARGAS_SOCIALES",
+  LIBRO_IVA_DIGITAL: "LIBRO_IVA_DIGITAL",
+  MONOTRIBUTO: "MONOTRIBUTO",
 } as const;
 
-export type FiscalObligationType =
-  (typeof FiscalObligation)[keyof typeof FiscalObligation];
+export type FiscalObligationType = (typeof FiscalObligation)[keyof typeof FiscalObligation];
 
 const OBLIGATION_LABEL: Record<FiscalObligationType, string> = {
-  IVA_DDJJ: 'DDJJ IVA',
-  CARGAS_SOCIALES: 'Cargas sociales',
-  LIBRO_IVA_DIGITAL: 'Libro IVA Digital',
-  MONOTRIBUTO: 'Monotributo',
+  IVA_DDJJ: "DDJJ IVA",
+  CARGAS_SOCIALES: "Cargas sociales",
+  LIBRO_IVA_DIGITAL: "Libro IVA Digital",
+  MONOTRIBUTO: "Monotributo",
 };
 
 export const VencimientoStatus = {
-  OVERDUE: 'OVERDUE',
-  DUE_SOON: 'DUE_SOON',
-  UPCOMING: 'UPCOMING',
+  OVERDUE: "OVERDUE",
+  DUE_SOON: "DUE_SOON",
+  UPCOMING: "UPCOMING",
 } as const;
 
-export type VencimientoStatusType =
-  (typeof VencimientoStatus)[keyof typeof VencimientoStatus];
+export type VencimientoStatusType = (typeof VencimientoStatus)[keyof typeof VencimientoStatus];
 
 export interface Vencimiento {
   type: FiscalObligationType;
@@ -37,7 +35,7 @@ const DUE_SOON_DAYS = 5;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function lastDigitOf(cuit: string): number {
-  const digits = cuit.replace(/\D/g, '');
+  const digits = cuit.replace(/\D/g, "");
   if (digits.length === 0) return 0;
   return Number(digits[digits.length - 1]);
 }
@@ -56,11 +54,7 @@ function toIsoDate(date: Date): string {
 }
 
 function startOfDay(date: Date): number {
-  return Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-  );
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 function computeStatus(dueDate: Date, today: Date): VencimientoStatusType {
@@ -70,10 +64,7 @@ function computeStatus(dueDate: Date, today: Date): VencimientoStatusType {
   return VencimientoStatus.UPCOMING;
 }
 
-function dueDayFor(
-  obligation: FiscalObligationType,
-  lastDigit: number,
-): number {
+function dueDayFor(obligation: FiscalObligationType, lastDigit: number): number {
   const groupOffset = Math.floor(lastDigit / 2);
   if (obligation === FiscalObligation.CARGAS_SOCIALES) {
     return FIRST_DIGIT_GROUP_DAY - CARGAS_SOCIALES_OFFSET + groupOffset;

@@ -1,8 +1,8 @@
-import { Text, View } from 'react-native';
-import type { ServicePeriod, TransmissionTypeName } from '@chirola/shared';
-import { Card, Input, Segmented } from '@/components/ds';
-import { useTheme } from '@/hooks/use-theme';
-import { transmissionOptions } from './form-model';
+import { Text, View } from "react-native";
+import type { ServicePeriod, TransmissionTypeName } from "@chirola/shared";
+import { Card, Input, Segmented } from "@/components/ds";
+import { useTheme } from "@/hooks/use-theme";
+import { transmissionOptions } from "./form-model";
 
 interface BillingDatesSectionProps {
   needsServicePeriod: boolean;
@@ -32,10 +32,17 @@ export const BillingDatesSection = ({
     <>
       {needsServicePeriod ? (
         <Card>
-          <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption, color: theme.colors.textPrimary, marginBottom: 8 }}>
+          <Text
+            style={{
+              fontFamily: theme.font.semibold,
+              fontSize: theme.fontSize.caption,
+              color: theme.colors.textPrimary,
+              marginBottom: 8,
+            }}
+          >
             Período facturado
           </Text>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
               <Input
                 label="Desde"

@@ -1,6 +1,6 @@
-import { forwardRef, useState, type ReactNode } from 'react';
-import { Text, TextInput, View, type KeyboardTypeOptions, type ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { forwardRef, useState, type ReactNode } from "react";
+import { Text, TextInput, View, type KeyboardTypeOptions, type ViewStyle } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export type InputProps = {
   label?: string;
@@ -11,7 +11,7 @@ export type InputProps = {
   error?: string;
   mono?: boolean;
   keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
   secureTextEntry?: boolean;
   prefix?: string;
   suffix?: ReactNode;
@@ -61,8 +61,8 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
       ) : null}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: multiline ? 'flex-start' : 'center',
+          flexDirection: "row",
+          alignItems: multiline ? "flex-start" : "center",
           gap: 8,
           minHeight: 48,
           paddingHorizontal: 14,
@@ -95,7 +95,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             fontSize: theme.fontSize.body,
             fontFamily: mono ? theme.font.monoRegular : theme.font.regular,
             color: theme.colors.textPrimary,
-            textAlignVertical: multiline ? 'top' : 'center',
+            textAlignVertical: multiline ? "top" : "center",
           }}
         />
         {suffix}

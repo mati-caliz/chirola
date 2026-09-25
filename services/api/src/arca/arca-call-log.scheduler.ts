@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import { ArcaCallLogService } from './arca-call-log.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { ArcaCallLogService } from "./arca-call-log.service";
 
 const PURGE_INTERVAL_MS = 6 * 60 * 60_000;
 
@@ -19,9 +19,7 @@ export class ArcaCallLogScheduler {
       }
     } catch (err) {
       this.logger.warn(
-        `No se pudo purgar el registro de llamadas: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `No se pudo purgar el registro de llamadas: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

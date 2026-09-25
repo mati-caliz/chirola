@@ -1,18 +1,10 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import * as forge from 'node-forge';
-import {
-  IssuerOnboardingStatus,
-  hasConfirmedDelegation,
-  normalizeCuit,
-} from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import { FieldEncryptionService } from '../crypto/field-encryption.service';
-import type { CertificateCredentials } from '../arca/wsaa/wsaa.types';
-import { certificateHolderCuit } from './certificate-subject';
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import * as forge from "node-forge";
+import { IssuerOnboardingStatus, hasConfirmedDelegation, normalizeCuit } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { FieldEncryptionService } from "../crypto/field-encryption.service";
+import type { CertificateCredentials } from "../arca/wsaa/wsaa.types";
+import { certificateHolderCuit } from "./certificate-subject";
 
 @Injectable()
 export class CertsService {
@@ -60,10 +52,10 @@ export class CertsService {
     const csr = forge.pki.createCertificationRequest();
     csr.publicKey = keys.publicKey;
     csr.setSubject([
-      { shortName: 'C', value: 'AR' },
-      { shortName: 'O', value: legalName },
-      { shortName: 'CN', value: alias ?? legalName },
-      { name: 'serialNumber', value: `CUIT ${cuit}` },
+      { shortName: "C", value: "AR" },
+      { shortName: "O", value: legalName },
+      { shortName: "CN", value: alias ?? legalName },
+      { name: "serialNumber", value: `CUIT ${cuit}` },
     ]);
     csr.sign(keys.privateKey, forge.md.sha256.create());
 
@@ -87,7 +79,7 @@ export class CertsService {
     });
     if (!existing) {
       throw new NotFoundException(
-        'No hay una clave privada generada para este emisor. Generá primero el CSR.',
+        "No hay una clave privada generada para este emisor. Generá primero el CSR.",
       );
     }
 
@@ -97,7 +89,7 @@ export class CertsService {
     const privateKeyPem = this.encryption.decrypt(existing.privateKeyEnc);
     if (!this.certMatchesKey(cert, privateKeyPem)) {
       throw new BadRequestException(
-        'El certificado no corresponde a la clave privada generada para este emisor.',
+        "El certificado no corresponde a la clave privada generada para este emisor.",
       );
     }
     const holderCuit = await this.assertCertificateHolder(issuerId, cert);
@@ -113,31 +105,25 @@ export class CertsService {
     try {
       return forge.pki.certificateFromPem(certPem);
     } catch {
-      throw new BadRequestException('El certificado (.crt) no es un PEM válido.');
+      throw new BadRequestException("El certificado (.crt) no es un PEM válido.");
     }
   }
 
-  private async assertCertificateHolder(
-    issuerId: string,
-    cert: forge.pki.Certificate,
-  ): Promise<string> {
+  private async assertCertificateHolder(issuerId: string, cert: forge.pki.Certificate): Promise<string> {
     const issuer = await this.prisma.issuer.findUnique({
       where: { id: issuerId },
       select: { cuit: true, representativeCuit: true },
     });
-    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    if (!issuer) throw new NotFoundException("Emisor inexistente.");
 
     const holderCuit = certificateHolderCuit(cert);
     if (!holderCuit) {
       throw new BadRequestException(
-        'El certificado no declara el CUIT de su titular. ' +
-          'No parece un certificado emitido por ARCA.',
+        "El certificado no declara el CUIT de su titular. " + "No parece un certificado emitido por ARCA.",
       );
     }
 
-    const expectedHolderCuit = normalizeCuit(
-      issuer.representativeCuit ?? issuer.cuit,
-    );
+    const expectedHolderCuit = normalizeCuit(issuer.representativeCuit ?? issuer.cuit);
     if (holderCuit !== expectedHolderCuit) {
       throw new BadRequestException(
         issuer.representativeCuit
@@ -145,7 +131,7 @@ export class CertsService {
               `como representante al CUIT ${issuer.representativeCuit}.`
           : `El certificado pertenece al CUIT ${holderCuit} y el emisor es el CUIT ` +
               `${issuer.cuit}. Si es un representante que factura en nombre de este ` +
-              'contribuyente, hay que declararlo en el emisor antes de cargar el certificado.',
+              "contribuyente, hay que declararlo en el emisor antes de cargar el certificado.",
       );
     }
     return holderCuit;
@@ -163,10 +149,7 @@ export class CertsService {
     });
   }
 
-  private certMatchesKey(
-    cert: forge.pki.Certificate,
-    privateKeyPem: string,
-  ): boolean {
+  private certMatchesKey(cert: forge.pki.Certificate, privateKeyPem: string): boolean {
     try {
       const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
       const derivedPublicPem = forge.pki.publicKeyToPem(
@@ -184,23 +167,16 @@ export class CertsService {
       where: { issuerId },
     });
     if (!cert || !cert.certPem) {
-      throw new NotFoundException(
-        'El emisor no tiene un certificado cargado todavía.',
-      );
+      throw new NotFoundException("El emisor no tiene un certificado cargado todavía.");
     }
     return {
       certPem: cert.certPem,
       privateKeyPem: this.encryption.decrypt(cert.privateKeyEnc),
-      holderCuit:
-        cert.holderCuit ??
-        (await this.backfillHolderCuit(issuerId, cert.certPem)),
+      holderCuit: cert.holderCuit ?? (await this.backfillHolderCuit(issuerId, cert.certPem)),
     };
   }
 
-  private async backfillHolderCuit(
-    issuerId: string,
-    certPem: string,
-  ): Promise<string | null> {
+  private async backfillHolderCuit(issuerId: string, certPem: string): Promise<string | null> {
     const holderCuit = certificateHolderCuit(this.parseCertificate(certPem));
     if (!holderCuit) return null;
     await this.prisma.certificate.update({

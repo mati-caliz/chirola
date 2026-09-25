@@ -26,30 +26,30 @@ export const VoucherType = {
 } as const;
 
 export const voucherTypeName: Record<number, string> = {
-  1: 'Factura A',
-  2: 'Nota de Débito A',
-  3: 'Nota de Crédito A',
-  6: 'Factura B',
-  7: 'Nota de Débito B',
-  8: 'Nota de Crédito B',
-  19: 'Factura E',
-  20: 'Nota de Débito E',
-  21: 'Nota de Crédito E',
-  11: 'Factura C',
-  12: 'Nota de Débito C',
-  13: 'Nota de Crédito C',
-  51: 'Factura M',
-  52: 'Nota de Débito M',
-  53: 'Nota de Crédito M',
-  201: 'Factura de Crédito MiPyME A',
-  202: 'Nota de Débito MiPyME A',
-  203: 'Nota de Crédito MiPyME A',
-  206: 'Factura de Crédito MiPyME B',
-  207: 'Nota de Débito MiPyME B',
-  208: 'Nota de Crédito MiPyME B',
-  211: 'Factura de Crédito MiPyME C',
-  212: 'Nota de Débito MiPyME C',
-  213: 'Nota de Crédito MiPyME C',
+  1: "Factura A",
+  2: "Nota de Débito A",
+  3: "Nota de Crédito A",
+  6: "Factura B",
+  7: "Nota de Débito B",
+  8: "Nota de Crédito B",
+  19: "Factura E",
+  20: "Nota de Débito E",
+  21: "Nota de Crédito E",
+  11: "Factura C",
+  12: "Nota de Débito C",
+  13: "Nota de Crédito C",
+  51: "Factura M",
+  52: "Nota de Débito M",
+  53: "Nota de Crédito M",
+  201: "Factura de Crédito MiPyME A",
+  202: "Nota de Débito MiPyME A",
+  203: "Nota de Crédito MiPyME A",
+  206: "Factura de Crédito MiPyME B",
+  207: "Nota de Débito MiPyME B",
+  208: "Nota de Crédito MiPyME B",
+  211: "Factura de Crédito MiPyME C",
+  212: "Nota de Débito MiPyME C",
+  213: "Nota de Crédito MiPyME C",
 };
 
 const creditInvoiceTypes: readonly number[] = [
@@ -120,12 +120,12 @@ export function isCreditNote(voucherType: number): boolean {
 }
 
 export function voucherLetter(voucherType: number): string {
-  const name = voucherTypeName[voucherType] ?? '';
+  const name = voucherTypeName[voucherType] ?? "";
   const match = name.match(/ ([ABCEM])$/);
-  return match ? match[1] : '';
+  return match ? match[1] : "";
 }
 
-const ivaDiscriminatingLetters: readonly string[] = ['A', 'M'];
+const ivaDiscriminatingLetters: readonly string[] = ["A", "M"];
 
 export function discriminatesIva(voucherType: number): boolean {
   return ivaDiscriminatingLetters.includes(voucherLetter(voucherType));

@@ -1,11 +1,7 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type { UpdateClient, CreateClient } from '@chirola/shared';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import type { UpdateClient, CreateClient } from "@chirola/shared";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class ClientsService {
@@ -31,7 +27,7 @@ export class ClientsService {
   list(issuerId: string) {
     return this.prisma.client.findMany({
       where: { issuerId },
-      orderBy: { legalName: 'asc' },
+      orderBy: { legalName: "asc" },
     });
   }
 
@@ -39,7 +35,7 @@ export class ClientsService {
     const client = await this.prisma.client.findFirst({
       where: { id, issuerId },
     });
-    if (!client) throw new NotFoundException('Cliente inexistente.');
+    if (!client) throw new NotFoundException("Cliente inexistente.");
     return client;
   }
 
@@ -68,13 +64,8 @@ export class ClientsService {
   }
 
   private mapError(e: unknown): unknown {
-    if (
-      e instanceof Prisma.PrismaClientKnownRequestError &&
-      e.code === 'P2002'
-    ) {
-      return new ConflictException(
-        'Ya existe un cliente con ese documento para este emisor.',
-      );
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return new ConflictException("Ya existe un cliente con ese documento para este emisor.");
     }
     return e;
   }

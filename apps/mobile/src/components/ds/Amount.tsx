@@ -1,13 +1,13 @@
-import { Text, type TextStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { Text, type TextStyle } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
-export type AmountSize = 'sm' | 'md' | 'xl';
+export type AmountSize = "sm" | "md" | "xl";
 
 const fontSizes: Record<AmountSize, number> = { sm: 16, md: 24, xl: 40 };
 
 export const Amount = ({
   value,
-  size = 'md',
+  size = "md",
   currency,
   muted = false,
   style,
@@ -25,7 +25,7 @@ export const Amount = ({
       style={[
         {
           fontFamily: theme.font.monoSemibold,
-          fontVariant: ['tabular-nums'],
+          fontVariant: ["tabular-nums"],
           fontSize: fs,
           letterSpacing: -0.3,
           color: muted ? theme.colors.textSecondary : theme.colors.textPrimary,

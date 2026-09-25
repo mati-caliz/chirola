@@ -1,17 +1,8 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import {
-  decryptField,
-  encryptField,
-  InvalidEncryptionKeyError,
-  parseEncryptionKey,
-} from './field-cipher';
+import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { decryptField, encryptField, InvalidEncryptionKeyError, parseEncryptionKey } from "./field-cipher";
 
-const KEY_VARIABLE = 'CERT_ENCRYPTION_KEY';
+const KEY_VARIABLE = "CERT_ENCRYPTION_KEY";
 
 @Injectable()
 export class FieldEncryptionService {
@@ -20,7 +11,7 @@ export class FieldEncryptionService {
 
   constructor(config: ConfigService) {
     try {
-      this.key = parseEncryptionKey(config.get<string>(KEY_VARIABLE, ''), KEY_VARIABLE);
+      this.key = parseEncryptionKey(config.get<string>(KEY_VARIABLE, ""), KEY_VARIABLE);
     } catch (err) {
       if (err instanceof InvalidEncryptionKeyError) {
         throw new InternalServerErrorException(err.message);
@@ -37,10 +28,8 @@ export class FieldEncryptionService {
     try {
       return decryptField(this.key, ciphertext);
     } catch (err) {
-      this.logger.error('Fallo al descifrar campo', err as Error);
-      throw new InternalServerErrorException(
-        'No se pudo descifrar la clave privada del certificado.',
-      );
+      this.logger.error("Fallo al descifrar campo", err as Error);
+      throw new InternalServerErrorException("No se pudo descifrar la clave privada del certificado.");
     }
   }
 }

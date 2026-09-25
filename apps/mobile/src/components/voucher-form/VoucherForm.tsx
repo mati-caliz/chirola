@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ScrollView } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArcaParamType,
   discriminatesIva,
@@ -20,14 +20,14 @@ import {
   type IssueVoucher,
   type TransmissionTypeName,
   type VoucherConceptType,
-} from '@chirola/shared';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Banner, BottomSheet, Button, Input, ListItem, Segmented, Select } from '@/components/ds';
-import { ArcaHealthBanner } from '@/components/vouchers/ArcaHealthBanner';
-import { ConfirmEmissionSheet } from '@/components/vouchers/ConfirmEmissionSheet';
-import { QueuedEmissionScreen } from '@/components/vouchers/QueuedEmissionScreen';
-import { pendingVouchersQueryKey } from '@/components/vouchers/PendingVouchersSection';
-import { ApiError } from '@/lib/api';
+} from "@chirola/shared";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Banner, BottomSheet, Button, Input, ListItem, Segmented, Select } from "@/components/ds";
+import { ArcaHealthBanner } from "@/components/vouchers/ArcaHealthBanner";
+import { ConfirmEmissionSheet } from "@/components/vouchers/ConfirmEmissionSheet";
+import { QueuedEmissionScreen } from "@/components/vouchers/QueuedEmissionScreen";
+import { pendingVouchersQueryKey } from "@/components/vouchers/PendingVouchersSection";
+import { ApiError } from "@/lib/api";
 import {
   dryRunVoucher,
   getExchangeRate,
@@ -38,7 +38,7 @@ import {
   listSalesPoints,
   lookupTaxpayer,
   type Client,
-} from '@/lib/resources';
+} from "@/lib/resources";
 import {
   conceptOptions,
   CREDIT_NOTE_HINT,
@@ -53,26 +53,25 @@ import {
   voucherTypeHint,
   type ItemForm,
   type TributeForm,
-} from './form-model';
-import { RecipientSection } from './RecipientSection';
-import { BillingDatesSection } from './BillingDatesSection';
-import { ItemCard } from './ItemCard';
-import { TributeCard } from './TributeCard';
-import { TotalsFooter } from './TotalsFooter';
-import { EmittingScreen, FailedEmissionScreen } from './EmissionStatusScreens';
-import { useTheme } from '@/hooks/use-theme';
+} from "./form-model";
+import { RecipientSection } from "./RecipientSection";
+import { BillingDatesSection } from "./BillingDatesSection";
+import { ItemCard } from "./ItemCard";
+import { TributeCard } from "./TributeCard";
+import { TotalsFooter } from "./TotalsFooter";
+import { EmittingScreen, FailedEmissionScreen } from "./EmissionStatusScreens";
+import { useTheme } from "@/hooks/use-theme";
 
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const SALES_POINT_DIGITS = 4;
-const INVALID_FORM_MESSAGE = 'Revisá los datos de la factura.';
+const INVALID_FORM_MESSAGE = "Revisá los datos de la factura.";
 
-type SheetName = 'tipo' | 'pdv' | 'moneda' | 'confirm';
+type SheetName = "tipo" | "pdv" | "moneda" | "confirm";
 
 const replaceAt = <T,>(list: T[], index: number, patch: Partial<T>): T[] =>
   list.map((entry, position) => (position === index ? { ...entry, ...patch } : entry));
 
-const removeAt = <T,>(list: T[], index: number): T[] =>
-  list.filter((_, position) => position !== index);
+const removeAt = <T,>(list: T[], index: number): T[] => list.filter((_, position) => position !== index);
 
 export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: IssueVoucher | null }) {
   const theme = useTheme();
@@ -80,7 +79,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
   const queryClient = useQueryClient();
 
   const [voucherType, setVoucherType] = useState<number>(draft?.voucherType ?? VoucherType.FACTURA_B);
-  const [salesPoint, setSalesPoint] = useState(draft ? String(draft.salesPoint) : '1');
+  const [salesPoint, setSalesPoint] = useState(draft ? String(draft.salesPoint) : "1");
   const [concept, setConcept] = useState<VoucherConceptType>(draft?.concept ?? VoucherConcept.PRODUCTS);
   const [servicePeriod, setServicePeriod] = useState(() => draft?.servicePeriod ?? currentMonthPeriod());
   const [paymentDueDate, setPaymentDueDate] = useState(() => draft?.paymentDueDate ?? todayIso());
@@ -88,8 +87,8 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
     TransmissionType.OPEN_CIRCULATION,
   );
   const [docType, setDocType] = useState<number>(draft?.recipient.docType ?? DocumentType.CONSUMIDOR_FINAL);
-  const [docNumber, setDocNumber] = useState(draft?.recipient.docNumber ?? '0');
-  const [legalName, setLegalName] = useState(draft?.recipient.legalName ?? '');
+  const [docNumber, setDocNumber] = useState(draft?.recipient.docNumber ?? "0");
+  const [legalName, setLegalName] = useState(draft?.recipient.legalName ?? "");
   const [recipientIvaConditionId, setRecipientIvaConditionId] = useState<number | null>(null);
   const [currency, setCurrency] = useState(draft?.currency ?? LOCAL_CURRENCY);
   const [exchangeRate, setExchangeRate] = useState(String(draft?.exchangeRate ?? LOCAL_EXCHANGE_RATE));
@@ -99,24 +98,27 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
   const [queued, setQueued] = useState(false);
   const [sheet, setSheet] = useState<SheetName | null>(null);
 
-  const { data: clients } = useQuery({ queryKey: ['clients', issuerId], queryFn: () => listClients(issuerId) });
+  const { data: clients } = useQuery({
+    queryKey: ["clients", issuerId],
+    queryFn: () => listClients(issuerId),
+  });
   const { data: salesPoints } = useQuery({
-    queryKey: ['sales-points', issuerId],
+    queryKey: ["sales-points", issuerId],
     queryFn: () => listSalesPoints(issuerId),
   });
   const { data: enabledVoucherTypes } = useQuery({
-    queryKey: ['params', issuerId, ArcaParamType.VOUCHER_TYPES],
+    queryKey: ["params", issuerId, ArcaParamType.VOUCHER_TYPES],
     queryFn: () => listArcaParams(issuerId, ArcaParamType.VOUCHER_TYPES),
   });
   const { data: currencies } = useQuery({
-    queryKey: ['currencies', issuerId],
+    queryKey: ["currencies", issuerId],
     queryFn: () => listCurrencies(issuerId),
   });
 
   const mutation = useMutation({
     mutationFn: issueVoucher,
     onSuccess: (res) => {
-      void queryClient.invalidateQueries({ queryKey: ['vouchers', issuerId] });
+      void queryClient.invalidateQueries({ queryKey: ["vouchers", issuerId] });
       router.replace(`/(app)/vouchers/${res.id}`);
     },
     onError: (e) => {
@@ -126,7 +128,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
         setQueued(true);
         return;
       }
-      setError(e instanceof Error ? e.message : 'No se pudo emitir el comprobante.');
+      setError(e instanceof Error ? e.message : "No se pudo emitir el comprobante.");
     },
   });
 
@@ -135,7 +137,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
   const exchangeRateLookup = useMutation({
     mutationFn: (currencyId: string) => getExchangeRate(issuerId, currencyId),
     onSuccess: (quote) => setExchangeRate(String(quote.rate)),
-    onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo traer la cotización.'),
+    onError: (e) => setError(e instanceof Error ? e.message : "No se pudo traer la cotización."),
   });
 
   const padronLookup = useMutation({
@@ -145,12 +147,14 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
       setRecipientIvaConditionId(taxpayer.ivaConditionId);
       setError(null);
     },
-    onError: (e) => setError(e instanceof Error ? e.message : 'No se pudo consultar el padrón.'),
+    onError: (e) => setError(e instanceof Error ? e.message : "No se pudo consultar el padrón."),
   });
 
   const voucherTypeOptions = useMemo(() => {
     if (draft) {
-      return [{ value: draft.voucherType, label: voucherTypeName[draft.voucherType], hint: CREDIT_NOTE_HINT }];
+      return [
+        { value: draft.voucherType, label: voucherTypeName[draft.voucherType], hint: CREDIT_NOTE_HINT },
+      ];
     }
     const enabledIds = new Set((enabledVoucherTypes ?? []).map((param) => param.id));
     const available = issuableInvoiceTypes.filter((type) => enabledIds.has(type));
@@ -168,14 +172,14 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
     const byId = new Map((currencies ?? []).map((item) => [item.id, item.description]));
     return SELECTABLE_CURRENCIES.map((id) => ({
       value: id,
-      label: id === LOCAL_CURRENCY ? 'Pesos' : (byId.get(id) ?? id),
+      label: id === LOCAL_CURRENCY ? "Pesos" : (byId.get(id) ?? id),
     }));
   }, [currencies]);
 
   const chooseClient = (client: Client) => {
     setDocType(client.docType);
     setDocNumber(client.docNumber);
-    setLegalName(client.legalName ?? '');
+    setLegalName(client.legalName ?? "");
   };
 
   const chooseCurrency = (currencyId: string) => {
@@ -200,11 +204,11 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
   const selectedType = voucherTypeOptions.find((type) => type.value === voucherType);
   const selectedSalesPoint = salesPoints?.find((point) => String(point.number) === salesPoint);
   const salesPointLabel = selectedSalesPoint
-    ? `${String(selectedSalesPoint.number).padStart(SALES_POINT_DIGITS, '0')}${selectedSalesPoint.description ? ` — ${selectedSalesPoint.description}` : ''}`
+    ? `${String(selectedSalesPoint.number).padStart(SALES_POINT_DIGITS, "0")}${selectedSalesPoint.description ? ` — ${selectedSalesPoint.description}` : ""}`
     : undefined;
   const selectedCurrency = currencyOptions.find((option) => option.value === currency);
   const clientLabel =
-    legalName.trim() || (docType === DocumentType.CONSUMIDOR_FINAL ? 'Consumidor final' : docNumber);
+    legalName.trim() || (docType === DocumentType.CONSUMIDOR_FINAL ? "Consumidor final" : docNumber);
 
   const parsePayload = () =>
     issueVoucherSchema.safeParse({
@@ -251,7 +255,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
     }
     emissionPlan.reset();
     emissionPlan.mutate(parsed.data);
-    setSheet('confirm');
+    setSheet("confirm");
   };
 
   const emit = () => {
@@ -267,7 +271,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
   if (queued) {
     return (
       <QueuedEmissionScreen
-        onSeeVouchers={() => router.replace('/(app)/(tabs)/comprobantes')}
+        onSeeVouchers={() => router.replace("/(app)/(tabs)/comprobantes")}
         onExit={() => router.back()}
       />
     );
@@ -276,12 +280,14 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
     return <EmittingScreen />;
   }
   if (error) {
-    return <FailedEmissionScreen message={error} onRetry={() => setError(null)} onExit={() => router.back()} />;
+    return (
+      <FailedEmissionScreen message={error} onRetry={() => setError(null)} onExit={() => router.back()} />
+    );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={['bottom']}>
-      <Stack.Screen options={{ title: draft ? 'Nota de crédito' : 'Emitir comprobante' }} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={["bottom"]}>
+      <Stack.Screen options={{ title: draft ? "Nota de crédito" : "Emitir comprobante" }} />
       <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} showsVerticalScrollIndicator={false}>
         <ArcaHealthBanner issuerId={issuerId} />
         {draft ? (
@@ -291,9 +297,14 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
             body="Los datos vienen del original. Si la anulación es parcial, ajustá los ítems antes de emitir."
           />
         ) : null}
-        <Select label="Tipo de comprobante" value={selectedType?.label} hint={selectedType?.hint} onPress={() => setSheet('tipo')} />
+        <Select
+          label="Tipo de comprobante"
+          value={selectedType?.label}
+          hint={selectedType?.hint}
+          onPress={() => setSheet("tipo")}
+        />
         {salesPoints && salesPoints.length > 0 ? (
-          <Select label="Punto de venta" value={salesPointLabel} onPress={() => setSheet('pdv')} />
+          <Select label="Punto de venta" value={salesPointLabel} onPress={() => setSheet("pdv")} />
         ) : (
           <Input
             label="Punto de venta"
@@ -309,7 +320,7 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
           label="Moneda"
           value={selectedCurrency?.label}
           hint={currency === LOCAL_CURRENCY ? undefined : `Cotización ${exchangeRate}`}
-          onPress={() => setSheet('moneda')}
+          onPress={() => setSheet("moneda")}
         />
         {currency !== LOCAL_CURRENCY ? (
           <Input
@@ -318,7 +329,11 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
             onChangeText={setExchangeRate}
             keyboardType="decimal-pad"
             mono
-            hint={exchangeRateLookup.isPending ? 'Consultando a ARCA…' : 'ARCA valida contra su propia cotización.'}
+            hint={
+              exchangeRateLookup.isPending
+                ? "Consultando a ARCA…"
+                : "ARCA valida contra su propia cotización."
+            }
           />
         ) : null}
 
@@ -380,13 +395,9 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
         </Button>
       </ScrollView>
 
-      <TotalsFooter
-        amountsInput={amountsInput}
-        currency={currency}
-        onReview={review}
-      />
+      <TotalsFooter amountsInput={amountsInput} currency={currency} onReview={review} />
 
-      <BottomSheet open={sheet === 'tipo'} title="Tipo de comprobante" onClose={() => setSheet(null)}>
+      <BottomSheet open={sheet === "tipo"} title="Tipo de comprobante" onClose={() => setSheet(null)}>
         {voucherTypeOptions.map((type) => (
           <ListItem
             key={type.value}
@@ -400,11 +411,11 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
         ))}
       </BottomSheet>
 
-      <BottomSheet open={sheet === 'pdv'} title="Punto de venta" onClose={() => setSheet(null)}>
+      <BottomSheet open={sheet === "pdv"} title="Punto de venta" onClose={() => setSheet(null)}>
         {(salesPoints ?? []).map((point) => (
           <ListItem
             key={point.id}
-            title={`Punto de venta ${String(point.number).padStart(SALES_POINT_DIGITS, '0')}`}
+            title={`Punto de venta ${String(point.number).padStart(SALES_POINT_DIGITS, "0")}`}
             subtitle={point.description ?? undefined}
             onPress={() => {
               setSalesPoint(String(point.number));
@@ -414,14 +425,19 @@ export function VoucherForm({ issuerId, draft }: { issuerId: string; draft: Issu
         ))}
       </BottomSheet>
 
-      <BottomSheet open={sheet === 'moneda'} title="Moneda" onClose={() => setSheet(null)}>
+      <BottomSheet open={sheet === "moneda"} title="Moneda" onClose={() => setSheet(null)}>
         {currencyOptions.map((option) => (
-          <ListItem key={option.value} title={option.label} subtitle={option.value} onPress={() => chooseCurrency(option.value)} />
+          <ListItem
+            key={option.value}
+            title={option.label}
+            subtitle={option.value}
+            onPress={() => chooseCurrency(option.value)}
+          />
         ))}
       </BottomSheet>
 
       <ConfirmEmissionSheet
-        open={sheet === 'confirm'}
+        open={sheet === "confirm"}
         typeLabel={selectedType?.label}
         clientLabel={clientLabel}
         currency={currency}

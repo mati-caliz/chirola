@@ -6,8 +6,8 @@ export const DocumentType = {
 } as const;
 
 export const documentTypeName: Record<number, string> = {
-  80: 'CUIT',
-  86: 'CUIL',
-  96: 'DNI',
-  99: 'Consumidor Final',
+  80: "CUIT",
+  86: "CUIL",
+  96: "DNI",
+  99: "Consumidor Final",
 };

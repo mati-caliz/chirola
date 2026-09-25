@@ -1,22 +1,22 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useTheme, type Theme } from '@/hooks/use-theme';
-import { type StatusKey } from '@/theme/tokens';
+import { StyleSheet, Text, View } from "react-native";
+import { useTheme, type Theme } from "@/hooks/use-theme";
+import { type StatusKey } from "@/theme/tokens";
 
 const defaultLabels: Record<StatusKey, string> = {
-  aprobado: 'Aprobado',
-  observado: 'Observado',
-  rechazado: 'Rechazado',
-  pendiente: 'Pendiente',
+  aprobado: "Aprobado",
+  observado: "Observado",
+  rechazado: "Rechazado",
+  pendiente: "Pendiente",
 };
 
 function statusColors(theme: Theme, status: StatusKey) {
   const { colors } = theme;
   switch (status) {
-    case 'aprobado':
+    case "aprobado":
       return { bg: colors.statusAprobadoBg, fg: colors.statusAprobadoFg };
-    case 'observado':
+    case "observado":
       return { bg: colors.statusObservadoBg, fg: colors.statusObservadoFg };
-    case 'rechazado':
+    case "rechazado":
       return { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg };
     default:
       return { bg: colors.statusPendienteBg, fg: colors.statusPendienteFg };
@@ -24,17 +24,17 @@ function statusColors(theme: Theme, status: StatusKey) {
 }
 
 export const StatusBadge = ({
-  status = 'pendiente',
+  status = "pendiente",
   label,
-  size = 'md',
+  size = "md",
 }: {
   status?: StatusKey;
   label?: string;
-  size?: 'sm' | 'md';
+  size?: "sm" | "md";
 }) => {
   const theme = useTheme();
   const { bg, fg } = statusColors(theme, status);
-  const small = size === 'sm';
+  const small = size === "sm";
   const dot = small ? 5 : 6;
   return (
     <View
@@ -50,7 +50,11 @@ export const StatusBadge = ({
     >
       <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: fg }} />
       <Text
-        style={{ color: fg, fontFamily: theme.font.semibold, fontSize: small ? theme.fontSize.micro : theme.fontSize.caption }}
+        style={{
+          color: fg,
+          fontFamily: theme.font.semibold,
+          fontSize: small ? theme.fontSize.micro : theme.fontSize.caption,
+        }}
       >
         {label ?? defaultLabels[status]}
       </Text>
@@ -59,5 +63,5 @@ export const StatusBadge = ({
 };
 
 const styles = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  badge: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
 });

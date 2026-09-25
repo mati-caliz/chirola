@@ -1,6 +1,6 @@
-import { Text, View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
-import { Chip } from '@/components/ds/Chip';
+import { Text, View } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
+import { Chip } from "@/components/ds/Chip";
 
 export function Segmented<T extends string | number>({
   value,
@@ -28,7 +28,7 @@ export function Segmented<T extends string | number>({
           {label}
         </Text>
       ) : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {options.map((option) => (
           <Chip
             key={String(option.value)}

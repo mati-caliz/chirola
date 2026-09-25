@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 export interface AuditEntry {
   apiClientId: string;
   issuerId?: string;
   method: string;
   path: string;
-  outcome: 'success' | 'error';
+  outcome: "success" | "error";
   resourceId?: string;
   detail?: string;
 }
@@ -21,7 +21,7 @@ export class ServiceAuditService {
     try {
       await this.prisma.serviceAuditLog.create({ data: entry });
     } catch (err) {
-      this.logger.error('No se pudo registrar la auditoría de servicio', err as Error);
+      this.logger.error("No se pudo registrar la auditoría de servicio", err as Error);
     }
   }
 }

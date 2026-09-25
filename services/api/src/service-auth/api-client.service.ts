@@ -1,6 +1,6 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { ApiKeyService } from './api-key.service';
+import { ForbiddenException, Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { ApiKeyService } from "./api-key.service";
 
 export interface AuthenticatedApiClient {
   id: string;
@@ -36,7 +36,7 @@ export class ApiClientService {
       where: { apiClientId_issuerId: { apiClientId, issuerId } },
     });
     if (!grant) {
-      throw new ForbiddenException('El emisor no está habilitado para este cliente.');
+      throw new ForbiddenException("El emisor no está habilitado para este cliente.");
     }
   }
 }

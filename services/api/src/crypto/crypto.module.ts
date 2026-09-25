@@ -1,5 +1,5 @@
-import { Global, Module } from '@nestjs/common';
-import { FieldEncryptionService } from './field-encryption.service';
+import { Global, Module } from "@nestjs/common";
+import { FieldEncryptionService } from "./field-encryption.service";
 
 @Global()
 @Module({

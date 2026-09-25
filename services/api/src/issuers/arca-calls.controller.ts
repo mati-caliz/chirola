@@ -1,11 +1,11 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { JwtPayload } from '../auth/auth.service';
-import { IssuersService } from './issuers.service';
-import { ArcaCallLogService } from '../arca/arca-call-log.service';
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
+import type { JwtPayload } from "../auth/auth.service";
+import { IssuersService } from "./issuers.service";
+import { ArcaCallLogService } from "../arca/arca-call-log.service";
 
-@Controller('issuers/:issuerId/arca-calls')
+@Controller("issuers/:issuerId/arca-calls")
 @UseGuards(JwtAuthGuard)
 export class ArcaCallsController {
   constructor(
@@ -16,10 +16,10 @@ export class ArcaCallsController {
   @Get()
   async list(
     @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-    @Query('operation') operation?: string,
-    @Query('outcome') outcome?: string,
-    @Query('limit') limit?: string,
+    @Param("issuerId") issuerId: string,
+    @Query("operation") operation?: string,
+    @Query("outcome") outcome?: string,
+    @Query("limit") limit?: string,
   ) {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
     return this.callLog.listForIssuer(issuer.id, {
@@ -29,11 +29,11 @@ export class ArcaCallsController {
     });
   }
 
-  @Get(':callId')
+  @Get(":callId")
   async detail(
     @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-    @Param('callId') callId: string,
+    @Param("issuerId") issuerId: string,
+    @Param("callId") callId: string,
   ) {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
     return this.callLog.getForIssuer(issuer.id, callId);

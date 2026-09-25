@@ -1,27 +1,17 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as forge from 'node-forge';
-import { XMLParser } from 'fast-xml-parser';
-import { PrismaService } from '../../prisma/prisma.service';
-import { isProduction } from '../arca-environment';
-import { ArcaCallOutcome } from '../arca-call-log.service';
-import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from '../arca-soap.util';
-import { wsaaFaultMessage } from './wsaa-fault';
-import {
-  AccessTicketRequest,
-  CertificateCredentials,
-  ArcaService,
-  AccessTicket,
-} from './wsaa.types';
+import { Inject, Injectable, Logger, InternalServerErrorException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as forge from "node-forge";
+import { XMLParser } from "fast-xml-parser";
+import { PrismaService } from "../../prisma/prisma.service";
+import { isProduction } from "../arca-environment";
+import { ArcaCallOutcome } from "../arca-call-log.service";
+import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from "../arca-soap.util";
+import { wsaaFaultMessage } from "./wsaa-fault";
+import { AccessTicketRequest, CertificateCredentials, ArcaService, AccessTicket } from "./wsaa.types";
 
 const TICKET_RENEWAL_MARGIN_MS = 10 * 60_000;
-const WSAA_OPERATION = 'loginCms';
-const WSAA_SERVICE = 'wsaa';
+const WSAA_OPERATION = "loginCms";
+const WSAA_SERVICE = "wsaa";
 const NO_HTTP_RESPONSE = 0;
 
 @Injectable()
@@ -38,14 +28,8 @@ export class WsaaService {
 
   private wsaaUrl(environment: string): string {
     return isProduction(environment)
-      ? this.config.get<string>(
-          'ARCA_WSAA_URL_PROD',
-          'https://wsaa.afip.gov.ar/ws/services/LoginCms',
-        )
-      : this.config.get<string>(
-          'ARCA_WSAA_URL_HOMO',
-          'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
-        );
+      ? this.config.get<string>("ARCA_WSAA_URL_PROD", "https://wsaa.afip.gov.ar/ws/services/LoginCms")
+      : this.config.get<string>("ARCA_WSAA_URL_HOMO", "https://wsaahomo.afip.gov.ar/ws/services/LoginCms");
   }
 
   async getAccessTicket(request: AccessTicketRequest): Promise<AccessTicket> {
@@ -55,10 +39,7 @@ export class WsaaService {
       where: { holderCuit_environment_service: cacheKey },
     });
 
-    if (
-      cached &&
-      cached.expiration.getTime() - Date.now() > TICKET_RENEWAL_MARGIN_MS
-    ) {
+    if (cached && cached.expiration.getTime() - Date.now() > TICKET_RENEWAL_MARGIN_MS) {
       return {
         token: cached.token,
         sign: cached.sign,
@@ -67,12 +48,7 @@ export class WsaaService {
       };
     }
 
-    const accessTicket = await this.login(
-      issuerId,
-      credentials,
-      service,
-      environment,
-    );
+    const accessTicket = await this.login(issuerId, credentials, service, environment);
     await this.prisma.accessTicketCache.upsert({
       where: { holderCuit_environment_service: cacheKey },
       create: { ...cacheKey, ...accessTicket },
@@ -104,14 +80,14 @@ export class WsaaService {
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<loginTicketRequest version="1.0">',
-      '<header>',
+      "<header>",
       `<uniqueId>${uniqueId}</uniqueId>`,
       `<generationTime>${gen.toISOString()}</generationTime>`,
       `<expirationTime>${exp.toISOString()}</expirationTime>`,
-      '</header>',
+      "</header>",
       `<service>${service}</service>`,
-      '</loginTicketRequest>',
-    ].join('');
+      "</loginTicketRequest>",
+    ].join("");
   }
 
   private signCms(ltr: string, creds: CertificateCredentials): string {
@@ -120,7 +96,7 @@ export class WsaaService {
       const privateKey = forge.pki.privateKeyFromPem(creds.privateKeyPem);
 
       const p7 = forge.pkcs7.createSignedData();
-      p7.content = forge.util.createBuffer(ltr, 'utf8');
+      p7.content = forge.util.createBuffer(ltr, "utf8");
       p7.addCertificate(cert);
       p7.addSigner({
         key: privateKey,
@@ -137,30 +113,24 @@ export class WsaaService {
       const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
       return forge.util.encode64(der);
     } catch (err) {
-      this.logger.error('Error firmando CMS', err as Error);
-      throw new InternalServerErrorException(
-        'No se pudo firmar el pedido de autenticación (CMS).',
-      );
+      this.logger.error("Error firmando CMS", err as Error);
+      throw new InternalServerErrorException("No se pudo firmar el pedido de autenticación (CMS).");
     }
   }
 
-  private async callLoginCms(
-    issuerId: string,
-    cmsBase64: string,
-    environment: string,
-  ): Promise<string> {
+  private async callLoginCms(issuerId: string, cmsBase64: string, environment: string): Promise<string> {
     const envelope = [
-      '<soapenv:Envelope',
+      "<soapenv:Envelope",
       ' xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"',
       ' xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">',
-      '<soapenv:Header/>',
-      '<soapenv:Body>',
-      '<wsaa:loginCms>',
+      "<soapenv:Header/>",
+      "<soapenv:Body>",
+      "<wsaa:loginCms>",
       `<wsaa:in0>${cmsBase64}</wsaa:in0>`,
-      '</wsaa:loginCms>',
-      '</soapenv:Body>',
-      '</soapenv:Envelope>',
-    ].join('');
+      "</wsaa:loginCms>",
+      "</soapenv:Body>",
+      "</soapenv:Envelope>",
+    ].join("");
 
     const startedAt = Date.now();
     const record = (
@@ -182,10 +152,10 @@ export class WsaaService {
     let res: Response;
     try {
       res = await fetch(this.wsaaUrl(environment), {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'text/xml; charset=utf-8',
-          SOAPAction: '',
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: "",
         },
         body: envelope,
       });
@@ -194,7 +164,6 @@ export class WsaaService {
       await record(ArcaCallOutcome.NETWORK_ERROR, NO_HTTP_RESPONSE, message);
       throw err;
     }
-
 
     const text = await res.text();
     if (!res.ok) {
@@ -208,25 +177,20 @@ export class WsaaService {
 
   private parseLoginResponse(soapXml: string): AccessTicket {
     const soap = this.parser.parse(soapXml) as Record<string, unknown>;
-    const loginReturn = this.deepFind(soap, 'loginCmsReturn');
-    if (typeof loginReturn !== 'string') {
-
-      const fault = this.deepFind(soap, 'faultstring');
-      throw new InternalServerErrorException(
-        `WSAA no devolvió un TA${fault ? `: ${String(fault)}` : ''}.`,
-      );
+    const loginReturn = this.deepFind(soap, "loginCmsReturn");
+    if (typeof loginReturn !== "string") {
+      const fault = this.deepFind(soap, "faultstring");
+      throw new InternalServerErrorException(`WSAA no devolvió un TA${fault ? `: ${String(fault)}` : ""}.`);
     }
 
     const inner = this.parser.parse(loginReturn) as Record<string, unknown>;
-    const token = this.deepFind(inner, 'token');
-    const sign = this.deepFind(inner, 'sign');
-    const expiration = this.deepFind(inner, 'expirationTime');
-    const generation = this.deepFind(inner, 'generationTime');
+    const token = this.deepFind(inner, "token");
+    const sign = this.deepFind(inner, "sign");
+    const expiration = this.deepFind(inner, "expirationTime");
+    const generation = this.deepFind(inner, "generationTime");
 
-    if (typeof token !== 'string' || typeof sign !== 'string') {
-      throw new InternalServerErrorException(
-        'No se pudieron extraer token/sign de la respuesta de WSAA.',
-      );
+    if (typeof token !== "string" || typeof sign !== "string") {
+      throw new InternalServerErrorException("No se pudieron extraer token/sign de la respuesta de WSAA.");
     }
 
     return {
@@ -238,7 +202,7 @@ export class WsaaService {
   }
 
   private deepFind(obj: unknown, key: string): unknown {
-    if (obj == null || typeof obj !== 'object') return undefined;
+    if (obj == null || typeof obj !== "object") return undefined;
     if (key in (obj as Record<string, unknown>)) {
       return (obj as Record<string, unknown>)[key];
     }

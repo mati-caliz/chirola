@@ -1,27 +1,18 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import {
   updateClientSchema,
   createClientSchema,
   type UpdateClient,
   type CreateClient,
-} from '@chirola/shared';
-import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { JwtPayload } from '../auth/auth.service';
-import { IssuersService } from '../issuers/issuers.service';
-import { ClientsService } from './clients.service';
+} from "@chirola/shared";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
+import type { JwtPayload } from "../auth/auth.service";
+import { IssuersService } from "../issuers/issuers.service";
+import { ClientsService } from "./clients.service";
 
-@Controller('issuers/:issuerId/clients')
+@Controller("issuers/:issuerId/clients")
 @UseGuards(JwtAuthGuard)
 export class ClientsController {
   constructor(
@@ -36,7 +27,7 @@ export class ClientsController {
   @Post()
   async create(
     @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
+    @Param("issuerId") issuerId: string,
     @Body(new ZodValidationPipe(createClientSchema)) body: CreateClient,
   ) {
     await this.assertIssuer(issuerId, user);
@@ -44,40 +35,33 @@ export class ClientsController {
   }
 
   @Get()
-  async list(
-    @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-  ) {
+  async list(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string) {
     await this.assertIssuer(issuerId, user);
     return this.clients.list(issuerId);
   }
 
-  @Get(':id')
-  async get(
-    @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-    @Param('id') id: string,
-  ) {
+  @Get(":id")
+  async get(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string, @Param("id") id: string) {
     await this.assertIssuer(issuerId, user);
     return this.clients.get(issuerId, id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   async update(
     @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-    @Param('id') id: string,
+    @Param("issuerId") issuerId: string,
+    @Param("id") id: string,
     @Body(new ZodValidationPipe(updateClientSchema)) body: UpdateClient,
   ) {
     await this.assertIssuer(issuerId, user);
     return this.clients.update(issuerId, id, body);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   async delete(
     @CurrentUser() user: JwtPayload,
-    @Param('issuerId') issuerId: string,
-    @Param('id') id: string,
+    @Param("issuerId") issuerId: string,
+    @Param("id") id: string,
   ) {
     await this.assertIssuer(issuerId, user);
     return this.clients.delete(issuerId, id);

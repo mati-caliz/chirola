@@ -1,12 +1,12 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const PushPlatform = {
-  IOS: 'ios',
-  ANDROID: 'android',
+  IOS: "ios",
+  ANDROID: "android",
 } as const;
 
 export const pushTokenSchema = z.object({
-  token: z.string().regex(/^Expo(nent)?PushToken\[.+\]$/, 'Token de push inválido'),
+  token: z.string().regex(/^Expo(nent)?PushToken\[.+\]$/, "Token de push inválido"),
   platform: z.enum([PushPlatform.IOS, PushPlatform.ANDROID]),
 });
 

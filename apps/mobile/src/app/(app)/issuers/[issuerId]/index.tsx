@@ -1,23 +1,23 @@
-import { FileText, ShieldCheck, Store, Users } from 'lucide-react-native';
-import { Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { Banner, Button, Card, Divider, ListItem, Loading, Screen, StatusBadge } from '@/components/ds';
-import { listIssuers, type Issuer } from '@/lib/resources';
-import { formatDate } from '@/lib/format';
-import { useTheme } from '@/hooks/use-theme';
+import { FileText, ShieldCheck, Store, Users } from "lucide-react-native";
+import { Text, View } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { Banner, Button, Card, Divider, ListItem, Loading, Screen, StatusBadge } from "@/components/ds";
+import { listIssuers, type Issuer } from "@/lib/resources";
+import { formatDate } from "@/lib/format";
+import { useTheme } from "@/hooks/use-theme";
 
 const ivaConditionLabel: Record<string, string> = {
-  RESPONSABLE_INSCRIPTO: 'Responsable Inscripto',
-  MONOTRIBUTO: 'Monotributo',
-  EXENTO: 'Exento',
+  RESPONSABLE_INSCRIPTO: "Responsable Inscripto",
+  MONOTRIBUTO: "Monotributo",
+  EXENTO: "Exento",
 };
 
 export default function IssuerDetailScreen() {
   const theme = useTheme();
   const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
   const router = useRouter();
-  const { data, isLoading } = useQuery({ queryKey: ['issuers'], queryFn: listIssuers });
+  const { data, isLoading } = useQuery({ queryKey: ["issuers"], queryFn: listIssuers });
 
   const issuer = data?.find((candidate: Issuer) => candidate.id === issuerId);
 
@@ -25,7 +25,7 @@ export default function IssuerDetailScreen() {
   if (!issuer) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Emisor' }} />
+        <Stack.Screen options={{ title: "Emisor" }} />
         <Screen>
           <Banner kind="error" title="No se encontró el emisor" />
         </Screen>
@@ -35,19 +35,41 @@ export default function IssuerDetailScreen() {
 
   const cert = issuer.certificate;
   const hasCertificate = cert != null;
-  const rowIcon = (Icon: typeof Users) => <Icon size={20} color={theme.colors.textSecondary} strokeWidth={2} />;
+  const rowIcon = (Icon: typeof Users) => (
+    <Icon size={20} color={theme.colors.textSecondary} strokeWidth={2} />
+  );
 
   return (
     <>
       <Stack.Screen options={{ title: issuer.legalName }} />
       <Screen>
         <Card>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 12,
+            }}
+          >
             <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.subhead, color: theme.colors.textPrimary }}>
+              <Text
+                style={{
+                  fontFamily: theme.font.bold,
+                  fontSize: theme.fontSize.subhead,
+                  color: theme.colors.textPrimary,
+                }}
+              >
                 {issuer.legalName}
               </Text>
-              <Text style={{ marginTop: 2, fontFamily: theme.font.monoRegular, fontSize: theme.fontSize.callout, color: theme.colors.textSecondary }}>
+              <Text
+                style={{
+                  marginTop: 2,
+                  fontFamily: theme.font.monoRegular,
+                  fontSize: theme.fontSize.callout,
+                  color: theme.colors.textSecondary,
+                }}
+              >
                 CUIT {issuer.cuit}
               </Text>
             </View>
@@ -56,29 +78,54 @@ export default function IssuerDetailScreen() {
           <View style={{ height: 10 }} />
           <Divider />
           <View style={{ height: 10 }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.callout, color: theme.colors.textSecondary }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text
+              style={{
+                fontFamily: theme.font.regular,
+                fontSize: theme.fontSize.callout,
+                color: theme.colors.textSecondary,
+              }}
+            >
               Condición frente al IVA
             </Text>
-            <Text style={{ fontFamily: theme.font.medium, fontSize: theme.fontSize.callout, color: theme.colors.textPrimary }}>
+            <Text
+              style={{
+                fontFamily: theme.font.medium,
+                fontSize: theme.fontSize.callout,
+                color: theme.colors.textPrimary,
+              }}
+            >
               {ivaConditionLabel[issuer.ivaCondition] ?? issuer.ivaCondition}
             </Text>
           </View>
         </Card>
 
         <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <Text style={{ fontFamily: theme.font.semibold, fontSize: theme.fontSize.callout, color: theme.colors.textPrimary }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 10,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: theme.font.semibold,
+                fontSize: theme.fontSize.callout,
+                color: theme.colors.textPrimary,
+              }}
+            >
               Certificado ARCA
             </Text>
             <StatusBadge
-              status={hasCertificate ? 'aprobado' : 'pendiente'}
+              status={hasCertificate ? "aprobado" : "pendiente"}
               label={
                 hasCertificate
                   ? cert?.validUntil
                     ? `Vence ${formatDate(cert.validUntil)}`
-                    : 'Cargado'
-                  : 'Sin certificado'
+                    : "Cargado"
+                  : "Sin certificado"
               }
               size="sm"
             />
@@ -88,7 +135,7 @@ export default function IssuerDetailScreen() {
             full
             onPress={() => router.push(`/(app)/issuers/${issuer.id}/certificate`)}
           >
-            {hasCertificate ? 'Ver / renovar certificado' : 'Configurar certificado'}
+            {hasCertificate ? "Ver / renovar certificado" : "Configurar certificado"}
           </Button>
         </Card>
 

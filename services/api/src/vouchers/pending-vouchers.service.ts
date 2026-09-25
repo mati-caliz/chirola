@@ -1,24 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type { PendingVoucher } from '@prisma/client';
-import {
-  issueVoucherSchema,
-  PendingVoucherStatus,
-  type PendingVoucherSummary,
-} from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import { IssuersService } from '../issuers/issuers.service';
-import {
-  ApiClientService,
-  type AuthenticatedApiClient,
-} from '../service-auth/api-client.service';
-import { calculateAmounts } from '../arca/wsfe/iva-calculator';
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import type { PendingVoucher } from "@prisma/client";
+import { issueVoucherSchema, PendingVoucherStatus, type PendingVoucherSummary } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { IssuersService } from "../issuers/issuers.service";
+import { ApiClientService, type AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { calculateAmounts } from "../arca/wsfe/iva-calculator";
 
 const NOT_FAILED_MESSAGE =
-  'Sólo se puede reintentar o descartar un comprobante que falló: los que siguen en cola se reintentan solos.';
+  "Sólo se puede reintentar o descartar un comprobante que falló: los que siguen en cola se reintentan solos.";
 
 export function summarizePendingVoucher(pending: PendingVoucher): PendingVoucherSummary {
   const input = issueVoucherSchema.parse(pending.payload);
@@ -69,20 +58,12 @@ export class PendingVouchersService {
     return this.list(issuerId);
   }
 
-  async retryForApiClient(
-    apiClient: AuthenticatedApiClient,
-    issuerId: string,
-    id: string,
-  ): Promise<void> {
+  async retryForApiClient(apiClient: AuthenticatedApiClient, issuerId: string, id: string): Promise<void> {
     await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
     await this.retry(issuerId, id);
   }
 
-  async discardForApiClient(
-    apiClient: AuthenticatedApiClient,
-    issuerId: string,
-    id: string,
-  ): Promise<void> {
+  async discardForApiClient(apiClient: AuthenticatedApiClient, issuerId: string, id: string): Promise<void> {
     await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
     await this.discard(issuerId, id);
   }
@@ -90,7 +71,7 @@ export class PendingVouchersService {
   private async list(issuerId: string): Promise<PendingVoucherSummary[]> {
     const pending = await this.prisma.pendingVoucher.findMany({
       where: { issuerId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     return pending.map(summarizePendingVoucher);
   }
@@ -124,7 +105,7 @@ export class PendingVouchersService {
       select: { id: true },
     });
     if (!existing) {
-      throw new NotFoundException('Comprobante en cola inexistente.');
+      throw new NotFoundException("Comprobante en cola inexistente.");
     }
     throw new ConflictException(NOT_FAILED_MESSAGE);
   }

@@ -1,14 +1,14 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
-import { CurrentApiClient } from '../service-auth/current-api-client.decorator';
-import { ApiClientService } from '../service-auth/api-client.service';
-import type { AuthenticatedApiClient } from '../service-auth/api-client.service';
-import { RateLimitGuard } from '../service-auth/rate-limit.guard';
-import { IssuersService } from './issuers.service';
-import { ArcaParamsService } from './arca-params.service';
-import { ArcaHealthService } from './arca-health.service';
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
+import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
+import { ApiClientService } from "../service-auth/api-client.service";
+import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { RateLimitGuard } from "../service-auth/rate-limit.guard";
+import { IssuersService } from "./issuers.service";
+import { ArcaParamsService } from "./arca-params.service";
+import { ArcaHealthService } from "./arca-health.service";
 
-@Controller('v1')
+@Controller("v1")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
 export class V1ParamsController {
   constructor(
@@ -18,47 +18,47 @@ export class V1ParamsController {
     private readonly arcaHealth: ArcaHealthService,
   ) {}
 
-  @Get('sales-points')
+  @Get("sales-points")
   async salesPoints(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
+    @Query("issuerId") issuerId: string,
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.getSalesPoints(issuer);
   }
 
-  @Get('fiscal-condition')
+  @Get("fiscal-condition")
   async fiscalCondition(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
+    @Query("issuerId") issuerId: string,
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.detectFiscalCondition(issuer);
   }
 
-  @Get('currencies')
+  @Get("currencies")
   async currencies(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
+    @Query("issuerId") issuerId: string,
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.getCurrencies(issuer);
   }
 
-  @Get('exchange-rate/:currencyId')
+  @Get("exchange-rate/:currencyId")
   async exchangeRate(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
-    @Param('currencyId') currencyId: string,
+    @Query("issuerId") issuerId: string,
+    @Param("currencyId") currencyId: string,
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.params.getExchangeRate(issuer, currencyId);
   }
 
-  @Get('arca-health')
+  @Get("arca-health")
   async arcaHealthCheck(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
+    @Query("issuerId") issuerId: string,
   ) {
     const issuer = await this.resolve(apiClient, issuerId);
     return this.arcaHealth.check(issuer.environment);

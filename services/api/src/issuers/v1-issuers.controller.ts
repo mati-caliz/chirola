@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, UseGuards, UseInterceptors } from "@nestjs/common";
 import {
   commercialAddressSchema,
   createIssuerSchema,
@@ -19,21 +10,18 @@ import {
   type GenerateCsr,
   type MatchCertificate,
   type Representative,
-} from '@chirola/shared';
-import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
-import { RateLimitGuard } from '../service-auth/rate-limit.guard';
-import { ServiceAuditInterceptor } from '../service-auth/service-audit.interceptor';
-import { CurrentApiClient } from '../service-auth/current-api-client.decorator';
-import {
-  ApiClientService,
-  type AuthenticatedApiClient,
-} from '../service-auth/api-client.service';
-import { CertsService } from '../certs/certs.service';
-import { SalesPointsService } from './sales-points.service';
-import { IssuersService } from './issuers.service';
+} from "@chirola/shared";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
+import { RateLimitGuard } from "../service-auth/rate-limit.guard";
+import { ServiceAuditInterceptor } from "../service-auth/service-audit.interceptor";
+import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
+import { ApiClientService, type AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { CertsService } from "../certs/certs.service";
+import { SalesPointsService } from "./sales-points.service";
+import { IssuersService } from "./issuers.service";
 
-@Controller('v1/issuers')
+@Controller("v1/issuers")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
 @UseInterceptors(ServiceAuditInterceptor)
 export class V1IssuersController {
@@ -57,28 +45,22 @@ export class V1IssuersController {
     return this.issuers.listForApiClient(apiClient.id);
   }
 
-  @Get(':id')
-  async get(
-    @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
-  ) {
+  @Get(":id")
+  async get(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     return this.issuers.getWithCertificate(id);
   }
 
-  @Get(':id/sales-points')
-  async listSalesPoints(
-    @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
-  ) {
+  @Get(":id/sales-points")
+  async listSalesPoints(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     return this.salesPoints.listForIssuer(id);
   }
 
-  @Put(':id/representative')
+  @Put(":id/representative")
   async updateRepresentative(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
@@ -86,10 +68,10 @@ export class V1IssuersController {
     return this.issuers.getWithCertificate(id);
   }
 
-  @Put(':id/commercial-address')
+  @Put(":id/commercial-address")
   async updateCommercialAddress(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
@@ -97,27 +79,21 @@ export class V1IssuersController {
     return this.issuers.getWithCertificate(id);
   }
 
-  @Post(':id/csr')
+  @Post(":id/csr")
   async generateCsr(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body(new ZodValidationPipe(generateCsrSchema)) body: GenerateCsr,
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     const issuer = await this.issuers.getById(id);
-    return this.certs.generateCsr(
-      id,
-      issuer.cuit,
-      issuer.legalName,
-      body.alias,
-      body.regenerate,
-    );
+    return this.certs.generateCsr(id, issuer.cuit, issuer.legalName, body.alias, body.regenerate);
   }
 
-  @Put(':id/certificate')
+  @Put(":id/certificate")
   async matchCertificate(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body(new ZodValidationPipe(matchCertificateSchema)) body: MatchCertificate,
   ) {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);

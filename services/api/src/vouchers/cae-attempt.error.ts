@@ -5,6 +5,6 @@ export class CaeAttemptError extends Error {
     readonly attemptedNumber: number | null,
   ) {
     super(cause instanceof Error ? cause.message : String(cause));
-    this.name = 'CaeAttemptError';
+    this.name = "CaeAttemptError";
   }
 }

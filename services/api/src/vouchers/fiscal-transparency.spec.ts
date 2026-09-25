@@ -1,5 +1,5 @@
-import { TaxTreatment, TributeType, VoucherType } from '@chirola/shared';
-import { buildFiscalTransparency, type FiscalTransparencySource } from './fiscal-transparency';
+import { TaxTreatment, TributeType, VoucherType } from "@chirola/shared";
+import { buildFiscalTransparency, type FiscalTransparencySource } from "./fiscal-transparency";
 
 const taxedItem = {
   quantity: 1,
@@ -18,29 +18,29 @@ function source(overrides: Partial<FiscalTransparencySource> = {}): FiscalTransp
   };
 }
 
-describe('buildFiscalTransparency', () => {
+describe("buildFiscalTransparency", () => {
   it.each([VoucherType.FACTURA_B, VoucherType.NOTA_DEBITO_B, VoucherType.NOTA_CREDITO_B])(
-    'informa la leyenda en el comprobante clase B %i',
+    "informa la leyenda en el comprobante clase B %i",
     (voucherType) => {
       expect(buildFiscalTransparency(source({ voucherType }))).not.toBeNull();
     },
   );
 
   it.each([VoucherType.FACTURA_A, VoucherType.FACTURA_C, VoucherType.FACTURA_M, VoucherType.FCE_FACTURA_B])(
-    'no informa la leyenda en el comprobante %i',
+    "no informa la leyenda en el comprobante %i",
     (voucherType) => {
       expect(buildFiscalTransparency(source({ voucherType }))).toBeNull();
     },
   );
 
-  it('usa el IVA guardado del comprobante cuando lo tiene', () => {
+  it("usa el IVA guardado del comprobante cuando lo tiene", () => {
     expect(buildFiscalTransparency(source({ ivaAmount: 42.5 }))).toEqual({
       containedIva: 42.5,
       otherNationalIndirectTaxes: 0,
     });
   });
 
-  it('calcula el IVA contenido en el precio de los ítems gravados cuando no está discriminado', () => {
+  it("calcula el IVA contenido en el precio de los ítems gravados cuando no está discriminado", () => {
     const transparency = buildFiscalTransparency(
       source({
         items: [
@@ -53,7 +53,7 @@ describe('buildFiscalTransparency', () => {
     expect(transparency?.containedIva).toBe(30.98);
   });
 
-  it('suma como otros impuestos nacionales indirectos sólo los tributos nacionales e internos', () => {
+  it("suma como otros impuestos nacionales indirectos sólo los tributos nacionales e internos", () => {
     const transparency = buildFiscalTransparency(
       source({
         tributes: [

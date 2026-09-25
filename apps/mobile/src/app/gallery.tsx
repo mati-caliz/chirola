@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { FileText, Plus } from 'lucide-react-native';
-import { ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from "react";
+import { FileText, Plus } from "lucide-react-native";
+import { ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Amount,
   Banner,
@@ -22,8 +22,8 @@ import {
   Switch,
   TabBar,
   type TabId,
-} from '@/components/ds';
-import { useTheme } from '@/hooks/use-theme';
+} from "@/components/ds";
+import { useTheme } from "@/hooks/use-theme";
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => {
   const theme = useTheme();
@@ -34,7 +34,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
           fontFamily: theme.font.semibold,
           fontSize: theme.fontSize.micro,
           letterSpacing: 0.66,
-          textTransform: 'uppercase',
+          textTransform: "uppercase",
           color: theme.colors.textTertiary,
         }}
       >
@@ -47,18 +47,18 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 export default function GalleryScreen() {
   const theme = useTheme();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [checked, setChecked] = useState(true);
-  const [chip, setChip] = useState('todos');
+  const [chip, setChip] = useState("todos");
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [tab, setTab] = useState<TabId>('inicio');
+  const [tab, setTab] = useState<TabId>("inicio");
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={["top"]}>
       <NavBar title="Design System" subtitle={`Tema ${theme.scheme}`} />
       <ScrollView contentContainerStyle={{ padding: 20, gap: 28, paddingBottom: 120 }}>
         <Section title="Buttons">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             <Button variant="primary" onPress={() => {}}>
               Emitir
             </Button>
@@ -75,40 +75,59 @@ export default function GalleryScreen() {
           <Button variant="primary" full loading onPress={() => {}}>
             Cargando
           </Button>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
             <IconButton label="Agregar" variant="tonal" icon={(p) => <Plus {...p} strokeWidth={2} />} />
-            <IconButton label="Comprobante" variant="filled" icon={(p) => <FileText {...p} strokeWidth={2} />} />
+            <IconButton
+              label="Comprobante"
+              variant="filled"
+              icon={(p) => <FileText {...p} strokeWidth={2} />}
+            />
             <IconButton label="Más" icon={(p) => <Plus {...p} strokeWidth={2} />} />
           </View>
         </Section>
 
         <Section title="Forms">
           <Input label="Razón social" value="" onChangeText={() => {}} placeholder="Nombre del cliente" />
-          <Input label="Importe" mono keyboardType="numeric" prefix="$" value="48.400,00" onChangeText={() => {}} />
+          <Input
+            label="Importe"
+            mono
+            keyboardType="numeric"
+            prefix="$"
+            value="48.400,00"
+            onChangeText={() => {}}
+          />
           <Input label="Con error" value="12" onChangeText={() => {}} error="Revisá el CUIT ingresado" />
           <Select label="Tipo de comprobante" value="Factura B" onPress={() => {}} />
-          <SearchBar value={search} onChangeText={setSearch} onClear={() => setSearch('')} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <SearchBar value={search} onChangeText={setSearch} onClear={() => setSearch("")} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <Switch checked={checked} onChange={setChecked} label="Face ID" />
-            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.font.regular }}>Ingreso con Face ID</Text>
+            <Text style={{ color: theme.colors.textSecondary, fontFamily: theme.font.regular }}>
+              Ingreso con Face ID
+            </Text>
           </View>
         </Section>
 
         <Section title="Display">
           <Card>
-            <Text style={{ fontFamily: theme.font.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSize.body }}>
+            <Text
+              style={{
+                fontFamily: theme.font.semibold,
+                color: theme.colors.textPrimary,
+                fontSize: theme.fontSize.body,
+              }}
+            >
               Facturado este mes
             </Text>
             <Amount value="$ 1.284.500,00" size="xl" />
           </Card>
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
             <StatusBadge status="aprobado" />
             <StatusBadge status="observado" />
             <StatusBadge status="rechazado" />
             <StatusBadge status="pendiente" />
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {['todos', 'aprobados', 'observados'].map((id) => (
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {["todos", "aprobados", "observados"].map((id) => (
               <Chip key={id} label={id} selected={chip === id} onPress={() => setChip(id)} />
             ))}
           </View>
@@ -121,7 +140,12 @@ export default function GalleryScreen() {
               onPress={() => {}}
             />
             <Divider inset={16} />
-            <ListItem title="Kiosco Don Pedro" subtitle="Factura C 0001-00000041" chevron onPress={() => {}} />
+            <ListItem
+              title="Kiosco Don Pedro"
+              subtitle="Factura C 0001-00000041"
+              chevron
+              onPress={() => {}}
+            />
           </Card>
         </Section>
 
@@ -151,14 +175,18 @@ export default function GalleryScreen() {
         </Section>
 
         <Section title="Navigation">
-          <Stepper steps={['Clave', 'CSR', 'Certificado', 'Listo']} current={1} />
+          <Stepper steps={["Clave", "CSR", "Certificado", "Listo"]} current={1} />
         </Section>
       </ScrollView>
 
       <TabBar active={tab} onSelect={setTab} onEmitir={() => setSheetOpen(true)} />
 
       <BottomSheet open={sheetOpen} title="Tus emisores" onClose={() => setSheetOpen(false)}>
-        <ListItem title="Comercial del Sur SA" subtitle="20-33222111-9" trailing={<StatusBadge status="aprobado" label="Activo" size="sm" />} />
+        <ListItem
+          title="Comercial del Sur SA"
+          subtitle="20-33222111-9"
+          trailing={<StatusBadge status="aprobado" label="Activo" size="sm" />}
+        />
         <Divider />
         <ListItem title="Estudio Contable MB" subtitle="27-40111222-3" chevron onPress={() => {}} />
         <View style={{ height: 12 }} />

@@ -1,21 +1,20 @@
-import { z } from 'zod';
-import { documentTypeName } from './document-type';
-import { ivaRates, ivaRateAfipId } from './iva-rate';
-import { recipientIvaConditionName } from './recipient-iva-condition';
-import { tributeTypeName } from './tribute-type';
-import { voucherTypeName } from './voucher-type';
+import { z } from "zod";
+import { documentTypeName } from "./document-type";
+import { ivaRates, ivaRateAfipId } from "./iva-rate";
+import { recipientIvaConditionName } from "./recipient-iva-condition";
+import { tributeTypeName } from "./tribute-type";
+import { voucherTypeName } from "./voucher-type";
 
 export const ArcaParamType = {
-  VOUCHER_TYPES: 'VOUCHER_TYPES',
-  DOCUMENT_TYPES: 'DOCUMENT_TYPES',
-  IVA_RATES: 'IVA_RATES',
-  TRIBUTE_TYPES: 'TRIBUTE_TYPES',
-  OPTIONAL_TYPES: 'OPTIONAL_TYPES',
-  RECIPIENT_IVA_CONDITIONS: 'RECIPIENT_IVA_CONDITIONS',
+  VOUCHER_TYPES: "VOUCHER_TYPES",
+  DOCUMENT_TYPES: "DOCUMENT_TYPES",
+  IVA_RATES: "IVA_RATES",
+  TRIBUTE_TYPES: "TRIBUTE_TYPES",
+  OPTIONAL_TYPES: "OPTIONAL_TYPES",
+  RECIPIENT_IVA_CONDITIONS: "RECIPIENT_IVA_CONDITIONS",
 } as const;
 
-export type ArcaParamTypeName =
-  (typeof ArcaParamType)[keyof typeof ArcaParamType];
+export type ArcaParamTypeName = (typeof ArcaParamType)[keyof typeof ArcaParamType];
 
 export const arcaParamTypeSchema = z.enum([
   ArcaParamType.VOUCHER_TYPES,

@@ -1,11 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { z } from 'zod';
-import type { TaxpayerAddress, TaxpayerInfo } from '@chirola/shared';
-import type { ArcaIssuer } from '../arca/arca-environment';
-import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { PadronService } from '../arca/padron/padron.service';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
+import type { TaxpayerAddress, TaxpayerInfo } from "@chirola/shared";
+import type { ArcaIssuer } from "../arca/arca-environment";
+import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { PadronService } from "../arca/padron/padron.service";
 
 const CUIT_LENGTH = 11;
 const DEFAULT_CACHE_TTL_DAYS = 30;
@@ -24,9 +24,9 @@ function parseAddress(stored: unknown): TaxpayerAddress | null {
 }
 
 function normalizeCuit(cuit: string): string {
-  const digits = cuit.replace(/\D/g, '');
+  const digits = cuit.replace(/\D/g, "");
   if (digits.length !== CUIT_LENGTH) {
-    throw new BadRequestException('El CUIT debe tener 11 dígitos.');
+    throw new BadRequestException("El CUIT debe tener 11 dígitos.");
   }
   return digits;
 }
@@ -41,15 +41,10 @@ export class TaxpayersService {
     private readonly padron: PadronService,
     config: ConfigService,
   ) {
-    this.cacheTtlMs =
-      config.get<number>('PADRON_CACHE_TTL_DAYS', DEFAULT_CACHE_TTL_DAYS) *
-      MS_PER_DAY;
+    this.cacheTtlMs = config.get<number>("PADRON_CACHE_TTL_DAYS", DEFAULT_CACHE_TTL_DAYS) * MS_PER_DAY;
   }
 
-  async lookup(
-    issuer: ArcaIssuer,
-    rawCuit: string,
-  ): Promise<TaxpayerInfo> {
+  async lookup(issuer: ArcaIssuer, rawCuit: string): Promise<TaxpayerInfo> {
     const cuit = normalizeCuit(rawCuit);
 
     const cached = await this.prisma.taxpayerCache.findUnique({ where: { cuit } });
@@ -63,7 +58,7 @@ export class TaxpayersService {
       };
     }
 
-    const auth = await this.issuerAuth.buildAuth(issuer, 'ws_sr_constancia_inscripcion');
+    const auth = await this.issuerAuth.buildAuth(issuer, "ws_sr_constancia_inscripcion");
     const taxpayer = await this.padron.getTaxpayer(auth, cuit);
 
     await this.prisma.taxpayerCache.upsert({
@@ -87,5 +82,4 @@ export class TaxpayersService {
 
     return taxpayer;
   }
-
 }

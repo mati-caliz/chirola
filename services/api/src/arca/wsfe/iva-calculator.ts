@@ -1,25 +1,17 @@
-import {
-  ivaRateAfipId,
-  reportsIvaToArca,
-  TaxTreatment,
-  type Item,
-  type Tribute,
-} from '@chirola/shared';
-import type { ArcaIvaRate, ArcaTribute, VoucherAmounts } from './wsfe.types';
+import { ivaRateAfipId, reportsIvaToArca, TaxTreatment, type Item, type Tribute } from "@chirola/shared";
+import type { ArcaIvaRate, ArcaTribute, VoucherAmounts } from "./wsfe.types";
 
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-function grossOf(item: Pick<Item, 'quantity' | 'unitPrice'>): number {
+function grossOf(item: Pick<Item, "quantity" | "unitPrice">): number {
   return item.quantity * item.unitPrice;
 }
 
 function sumBy(items: Item[], treatment: string): number {
   return round2(
-    items
-      .filter((item) => item.taxTreatment === treatment)
-      .reduce((acc, item) => acc + grossOf(item), 0),
+    items.filter((item) => item.taxTreatment === treatment).reduce((acc, item) => acc + grossOf(item), 0),
   );
 }
 
@@ -38,7 +30,7 @@ function calculateTributes(tributes: Tribute[]): {
   return { entries, total };
 }
 
-type TaxedItem = Pick<Item, 'quantity' | 'unitPrice' | 'ivaRate' | 'taxTreatment'>;
+type TaxedItem = Pick<Item, "quantity" | "unitPrice" | "ivaRate" | "taxTreatment">;
 
 interface TaxedGrossSplit {
   rates: ArcaIvaRate[];
@@ -50,10 +42,7 @@ function splitTaxedGrossByRate(items: TaxedItem[]): TaxedGrossSplit {
   const grossByRate = new Map<number, number>();
   for (const item of items) {
     if (item.taxTreatment !== TaxTreatment.TAXED) continue;
-    grossByRate.set(
-      item.ivaRate,
-      (grossByRate.get(item.ivaRate) ?? 0) + grossOf(item),
-    );
+    grossByRate.set(item.ivaRate, (grossByRate.get(item.ivaRate) ?? 0) + grossOf(item));
   }
 
   const rates: ArcaIvaRate[] = [];
@@ -86,8 +75,7 @@ export function calculateAmounts(
   items: Item[],
   tributes: Tribute[] = [],
 ): VoucherAmounts {
-  const { entries: tributeEntries, total: tributeAmount } =
-    calculateTributes(tributes);
+  const { entries: tributeEntries, total: tributeAmount } = calculateTributes(tributes);
   const itemsTotal = round2(items.reduce((acc, item) => acc + grossOf(item), 0));
   const totalAmount = round2(itemsTotal + tributeAmount);
 

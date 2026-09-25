@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { ArcaHealth } from '@chirola/shared';
-import { WsfeService, type ArcaServerStatus } from '../arca/wsfe/wsfe.service';
+import { Injectable, Logger } from "@nestjs/common";
+import type { ArcaHealth } from "@chirola/shared";
+import { WsfeService, type ArcaServerStatus } from "../arca/wsfe/wsfe.service";
 
 const HEALTH_CACHE_TTL_MS = 60_000;
 

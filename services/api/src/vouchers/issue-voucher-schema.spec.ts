@@ -6,37 +6,37 @@ import {
   TransmissionType,
   VoucherConcept,
   VoucherType,
-} from '@chirola/shared';
+} from "@chirola/shared";
 
 function input(overrides: Record<string, unknown> = {}) {
   return {
-    issuerId: 'issuer-1',
+    issuerId: "issuer-1",
     salesPoint: 1,
     voucherType: 11,
     concept: VoucherConcept.PRODUCTS,
-    recipient: { docType: 99, docNumber: '0' },
-    items: [{ description: 'Item', quantity: 1, unitPrice: 100, ivaRate: 21 }],
+    recipient: { docType: 99, docNumber: "0" },
+    items: [{ description: "Item", quantity: 1, unitPrice: 100, ivaRate: 21 }],
     ...overrides,
   };
 }
 
-const validPeriod = { from: '2026-07-01', to: '2026-07-31' };
+const validPeriod = { from: "2026-07-01", to: "2026-07-31" };
 
-const validPaymentDueDate = '2026-08-10';
+const validPaymentDueDate = "2026-08-10";
 
-describe('issueVoucherSchema — tratamiento fiscal de los ítems', () => {
-  it('asume gravado cuando no se especifica', () => {
+describe("issueVoucherSchema — tratamiento fiscal de los ítems", () => {
+  it("asume gravado cuando no se especifica", () => {
     const result = issueVoucherSchema.parse(input());
 
     expect(result.items[0].taxTreatment).toBe(TaxTreatment.TAXED);
   });
 
-  it('acepta un ítem exento sin alícuota', () => {
+  it("acepta un ítem exento sin alícuota", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         items: [
           {
-            description: 'Libro',
+            description: "Libro",
             quantity: 1,
             unitPrice: 500,
             ivaRate: 0,
@@ -49,12 +49,12 @@ describe('issueVoucherSchema — tratamiento fiscal de los ítems', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rechaza un ítem exento con alícuota de IVA', () => {
+  it("rechaza un ítem exento con alícuota de IVA", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         items: [
           {
-            description: 'Libro',
+            description: "Libro",
             quantity: 1,
             unitPrice: 500,
             ivaRate: 21,
@@ -68,55 +68,47 @@ describe('issueVoucherSchema — tratamiento fiscal de los ítems', () => {
   });
 });
 
-describe('issueVoucherSchema — tributos', () => {
+describe("issueVoucherSchema — tributos", () => {
   const tribute = {
     id: 2,
-    description: 'Percepción IIBB CABA',
+    description: "Percepción IIBB CABA",
     taxableBase: 1000,
     rate: 3,
   };
 
-  it('acepta un comprobante sin tributos', () => {
+  it("acepta un comprobante sin tributos", () => {
     expect(issueVoucherSchema.safeParse(input()).success).toBe(true);
   });
 
-  it('acepta tributos con base y alícuota', () => {
-    expect(
-      issueVoucherSchema.safeParse(input({ tributes: [tribute] })).success,
-    ).toBe(true);
+  it("acepta tributos con base y alícuota", () => {
+    expect(issueVoucherSchema.safeParse(input({ tributes: [tribute] })).success).toBe(true);
   });
 
-  it('rechaza un tributo sin descripción', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ tributes: [{ ...tribute, description: '' }] }),
-    );
+  it("rechaza un tributo sin descripción", () => {
+    const result = issueVoucherSchema.safeParse(input({ tributes: [{ ...tribute, description: "" }] }));
 
     expect(result.success).toBe(false);
   });
 
-  it('rechaza una base imponible negativa', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ tributes: [{ ...tribute, taxableBase: -1 }] }),
-    );
+  it("rechaza una base imponible negativa", () => {
+    const result = issueVoucherSchema.safeParse(input({ tributes: [{ ...tribute, taxableBase: -1 }] }));
 
     expect(result.success).toBe(false);
   });
 });
 
-describe('issueVoucherSchema — período de servicios', () => {
-  it('acepta concepto productos sin período', () => {
+describe("issueVoucherSchema — período de servicios", () => {
+  it("acepta concepto productos sin período", () => {
     expect(issueVoucherSchema.safeParse(input()).success).toBe(true);
   });
 
-  it('rechaza concepto servicios sin período', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ concept: VoucherConcept.SERVICES }),
-    );
+  it("rechaza concepto servicios sin período", () => {
+    const result = issueVoucherSchema.safeParse(input({ concept: VoucherConcept.SERVICES }));
 
     expect(result.success).toBe(false);
   });
 
-  it('acepta concepto servicios con período completo', () => {
+  it("acepta concepto servicios con período completo", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         concept: VoucherConcept.SERVICES,
@@ -128,26 +120,24 @@ describe('issueVoucherSchema — período de servicios', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rechaza concepto productos y servicios sin período', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ concept: VoucherConcept.PRODUCTS_AND_SERVICES }),
-    );
+  it("rechaza concepto productos y servicios sin período", () => {
+    const result = issueVoucherSchema.safeParse(input({ concept: VoucherConcept.PRODUCTS_AND_SERVICES }));
 
     expect(result.success).toBe(false);
   });
 
-  it('rechaza un período con fin anterior al inicio', () => {
+  it("rechaza un período con fin anterior al inicio", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         concept: VoucherConcept.SERVICES,
-        servicePeriod: { ...validPeriod, from: '2026-07-31', to: '2026-07-01' },
+        servicePeriod: { ...validPeriod, from: "2026-07-31", to: "2026-07-01" },
       }),
     );
 
     expect(result.success).toBe(false);
   });
 
-  it('rechaza un período en un comprobante de productos', () => {
+  it("rechaza un período en un comprobante de productos", () => {
     const result = issueVoucherSchema.safeParse(
       input({ concept: VoucherConcept.PRODUCTS, servicePeriod: validPeriod }),
     );
@@ -155,11 +145,11 @@ describe('issueVoucherSchema — período de servicios', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rechaza fechas que no sean AAAA-MM-DD', () => {
+  it("rechaza fechas que no sean AAAA-MM-DD", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         concept: VoucherConcept.SERVICES,
-        servicePeriod: { ...validPeriod, from: '20260701' },
+        servicePeriod: { ...validPeriod, from: "20260701" },
       }),
     );
 
@@ -167,83 +157,77 @@ describe('issueVoucherSchema — período de servicios', () => {
   });
 });
 
-describe('issueVoucherSchema — identificación del receptor (C.1)', () => {
-  it('rechaza una Factura A cuyo receptor no se identifica con CUIT', () => {
+describe("issueVoucherSchema — identificación del receptor (C.1)", () => {
+  it("rechaza una Factura A cuyo receptor no se identifica con CUIT", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         voucherType: VoucherType.FACTURA_A,
-        recipient: { docType: DocumentType.DNI, docNumber: '30111222' },
+        recipient: { docType: DocumentType.DNI, docNumber: "30111222" },
       }),
     );
 
     expect(result.success).toBe(false);
   });
 
-  it('rechaza una Factura M cuyo receptor no se identifica con CUIT', () => {
+  it("rechaza una Factura M cuyo receptor no se identifica con CUIT", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         voucherType: VoucherType.FACTURA_M,
-        recipient: { docType: DocumentType.CONSUMIDOR_FINAL, docNumber: '0' },
+        recipient: { docType: DocumentType.CONSUMIDOR_FINAL, docNumber: "0" },
       }),
     );
 
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toContain('Factura M');
+    expect(result.error?.issues[0]?.message).toContain("Factura M");
   });
 
-  it('acepta una Factura M con CUIT', () => {
+  it("acepta una Factura M con CUIT", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         voucherType: VoucherType.FACTURA_M,
-        recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' },
+        recipient: { docType: DocumentType.CUIT, docNumber: "30111222234" },
       }),
     );
 
     expect(result.success).toBe(true);
   });
 
-  it('no exige CUIT en una Factura B', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ voucherType: VoucherType.FACTURA_B }),
-    );
+  it("no exige CUIT en una Factura B", () => {
+    const result = issueVoucherSchema.safeParse(input({ voucherType: VoucherType.FACTURA_B }));
 
     expect(result.success).toBe(true);
   });
 });
 
-describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
+describe("issueVoucherSchema — Factura de Crédito MiPyME (C.2)", () => {
   const fceInput = (overrides: Record<string, unknown> = {}) =>
     input({
       voucherType: VoucherType.FCE_FACTURA_A,
-      recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' },
+      recipient: { docType: DocumentType.CUIT, docNumber: "30111222234" },
       ...overrides,
     });
 
-  it('exige el vencimiento de pago aunque el concepto sea productos', () => {
+  it("exige el vencimiento de pago aunque el concepto sea productos", () => {
     const result = issueVoucherSchema.safeParse(fceInput());
 
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.path).toEqual(['paymentDueDate']);
+    expect(result.error?.issues[0]?.path).toEqual(["paymentDueDate"]);
   });
 
-  it('acepta la FCE de productos con vencimiento de pago y sin período', () => {
-    const result = issueVoucherSchema.safeParse(
-      fceInput({ paymentDueDate: '2026-09-30' }),
-    );
+  it("acepta la FCE de productos con vencimiento de pago y sin período", () => {
+    const result = issueVoucherSchema.safeParse(fceInput({ paymentDueDate: "2026-09-30" }));
 
     expect(result.success).toBe(true);
     expect(result.data?.servicePeriod).toBeUndefined();
   });
 
-  it('rechaza el vencimiento de pago en una factura común de productos', () => {
-    const result = issueVoucherSchema.safeParse(
-      input({ paymentDueDate: '2026-09-30' }),
-    );
+  it("rechaza el vencimiento de pago en una factura común de productos", () => {
+    const result = issueVoucherSchema.safeParse(input({ paymentDueDate: "2026-09-30" }));
 
     expect(result.success).toBe(false);
   });
 
-  it('rechaza el tipo de transmisión en un comprobante que no es FCE', () => {
+  it("rechaza el tipo de transmisión en un comprobante que no es FCE", () => {
     const result = issueVoucherSchema.safeParse(
       input({ transmissionType: TransmissionType.COLLECTIVE_DEPOSIT }),
     );
@@ -251,10 +235,10 @@ describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
     expect(result.success).toBe(false);
   });
 
-  it('acepta el tipo de transmisión en la FCE', () => {
+  it("acepta el tipo de transmisión en la FCE", () => {
     const result = issueVoucherSchema.safeParse(
       fceInput({
-        paymentDueDate: '2026-09-30',
+        paymentDueDate: "2026-09-30",
         transmissionType: TransmissionType.COLLECTIVE_DEPOSIT,
       }),
     );
@@ -262,11 +246,11 @@ describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
     expect(result.success).toBe(true);
   });
 
-  it('exige CUIT del receptor en la FCE', () => {
+  it("exige CUIT del receptor en la FCE", () => {
     const result = issueVoucherSchema.safeParse(
       fceInput({
-        paymentDueDate: '2026-09-30',
-        recipient: { docType: DocumentType.DNI, docNumber: '30111222' },
+        paymentDueDate: "2026-09-30",
+        recipient: { docType: DocumentType.DNI, docNumber: "30111222" },
       }),
     );
 
@@ -274,36 +258,33 @@ describe('issueVoucherSchema — Factura de Crédito MiPyME (C.2)', () => {
   });
 });
 
-describe('issueVoucherSchema — condición de IVA del receptor', () => {
+describe("issueVoucherSchema — condición de IVA del receptor", () => {
   const withCondition = (voucherType: number, ivaConditionId?: number) =>
     issueVoucherSchema.safeParse(
       input({
         voucherType,
         recipient: {
           docType: DocumentType.CUIT,
-          docNumber: '30111222234',
+          docNumber: "30111222234",
           ivaConditionId,
         },
       }),
     );
 
-  it('rechaza un consumidor final en una Factura A', () => {
-    const result = withCondition(
-      VoucherType.FACTURA_A,
-      RecipientIvaCondition.CONSUMIDOR_FINAL,
-    );
+  it("rechaza un consumidor final en una Factura A", () => {
+    const result = withCondition(VoucherType.FACTURA_A, RecipientIvaCondition.CONSUMIDOR_FINAL);
 
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toContain('Consumidor Final');
+    expect(result.error?.issues[0]?.message).toContain("Consumidor Final");
   });
 
-  it('rechaza un responsable inscripto en una Factura B', () => {
+  it("rechaza un responsable inscripto en una Factura B", () => {
     const result = issueVoucherSchema.safeParse(
       input({
         voucherType: VoucherType.FACTURA_B,
         recipient: {
           docType: DocumentType.CUIT,
-          docNumber: '30111222234',
+          docNumber: "30111222234",
           ivaConditionId: RecipientIvaCondition.RESPONSABLE_INSCRIPTO,
         },
       }),
@@ -312,43 +293,45 @@ describe('issueVoucherSchema — condición de IVA del receptor', () => {
     expect(result.success).toBe(false);
   });
 
-  it('acepta un responsable inscripto en una Factura A', () => {
-    expect(
-      withCondition(VoucherType.FACTURA_A, RecipientIvaCondition.RESPONSABLE_INSCRIPTO)
-        .success,
-    ).toBe(true);
+  it("acepta un responsable inscripto en una Factura A", () => {
+    expect(withCondition(VoucherType.FACTURA_A, RecipientIvaCondition.RESPONSABLE_INSCRIPTO).success).toBe(
+      true,
+    );
   });
 
-  it('la Factura M sigue la misma regla que la A', () => {
-    expect(
-      withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.MONOTRIBUTO).success,
-    ).toBe(false);
-    expect(
-      withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.RESPONSABLE_INSCRIPTO)
-        .success,
-    ).toBe(true);
+  it("la Factura M sigue la misma regla que la A", () => {
+    expect(withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.MONOTRIBUTO).success).toBe(false);
+    expect(withCondition(VoucherType.FACTURA_M, RecipientIvaCondition.RESPONSABLE_INSCRIPTO).success).toBe(
+      true,
+    );
   });
 
-  it('la Factura C acepta cualquier condición', () => {
+  it("la Factura C acepta cualquier condición", () => {
     for (const condition of Object.values(RecipientIvaCondition)) {
       expect(
         issueVoucherSchema.safeParse(
-          input({ recipient: { docType: 99, docNumber: '0', ivaConditionId: condition } }),
+          input({ recipient: { docType: 99, docNumber: "0", ivaConditionId: condition } }),
         ).success,
       ).toBe(true);
     }
   });
 
-  it('deja pasar una condición que la app todavía no conoce', () => {
+  it("deja pasar una condición que la app todavía no conoce", () => {
     const unknownCondition = 15;
 
     expect(withCondition(VoucherType.FACTURA_A, unknownCondition).success).toBe(true);
   });
 
-  it('el default que arma la app es coherente con la letra', () => {
+  it("el default que arma la app es coherente con la letra", () => {
     expect(withCondition(VoucherType.FACTURA_A).success).toBe(true);
     expect(
-      issueVoucherSchema.safeParse(input({ voucherType: VoucherType.FCE_FACTURA_B, paymentDueDate: '2026-09-30', recipient: { docType: DocumentType.CUIT, docNumber: '30111222234' } })).success,
+      issueVoucherSchema.safeParse(
+        input({
+          voucherType: VoucherType.FCE_FACTURA_B,
+          paymentDueDate: "2026-09-30",
+          recipient: { docType: DocumentType.CUIT, docNumber: "30111222234" },
+        }),
+      ).success,
     ).toBe(true);
   });
 });

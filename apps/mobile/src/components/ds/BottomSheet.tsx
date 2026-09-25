@@ -1,9 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Dimensions, Modal, Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/hooks/use-theme';
+import { useEffect, useRef, type ReactNode } from "react";
+import { Animated, Dimensions, Modal, Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/use-theme";
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 export const BottomSheet = ({
   open,
@@ -35,7 +35,7 @@ export const BottomSheet = ({
       </Animated.View>
       <Animated.View
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
@@ -57,7 +57,7 @@ export const BottomSheet = ({
             width: 36,
             height: 4,
             borderRadius: 2,
-            alignSelf: 'center',
+            alignSelf: "center",
             marginTop: 4,
             marginBottom: 12,
             backgroundColor: theme.colors.borderStrong,

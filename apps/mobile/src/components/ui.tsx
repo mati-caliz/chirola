@@ -1,8 +1,8 @@
-import { forwardRef } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
-import { Button as DsButton, type ButtonVariant } from '@/components/ds/Button';
-import { useTheme } from '@/hooks/use-theme';
-import { palette } from '@/theme/tokens';
+import { forwardRef } from "react";
+import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native";
+import { Button as DsButton, type ButtonVariant } from "@/components/ds/Button";
+import { useTheme } from "@/hooks/use-theme";
+import { palette } from "@/theme/tokens";
 
 export {
   Screen,
@@ -14,10 +14,10 @@ export {
   ErrorText,
   Centered,
   Loading,
-} from '@/components/ds/Text';
-export { Card } from '@/components/ds/Card';
-export { StatusBadge } from '@/components/ds/StatusBadge';
-export { Amount } from '@/components/ds/Amount';
+} from "@/components/ds/Text";
+export { Card } from "@/components/ds/Card";
+export { StatusBadge } from "@/components/ds/StatusBadge";
+export { Amount } from "@/components/ds/Amount";
 
 export const brandColor = palette.brand700;
 
@@ -26,7 +26,7 @@ export const Button = ({
   onPress,
   loading,
   disabled,
-  variant = 'primary',
+  variant = "primary",
 }: {
   title: string;
   onPress: () => void;
@@ -82,7 +82,7 @@ export const TextField = forwardRef<TextInput, TextInputProps & { label?: string
   );
 });
 
-export const Badge = ({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 'warn' | 'neutral' }) => {
+export const Badge = ({ text, tone = "neutral" }: { text: string; tone?: "ok" | "warn" | "neutral" }) => {
   const theme = useTheme();
   const { colors } = theme;
   const map = {
@@ -93,7 +93,9 @@ export const Badge = ({ text, tone = 'neutral' }: { text: string; tone?: 'ok' | 
   const { bg, fg } = map[tone];
   return (
     <View style={[styles.badge, { backgroundColor: bg, borderRadius: theme.radius.pill }]}>
-      <Text style={{ color: fg, fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption }}>{text}</Text>
+      <Text style={{ color: fg, fontFamily: theme.font.semibold, fontSize: theme.fontSize.caption }}>
+        {text}
+      </Text>
     </View>
   );
 };
@@ -161,7 +163,7 @@ export const OptionGroup = <T extends string | number>({
 
 const styles = StyleSheet.create({
   field: { gap: 4 },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, alignSelf: "flex-start" },
+  optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   option: { borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 10 },
 });

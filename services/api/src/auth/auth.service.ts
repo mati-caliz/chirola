@@ -1,17 +1,12 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import type { AuthResponse, LoginInput, RegisterInput } from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import { hashPassword, verifyPassword } from './password.util';
-import { generarRefreshToken, hashRefreshToken } from './refresh-token.util';
+import { ConflictException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import type { AuthResponse, LoginInput, RegisterInput } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { hashPassword, verifyPassword } from "./password.util";
+import { generarRefreshToken, hashRefreshToken } from "./refresh-token.util";
 
-const DUMMY_HASH = hashPassword('dummy-para-timing');
+const DUMMY_HASH = hashPassword("dummy-para-timing");
 
 export interface JwtPayload {
   sub: string;
@@ -29,7 +24,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     config: ConfigService,
   ) {
-    this.refreshTtlDays = Number(config.get('REFRESH_TOKEN_TTL_DAYS', '30'));
+    this.refreshTtlDays = Number(config.get("REFRESH_TOKEN_TTL_DAYS", "30"));
   }
 
   async register(input: RegisterInput): Promise<AuthResponse> {
@@ -37,7 +32,7 @@ export class AuthService {
       where: { email: input.email },
     });
     if (existing) {
-      throw new ConflictException('Ya existe un usuario con ese email.');
+      throw new ConflictException("Ya existe un usuario con ese email.");
     }
     const user = await this.prisma.user.create({
       data: { email: input.email, password: hashPassword(input.password) },
@@ -51,12 +46,11 @@ export class AuthService {
       where: { email: input.email },
     });
     if (!user) {
-
       verifyPassword(input.password, DUMMY_HASH);
-      throw new UnauthorizedException('Credenciales inválidas.');
+      throw new UnauthorizedException("Credenciales inválidas.");
     }
     if (!verifyPassword(input.password, user.password)) {
-      throw new UnauthorizedException('Credenciales inválidas.');
+      throw new UnauthorizedException("Credenciales inválidas.");
     }
     return this.emitirTokens(user.id, user.email);
   }
@@ -68,7 +62,7 @@ export class AuthService {
       include: { user: true },
     });
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token inválido o expirado.');
+      throw new UnauthorizedException("Refresh token inválido o expirado.");
     }
     await this.prisma.refreshToken.update({
       where: { id: stored.id },
@@ -89,9 +83,7 @@ export class AuthService {
   private async emitirTokens(id: string, email: string): Promise<AuthResponse> {
     const payload: JwtPayload = { sub: id, email };
     const refreshToken = generarRefreshToken();
-    const expiresAt = new Date(
-      Date.now() + this.refreshTtlDays * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + this.refreshTtlDays * 24 * 60 * 60 * 1000);
     await this.prisma.refreshToken.create({
       data: { userId: id, tokenHash: hashRefreshToken(refreshToken), expiresAt },
     });

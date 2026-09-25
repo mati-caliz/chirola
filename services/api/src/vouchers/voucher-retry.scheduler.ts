@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import { VouchersService } from './vouchers.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { VouchersService } from "./vouchers.service";
 
 const RETRY_INTERVAL_MS = 60_000;
 
@@ -21,9 +21,7 @@ export class VoucherRetryScheduler {
       await this.vouchers.retryPendingVouchers();
     } catch (err) {
       this.logger.error(
-        `Fallo en el ciclo de reintentos: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `Fallo en el ciclo de reintentos: ${err instanceof Error ? err.message : String(err)}`,
       );
     } finally {
       this.running = false;

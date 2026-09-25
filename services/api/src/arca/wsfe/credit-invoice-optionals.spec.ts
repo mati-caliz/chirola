@@ -1,28 +1,19 @@
-import { BadRequestException } from '@nestjs/common';
-import {
-  ArcaOptionalType,
-  CANCELLATION_NO,
-  TransmissionType,
-  VoucherType,
-} from '@chirola/shared';
-import { buildCreditInvoiceOptionals } from './credit-invoice-optionals';
+import { BadRequestException } from "@nestjs/common";
+import { ArcaOptionalType, CANCELLATION_NO, TransmissionType, VoucherType } from "@chirola/shared";
+import { buildCreditInvoiceOptionals } from "./credit-invoice-optionals";
 
 const issuerWithCbu = {
-  cbu: '2850590940090418135201',
+  cbu: "2850590940090418135201",
   paymentAlias: null,
 };
 
-describe('buildCreditInvoiceOptionals (C.2)', () => {
-  it('no agrega opcionales a un comprobante que no es FCE', () => {
-    expect(
-      buildCreditInvoiceOptionals(VoucherType.FACTURA_A, issuerWithCbu),
-    ).toEqual([]);
+describe("buildCreditInvoiceOptionals (C.2)", () => {
+  it("no agrega opcionales a un comprobante que no es FCE", () => {
+    expect(buildCreditInvoiceOptionals(VoucherType.FACTURA_A, issuerWithCbu)).toEqual([]);
   });
 
-  it('informa CBU y tipo de transmisión en la FCE', () => {
-    expect(
-      buildCreditInvoiceOptionals(VoucherType.FCE_FACTURA_A, issuerWithCbu),
-    ).toEqual([
+  it("informa CBU y tipo de transmisión en la FCE", () => {
+    expect(buildCreditInvoiceOptionals(VoucherType.FCE_FACTURA_A, issuerWithCbu)).toEqual([
       { id: ArcaOptionalType.CBU, value: issuerWithCbu.cbu },
       {
         id: ArcaOptionalType.TRANSMISSION_TYPE,
@@ -31,7 +22,7 @@ describe('buildCreditInvoiceOptionals (C.2)', () => {
     ]);
   });
 
-  it('respeta el tipo de transmisión elegido', () => {
+  it("respeta el tipo de transmisión elegido", () => {
     const optionals = buildCreditInvoiceOptionals(
       VoucherType.FCE_FACTURA_B,
       issuerWithCbu,
@@ -44,19 +35,19 @@ describe('buildCreditInvoiceOptionals (C.2)', () => {
     });
   });
 
-  it('agrega el alias sólo si el emisor lo tiene cargado', () => {
+  it("agrega el alias sólo si el emisor lo tiene cargado", () => {
     const optionals = buildCreditInvoiceOptionals(VoucherType.FCE_FACTURA_C, {
       cbu: issuerWithCbu.cbu,
-      paymentAlias: 'acme.pagos.arca',
+      paymentAlias: "acme.pagos.arca",
     });
 
     expect(optionals).toContainEqual({
       id: ArcaOptionalType.PAYMENT_ALIAS,
-      value: 'acme.pagos.arca',
+      value: "acme.pagos.arca",
     });
   });
 
-  it('rechaza emitir una FCE si el emisor no tiene CBU', () => {
+  it("rechaza emitir una FCE si el emisor no tiene CBU", () => {
     expect(() =>
       buildCreditInvoiceOptionals(VoucherType.FCE_FACTURA_A, {
         cbu: null,
@@ -65,7 +56,7 @@ describe('buildCreditInvoiceOptionals (C.2)', () => {
     ).toThrow(BadRequestException);
   });
 
-  it('las NC/ND de FCE informan la marca de anulación en vez del CBU', () => {
+  it("las NC/ND de FCE informan la marca de anulación en vez del CBU", () => {
     expect(
       buildCreditInvoiceOptionals(VoucherType.FCE_NOTA_CREDITO_A, {
         cbu: null,

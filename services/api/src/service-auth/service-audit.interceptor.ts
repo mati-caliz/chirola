@@ -1,12 +1,7 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
-import { Observable, tap } from 'rxjs';
-import type { RequestWithApiClient } from './service-auth.guard';
-import { ServiceAuditService } from './service-audit.service';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
+import { Observable, tap } from "rxjs";
+import type { RequestWithApiClient } from "./service-auth.guard";
+import { ServiceAuditService } from "./service-audit.service";
 
 interface CreatedResource {
   id?: string;
@@ -37,11 +32,11 @@ export class ServiceAuditInterceptor implements NestInterceptor {
       tap({
         next: (result) => {
           const resourceId = (result as CreatedResource | undefined)?.id;
-          void this.audit.record({ ...base, outcome: 'success', resourceId });
+          void this.audit.record({ ...base, outcome: "success", resourceId });
         },
         error: (err: unknown) => {
           const detail = err instanceof Error ? err.message : String(err);
-          void this.audit.record({ ...base, outcome: 'error', detail });
+          void this.audit.record({ ...base, outcome: "error", detail });
         },
       }),
     );

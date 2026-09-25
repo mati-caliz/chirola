@@ -9,19 +9,19 @@ import {
   Res,
   UseGuards,
   UseInterceptors,
-} from '@nestjs/common';
-import type { Response } from 'express';
-import { issueVoucherSchema, type IssueVoucher } from '@chirola/shared';
-import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { ServiceAuthGuard } from '../service-auth/service-auth.guard';
-import { RateLimitGuard } from '../service-auth/rate-limit.guard';
-import { ServiceAuditInterceptor } from '../service-auth/service-audit.interceptor';
-import { CurrentApiClient } from '../service-auth/current-api-client.decorator';
-import type { AuthenticatedApiClient } from '../service-auth/api-client.service';
-import { VouchersService } from './vouchers.service';
-import { CreditNoteDraftService } from './credit-note-draft.service';
+} from "@nestjs/common";
+import type { Response } from "express";
+import { issueVoucherSchema, type IssueVoucher } from "@chirola/shared";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
+import { RateLimitGuard } from "../service-auth/rate-limit.guard";
+import { ServiceAuditInterceptor } from "../service-auth/service-audit.interceptor";
+import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
+import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { VouchersService } from "./vouchers.service";
+import { CreditNoteDraftService } from "./credit-note-draft.service";
 
-@Controller('v1/vouchers')
+@Controller("v1/vouchers")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
 @UseInterceptors(ServiceAuditInterceptor)
 export class V1VouchersController {
@@ -34,12 +34,12 @@ export class V1VouchersController {
   issue(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers("idempotency-key") idempotencyKey?: string,
   ) {
     return this.vouchers.issueForApiClient(apiClient, body, idempotencyKey);
   }
 
-  @Post('preview')
+  @Post("preview")
   preview(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
@@ -47,7 +47,7 @@ export class V1VouchersController {
     return this.vouchers.previewForApiClient(apiClient, body);
   }
 
-  @Post('dry-run')
+  @Post("dry-run")
   dryRun(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
@@ -58,8 +58,8 @@ export class V1VouchersController {
   @Get()
   list(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Query('issuerId') issuerId: string,
-    @Query('limit') limit?: string,
+    @Query("issuerId") issuerId: string,
+    @Query("limit") limit?: string,
   ) {
     return this.vouchers.listForApiClient(
       apiClient,
@@ -68,31 +68,25 @@ export class V1VouchersController {
     );
   }
 
-  @Get(':id/pdf')
+  @Get(":id/pdf")
   async pdf(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Res() res: Response,
   ) {
     const pdf = await this.vouchers.renderPdfForApiClient(apiClient, id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="voucher-${id}.pdf"`);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="voucher-${id}.pdf"`);
     res.end(pdf);
   }
 
-  @Get(':id/credit-note-draft')
-  creditNoteDraft(
-    @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
-  ) {
+  @Get(":id/credit-note-draft")
+  creditNoteDraft(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
     return this.creditNoteDrafts.draftForApiClient(apiClient, id);
   }
 
-  @Get(':id')
-  get(
-    @CurrentApiClient() apiClient: AuthenticatedApiClient,
-    @Param('id') id: string,
-  ) {
+  @Get(":id")
+  get(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
     return this.vouchers.getForApiClient(apiClient, id);
   }
 }

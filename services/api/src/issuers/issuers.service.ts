@@ -1,10 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import {
   describeIssuerOnboardingStatus,
   normalizeCuit,
@@ -12,12 +7,12 @@ import {
   type CreateIssuer,
   type PaymentAccount,
   type Representative,
-} from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
+} from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
 
-const SERVICE_USER_DOMAIN = 'service.chirola.internal';
-const SERVICE_USER_PASSWORD = 'service-account-no-login';
-const UNIQUE_CONSTRAINT_ERROR = 'P2002';
+const SERVICE_USER_DOMAIN = "service.chirola.internal";
+const SERVICE_USER_PASSWORD = "service-account-no-login";
+const UNIQUE_CONSTRAINT_ERROR = "P2002";
 
 @Injectable()
 export class IssuersService {
@@ -27,10 +22,7 @@ export class IssuersService {
     return `${apiClientId}@${SERVICE_USER_DOMAIN}`;
   }
 
-  private async ensureServiceUser(
-    tx: Prisma.TransactionClient,
-    apiClientId: string,
-  ): Promise<string> {
+  private async ensureServiceUser(tx: Prisma.TransactionClient, apiClientId: string): Promise<string> {
     const email = this.serviceUserEmail(apiClientId);
     const user = await tx.user.upsert({
       where: { email },
@@ -61,13 +53,8 @@ export class IssuersService {
         return issuer;
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === UNIQUE_CONSTRAINT_ERROR
-      ) {
-        throw new ConflictException(
-          'Ya existe un emisor con ese CUIT para este entorno.',
-        );
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNIQUE_CONSTRAINT_ERROR) {
+        throw new ConflictException("Ya existe un emisor con ese CUIT para este entorno.");
       }
       throw error;
     }
@@ -98,7 +85,7 @@ export class IssuersService {
         },
       },
     });
-    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    if (!issuer) throw new NotFoundException("Emisor inexistente.");
     const { certificate, ...rest } = issuer;
     return {
       ...rest,
@@ -109,7 +96,7 @@ export class IssuersService {
             alias: certificate.alias,
             validUntil: certificate.validUntil,
             holderCuit: certificate.holderCuit,
-            status: certificate.certPem ? 'ready' : 'pending_certificate',
+            status: certificate.certPem ? "ready" : "pending_certificate",
           }
         : null,
     };
@@ -120,19 +107,15 @@ export class IssuersService {
       where: { id },
       include: { certificate: { select: { certPem: true, holderCuit: true } } },
     });
-    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    if (!issuer) throw new NotFoundException("Emisor inexistente.");
 
-    const loadedHolderCuit = issuer.certificate?.certPem
-      ? issuer.certificate.holderCuit
-      : null;
-    const expectedHolderCuit = normalizeCuit(
-      input.representativeCuit ?? issuer.cuit,
-    );
+    const loadedHolderCuit = issuer.certificate?.certPem ? issuer.certificate.holderCuit : null;
+    const expectedHolderCuit = normalizeCuit(input.representativeCuit ?? issuer.cuit);
     if (loadedHolderCuit && loadedHolderCuit !== expectedHolderCuit) {
       throw new ConflictException(
         `El certificado cargado pertenece al CUIT ${loadedHolderCuit} y el cambio lo ` +
           `dejaría sin corresponder al titular ${expectedHolderCuit}. Primero hay que ` +
-          'cargar el certificado del nuevo titular.',
+          "cargar el certificado del nuevo titular.",
       );
     }
 
@@ -178,16 +161,16 @@ export class IssuersService {
 
   async getFromUser(id: string, userId: string) {
     const issuer = await this.prisma.issuer.findUnique({ where: { id } });
-    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    if (!issuer) throw new NotFoundException("Emisor inexistente.");
     if (issuer.userId !== userId) {
-      throw new ForbiddenException('El emisor no pertenece al usuario.');
+      throw new ForbiddenException("El emisor no pertenece al usuario.");
     }
     return issuer;
   }
 
   async getById(id: string) {
     const issuer = await this.prisma.issuer.findUnique({ where: { id } });
-    if (!issuer) throw new NotFoundException('Emisor inexistente.');
+    if (!issuer) throw new NotFoundException("Emisor inexistente.");
     return issuer;
   }
 }

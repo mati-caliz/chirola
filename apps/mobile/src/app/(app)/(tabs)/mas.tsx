@@ -1,12 +1,21 @@
-import { useState } from 'react';
-import { Building2, FileBadge, LogOut, Settings, ShieldCheck, Store, UserCircle, Users } from 'lucide-react-native';
-import { ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BottomSheet, Button, Card, Divider, ListItem, StatusBadge } from '@/components/ds';
-import { useActiveIssuer } from '@/lib/active-issuer';
-import { useAuth } from '@/lib/auth-context';
-import { useTheme } from '@/hooks/use-theme';
+import { useState } from "react";
+import {
+  Building2,
+  FileBadge,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  Store,
+  UserCircle,
+  Users,
+} from "lucide-react-native";
+import { ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { BottomSheet, Button, Card, Divider, ListItem, StatusBadge } from "@/components/ds";
+import { useActiveIssuer } from "@/lib/active-issuer";
+import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/hooks/use-theme";
 
 const SectionLabel = ({ children }: { children: string }) => {
   const theme = useTheme();
@@ -16,7 +25,7 @@ const SectionLabel = ({ children }: { children: string }) => {
         fontFamily: theme.font.semibold,
         fontSize: theme.fontSize.micro,
         letterSpacing: 0.66,
-        textTransform: 'uppercase',
+        textTransform: "uppercase",
         color: theme.colors.textTertiary,
         marginBottom: 4,
       }}
@@ -34,9 +43,15 @@ export default function MasScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }} edges={["top"]}>
       <ScrollView contentContainerStyle={{ padding: theme.spacing.screenPad, gap: 20, paddingBottom: 120 }}>
-        <Text style={{ fontFamily: theme.font.extrabold, fontSize: theme.fontSize.title, color: theme.colors.textPrimary }}>
+        <Text
+          style={{
+            fontFamily: theme.font.extrabold,
+            fontSize: theme.fontSize.title,
+            color: theme.colors.textPrimary,
+          }}
+        >
           Más
         </Text>
 
@@ -44,11 +59,13 @@ export default function MasScreen() {
           <SectionLabel>Emisor</SectionLabel>
           <Card pad={4}>
             <ListItem
-              title={activeIssuer ? activeIssuer.legalName : 'Sin emisor'}
-              subtitle={activeIssuer ? `CUIT ${activeIssuer.cuit}` : 'Agregá tu primer emisor'}
+              title={activeIssuer ? activeIssuer.legalName : "Sin emisor"}
+              subtitle={activeIssuer ? `CUIT ${activeIssuer.cuit}` : "Agregá tu primer emisor"}
               leading={<Building2 color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
-              trailing={issuers.length > 1 ? <StatusBadge status="pendiente" label="Cambiar" size="sm" /> : undefined}
-              onPress={() => (issuers.length > 0 ? setPickerOpen(true) : router.push('/(app)/issuers/new'))}
+              trailing={
+                issuers.length > 1 ? <StatusBadge status="pendiente" label="Cambiar" size="sm" /> : undefined
+              }
+              onPress={() => (issuers.length > 0 ? setPickerOpen(true) : router.push("/(app)/issuers/new"))}
             />
             {activeIssuer ? (
               <>
@@ -92,14 +109,14 @@ export default function MasScreen() {
               title="Perfil"
               leading={<UserCircle color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
               chevron
-              onPress={() => router.push('/(app)/profile')}
+              onPress={() => router.push("/(app)/profile")}
             />
             <Divider inset={16} />
             <ListItem
               title="Configuración"
               leading={<Settings color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
               chevron
-              onPress={() => router.push('/(app)/config')}
+              onPress={() => router.push("/(app)/config")}
             />
             <Divider inset={16} />
             <ListItem
@@ -119,7 +136,9 @@ export default function MasScreen() {
               title={issuer.legalName}
               subtitle={`CUIT ${issuer.cuit}`}
               trailing={
-                issuer.id === activeIssuerId ? <StatusBadge status="aprobado" label="Activo" size="sm" /> : undefined
+                issuer.id === activeIssuerId ? (
+                  <StatusBadge status="aprobado" label="Activo" size="sm" />
+                ) : undefined
               }
               onPress={() => {
                 selectIssuer(issuer.id);
@@ -134,7 +153,7 @@ export default function MasScreen() {
           full
           onPress={() => {
             setPickerOpen(false);
-            router.push('/(app)/issuers/new');
+            router.push("/(app)/issuers/new");
           }}
         >
           Agregar otro emisor

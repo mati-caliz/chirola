@@ -1,20 +1,19 @@
 export const VoucherStatus = {
-  PENDING: 'PENDING',
-  APPROVED: 'APPROVED',
-  RECOVERED: 'RECOVERED',
-  OBSERVED: 'OBSERVED',
-  REJECTED: 'REJECTED',
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  RECOVERED: "RECOVERED",
+  OBSERVED: "OBSERVED",
+  REJECTED: "REJECTED",
 } as const;
 
-export type VoucherStatusName =
-  (typeof VoucherStatus)[keyof typeof VoucherStatus];
+export type VoucherStatusName = (typeof VoucherStatus)[keyof typeof VoucherStatus];
 
 export const voucherStatusName: Record<VoucherStatusName, string> = {
-  PENDING: 'Pendiente',
-  APPROVED: 'Autorizado',
-  RECOVERED: 'Recuperado de ARCA',
-  OBSERVED: 'Autorizado con observaciones',
-  REJECTED: 'Rechazado',
+  PENDING: "Pendiente",
+  APPROVED: "Autorizado",
+  RECOVERED: "Recuperado de ARCA",
+  OBSERVED: "Autorizado con observaciones",
+  REJECTED: "Rechazado",
 };
 
 export function describeVoucherStatus(status: string): string {
@@ -33,9 +32,8 @@ export function isAuthorizedStatus(status: string): boolean {
 }
 
 export const PendingVoucherStatus = {
-  PENDING: 'PENDING',
-  FAILED: 'FAILED',
+  PENDING: "PENDING",
+  FAILED: "FAILED",
 } as const;
 
-export type PendingVoucherStatusName =
-  (typeof PendingVoucherStatus)[keyof typeof PendingVoucherStatus];
+export type PendingVoucherStatusName = (typeof PendingVoucherStatus)[keyof typeof PendingVoucherStatus];

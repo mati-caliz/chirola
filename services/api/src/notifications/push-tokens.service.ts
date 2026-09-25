@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import type { PushTokenInput } from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import type { PushTokenInput } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class PushTokensService {

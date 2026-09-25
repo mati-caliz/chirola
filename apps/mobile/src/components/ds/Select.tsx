@@ -1,11 +1,11 @@
-import { ChevronDown } from 'lucide-react-native';
-import { Pressable, Text, View, type ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { ChevronDown } from "lucide-react-native";
+import { Pressable, Text, View, type ViewStyle } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Select = ({
   label,
   value,
-  placeholder = 'Elegí una opción',
+  placeholder = "Elegí una opción",
   hint,
   error,
   onPress,
@@ -38,8 +38,8 @@ export const Select = ({
       <Pressable
         onPress={onPress}
         style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 8,
           minHeight: 48,
           paddingHorizontal: 14,

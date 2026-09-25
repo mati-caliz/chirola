@@ -1,24 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { z } from 'zod';
-import {
-  ArcaParamType,
-  localArcaParams,
-  type ArcaParam,
-  type ArcaParamTypeName,
-} from '@chirola/shared';
-import type { ArcaIssuer } from '../arca/arca-environment';
-import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { WsfeService } from '../arca/wsfe/wsfe.service';
-import type { AuthContext } from '../arca/wsfe/wsfe.types';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
+import { ArcaParamType, localArcaParams, type ArcaParam, type ArcaParamTypeName } from "@chirola/shared";
+import type { ArcaIssuer } from "../arca/arca-environment";
+import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { WsfeService } from "../arca/wsfe/wsfe.service";
+import type { AuthContext } from "../arca/wsfe/wsfe.types";
 
 const DEFAULT_CACHE_TTL_DAYS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const storedParamsSchema = z.array(
-  z.object({ id: z.number(), description: z.string() }),
-);
+const storedParamsSchema = z.array(z.object({ id: z.number(), description: z.string() }));
 
 type ParamFetcher = (auth: AuthContext) => Promise<ArcaParam[]>;
 
@@ -33,9 +26,7 @@ export class ArcaParamCacheService {
     private readonly wsfe: WsfeService,
     config: ConfigService,
   ) {
-    this.cacheTtlMs =
-      config.get<number>('ARCA_PARAM_CACHE_TTL_DAYS', DEFAULT_CACHE_TTL_DAYS) *
-      MS_PER_DAY;
+    this.cacheTtlMs = config.get<number>("ARCA_PARAM_CACHE_TTL_DAYS", DEFAULT_CACHE_TTL_DAYS) * MS_PER_DAY;
   }
 
   private fetcherFor(paramType: ArcaParamTypeName): ParamFetcher {
@@ -45,22 +36,17 @@ export class ArcaParamCacheService {
       [ArcaParamType.IVA_RATES]: (auth) => this.wsfe.getIvaRates(auth),
       [ArcaParamType.TRIBUTE_TYPES]: (auth) => this.wsfe.getTributeTypes(auth),
       [ArcaParamType.OPTIONAL_TYPES]: (auth) => this.wsfe.getOptionalTypes(auth),
-      [ArcaParamType.RECIPIENT_IVA_CONDITIONS]: (auth) =>
-        this.wsfe.getRecipientIvaConditions(auth),
+      [ArcaParamType.RECIPIENT_IVA_CONDITIONS]: (auth) => this.wsfe.getRecipientIvaConditions(auth),
     };
     return fetchers[paramType];
   }
 
-  async get(
-    issuer: ArcaIssuer,
-    paramType: ArcaParamTypeName,
-  ): Promise<ArcaParam[]> {
+  async get(issuer: ArcaIssuer, paramType: ArcaParamTypeName): Promise<ArcaParam[]> {
     const cached = await this.prisma.arcaParamCache.findUnique({
       where: { issuerId_paramType: { issuerId: issuer.id, paramType } },
     });
     const stored = cached ? storedParamsSchema.safeParse(cached.entries) : null;
-    const isFresh =
-      cached && Date.now() - cached.fetchedAt.getTime() < this.cacheTtlMs;
+    const isFresh = cached && Date.now() - cached.fetchedAt.getTime() < this.cacheTtlMs;
 
     if (stored?.success && isFresh) {
       return stored.data;
@@ -89,5 +75,4 @@ export class ArcaParamCacheService {
       return localArcaParams[paramType];
     }
   }
-
 }

@@ -1,16 +1,15 @@
-import { ConfigService } from '@nestjs/config';
-import { CertMonitorService } from './cert-monitor.service';
-import { WebhookService } from '../webhooks/webhook.service';
-import { WebhookEvent } from '../webhooks/webhook-events';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { PushNotificationService } from '../notifications/push-notification.service';
+import { ConfigService } from "@nestjs/config";
+import { CertMonitorService } from "./cert-monitor.service";
+import { WebhookService } from "../webhooks/webhook.service";
+import { WebhookEvent } from "../webhooks/webhook-events";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { PushNotificationService } from "../notifications/push-notification.service";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function config(warningDays: number): ConfigService {
   return {
-    get: (key: string, def?: number) =>
-      key === 'CERT_EXPIRY_WARNING_DAYS' ? warningDays : def,
+    get: (key: string, def?: number) => (key === "CERT_EXPIRY_WARNING_DAYS" ? warningDays : def),
   } as unknown as ConfigService;
 }
 
@@ -22,17 +21,17 @@ function prismaWithCertificateExpiringIn(days: number): PrismaService {
   const validUntil = new Date(Date.now() + days * MS_PER_DAY);
   return {
     certificate: {
-      findMany: jest.fn(async () => [{ issuerId: 'issuer-1', validUntil }]),
+      findMany: jest.fn(async () => [{ issuerId: "issuer-1", validUntil }]),
     },
   } as unknown as PrismaService;
 }
 
-describe('CertMonitorService', () => {
-  it('dispara certificate.expiring para certificados próximos a vencer', async () => {
+describe("CertMonitorService", () => {
+  it("dispara certificate.expiring para certificados próximos a vencer", async () => {
     const validUntil = new Date(Date.now() + 10 * MS_PER_DAY);
     const prisma = {
       certificate: {
-        findMany: jest.fn(async () => [{ issuerId: 'issuer-1', validUntil }]),
+        findMany: jest.fn(async () => [{ issuerId: "issuer-1", validUntil }]),
       },
     } as unknown as PrismaService;
     const webhooks = { dispatch: jest.fn(async () => undefined) } as unknown as WebhookService;
@@ -41,13 +40,13 @@ describe('CertMonitorService', () => {
     await service.checkExpiringCertificates();
 
     expect(webhooks.dispatch).toHaveBeenCalledWith(
-      'issuer-1',
+      "issuer-1",
       WebhookEvent.CERTIFICATE_EXPIRING,
-      expect.objectContaining({ issuerId: 'issuer-1', daysToExpiry: expect.any(Number) }),
+      expect.objectContaining({ issuerId: "issuer-1", daysToExpiry: expect.any(Number) }),
     );
   });
 
-  it('no dispara si no hay certificados por vencer', async () => {
+  it("no dispara si no hay certificados por vencer", async () => {
     const prisma = {
       certificate: { findMany: jest.fn(async () => []) },
     } as unknown as PrismaService;
@@ -59,7 +58,7 @@ describe('CertMonitorService', () => {
     expect(webhooks.dispatch).not.toHaveBeenCalled();
   });
 
-  it('avisa por push sólo en los días de umbral, no todos los días', async () => {
+  it("avisa por push sólo en los días de umbral, no todos los días", async () => {
     const webhooks = { dispatch: jest.fn(async () => undefined) } as unknown as WebhookService;
     const pushOnThreshold = fakePush();
     const pushOffThreshold = fakePush();

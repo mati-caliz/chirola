@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import type { DraftAmounts, DraftAmountsInput } from '@chirola/shared';
-import { calculateAmounts } from '../arca/wsfe/iva-calculator';
+import { Injectable } from "@nestjs/common";
+import type { DraftAmounts, DraftAmountsInput } from "@chirola/shared";
+import { calculateAmounts } from "../arca/wsfe/iva-calculator";
 
-const UNDESCRIBED = '';
+const UNDESCRIBED = "";
 
 @Injectable()
 export class DraftAmountsService {

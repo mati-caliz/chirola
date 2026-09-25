@@ -1,0 +1,8 @@
+dist/
+web-build/
+.expo/
+coverage/
+node_modules/
+ios/
+android/
+expo-env.d.ts

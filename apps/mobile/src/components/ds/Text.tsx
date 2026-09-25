@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/hooks/use-theme';
+import { type ReactNode } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Screen = ({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) => {
   const theme = useTheme();
@@ -18,7 +18,7 @@ export const Screen = ({ children, scroll = true }: { children: ReactNode; scrol
     <View style={[styles.flex, content]}>{children}</View>
   );
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.bgApp }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.bgApp }]} edges={["bottom"]}>
       {body}
     </SafeAreaView>
   );
@@ -65,7 +65,7 @@ export const Overline = ({ children }: { children: ReactNode }) => {
         fontFamily: theme.font.semibold,
         fontSize: theme.fontSize.micro,
         letterSpacing: 0.66,
-        textTransform: 'uppercase',
+        textTransform: "uppercase",
       }}
     >
       {children}
@@ -109,7 +109,9 @@ export const ErrorText = ({ children }: { children: ReactNode }) => {
   const theme = useTheme();
   if (!children) return null;
   return (
-    <Text style={{ color: theme.colors.errFg, fontFamily: theme.font.regular, fontSize: theme.fontSize.caption }}>
+    <Text
+      style={{ color: theme.colors.errFg, fontFamily: theme.font.regular, fontSize: theme.fontSize.caption }}
+    >
       {children}
     </Text>
   );
@@ -117,7 +119,9 @@ export const ErrorText = ({ children }: { children: ReactNode }) => {
 
 export const Centered = ({ children }: { children: ReactNode }) => {
   const theme = useTheme();
-  return <View style={[styles.centered, { padding: theme.spacing.xxl, gap: theme.spacing.lg }]}>{children}</View>;
+  return (
+    <View style={[styles.centered, { padding: theme.spacing.xxl, gap: theme.spacing.lg }]}>{children}</View>
+  );
 };
 
 export const Loading = () => {
@@ -132,6 +136,6 @@ export const Loading = () => {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   grow: { flexGrow: 1 },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { alignItems: "center", justifyContent: "center" },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

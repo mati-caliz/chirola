@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
-import { z } from 'zod';
-import { registerForPushNotifications } from '@/lib/push-notifications';
+import { useEffect } from "react";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { z } from "zod";
+import { registerForPushNotifications } from "@/lib/push-notifications";
 
 const notificationDataSchema = z.object({ voucherId: z.string().optional() });
 
@@ -29,7 +29,7 @@ export function usePushNotifications(): void {
         router.push(`/(app)/vouchers/${data.data.voucherId}`);
         return;
       }
-      router.push('/(app)/(tabs)/comprobantes');
+      router.push("/(app)/(tabs)/comprobantes");
     });
     return () => subscription.remove();
   }, [router]);

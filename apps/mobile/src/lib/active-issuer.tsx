@@ -1,15 +1,7 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { listIssuers, type Issuer } from '@/lib/resources';
-import { getPreference, preferenceKeys, removePreference, setPreference } from '@/lib/storage';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { listIssuers, type Issuer } from "@/lib/resources";
+import { getPreference, preferenceKeys, removePreference, setPreference } from "@/lib/storage";
 
 interface ActiveIssuerState {
   issuers: Issuer[];
@@ -25,7 +17,7 @@ const ActiveIssuerContext = createContext<ActiveIssuerState | null>(null);
 
 export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['issuers'],
+    queryKey: ["issuers"],
     queryFn: listIssuers,
   });
   const issuers = useMemo(() => data ?? [], [data]);
@@ -80,6 +72,6 @@ export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
 
 export function useActiveIssuer(): ActiveIssuerState {
   const ctx = useContext(ActiveIssuerContext);
-  if (!ctx) throw new Error('useActiveIssuer debe usarse dentro de <ActiveIssuerProvider>.');
+  if (!ctx) throw new Error("useActiveIssuer debe usarse dentro de <ActiveIssuerProvider>.");
   return ctx;
 }

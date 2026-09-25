@@ -1,15 +1,15 @@
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
-import { z } from 'zod';
-import { PushPlatform } from '@chirola/shared';
-import { registerPushToken, removePushToken } from './resources';
-import { getPreference, preferenceKeys, removePreference, setPreference } from './storage';
+import { Platform } from "react-native";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import { z } from "zod";
+import { PushPlatform } from "@chirola/shared";
+import { registerPushToken, removePushToken } from "./resources";
+import { getPreference, preferenceKeys, removePreference, setPreference } from "./storage";
 
-const ANDROID_CHANNEL_ID = 'default';
-const ANDROID_CHANNEL_NAME = 'Avisos de ARCA';
-const GRANTED = 'granted';
+const ANDROID_CHANNEL_ID = "default";
+const ANDROID_CHANNEL_NAME = "Avisos de ARCA";
+const GRANTED = "granted";
 
 const easExtraSchema = z.object({ eas: z.object({ projectId: z.string().min(1) }) });
 
@@ -35,7 +35,7 @@ export async function registerForPushNotifications(): Promise<void> {
   if (!Device.isDevice || !projectId || !(await hasPermission())) {
     return;
   }
-  if (Platform.OS === 'android') {
+  if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: ANDROID_CHANNEL_NAME,
       importance: Notifications.AndroidImportance.HIGH,
@@ -44,7 +44,7 @@ export async function registerForPushNotifications(): Promise<void> {
   const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
   await registerPushToken({
     token,
-    platform: Platform.OS === 'ios' ? PushPlatform.IOS : PushPlatform.ANDROID,
+    platform: Platform.OS === "ios" ? PushPlatform.IOS : PushPlatform.ANDROID,
   });
   await setPreference(preferenceKeys.pushToken, token);
 }

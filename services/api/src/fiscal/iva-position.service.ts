@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { authorizedVoucherStatuses, isCreditNote } from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import { breakDownVoucherTaxes, round2, voucherSign } from './voucher-tax-breakdown';
+import { Injectable } from "@nestjs/common";
+import { authorizedVoucherStatuses, isCreditNote } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { breakDownVoucherTaxes, round2, voucherSign } from "./voucher-tax-breakdown";
 
 const RATE_21 = 21;
 const RATE_105 = 10.5;
@@ -27,20 +27,14 @@ export interface IvaPosition {
 export class IvaPositionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMonthlyPosition(
-    issuerId: string,
-    year: number,
-    month: number,
-  ): Promise<IvaPosition> {
+  async getMonthlyPosition(issuerId: string, year: number, month: number): Promise<IvaPosition> {
     const from = new Date(Date.UTC(year, month - 1, 1));
     const to = new Date(Date.UTC(year, month, 1));
 
     const debitByRate = await this.computeDebit(issuerId, from, to);
     const creditByRate = await this.computeCredit(issuerId, from, to);
 
-    const rates = [...new Set([...debitByRate.keys(), ...creditByRate.keys()])].sort(
-      (a, b) => b - a,
-    );
+    const rates = [...new Set([...debitByRate.keys(), ...creditByRate.keys()])].sort((a, b) => b - a);
 
     const breakdown: IvaRateBreakdown[] = rates.map((rate) => {
       const debit = round2(debitByRate.get(rate) ?? 0);
@@ -61,11 +55,7 @@ export class IvaPositionService {
     };
   }
 
-  private async computeDebit(
-    issuerId: string,
-    from: Date,
-    to: Date,
-  ): Promise<Map<number, number>> {
+  private async computeDebit(issuerId: string, from: Date, to: Date): Promise<Map<number, number>> {
     const vouchers = await this.prisma.voucher.findMany({
       where: {
         issuerId,
@@ -86,11 +76,7 @@ export class IvaPositionService {
     return debitByRate;
   }
 
-  private async computeCredit(
-    issuerId: string,
-    from: Date,
-    to: Date,
-  ): Promise<Map<number, number>> {
+  private async computeCredit(issuerId: string, from: Date, to: Date): Promise<Map<number, number>> {
     const purchases = await this.prisma.purchaseInvoice.findMany({
       where: { issuerId, issueDate: { gte: from, lt: to } },
     });

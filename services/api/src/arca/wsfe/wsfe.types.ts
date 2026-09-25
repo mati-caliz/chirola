@@ -1,4 +1,4 @@
-import type { AssociatedVoucher, Item, ServicePeriod } from '@chirola/shared';
+import type { AssociatedVoucher, Item, ServicePeriod } from "@chirola/shared";
 
 export interface AuthContext {
   issuerId: string;
@@ -9,7 +9,6 @@ export interface AuthContext {
 }
 
 export interface ArcaIvaRate {
-
   id: number;
 
   taxableBase: number;

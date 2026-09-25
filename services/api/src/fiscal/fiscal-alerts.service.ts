@@ -1,10 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import {
-  upcomingVencimientos,
-  VencimientoStatus,
-  type Vencimiento,
-} from './vencimiento-calendar';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { upcomingVencimientos, VencimientoStatus, type Vencimiento } from "./vencimiento-calendar";
 
 const DEFAULT_HORIZON_DAYS = 90;
 const CERT_WARNING_DAYS = 30;
@@ -44,9 +40,7 @@ export class FiscalAlertsService {
     if (!certificate?.validUntil) {
       return null;
     }
-    const daysToExpiry = Math.ceil(
-      (certificate.validUntil.getTime() - Date.now()) / MS_PER_DAY,
-    );
+    const daysToExpiry = Math.ceil((certificate.validUntil.getTime() - Date.now()) / MS_PER_DAY);
     if (daysToExpiry > CERT_WARNING_DAYS) {
       return null;
     }

@@ -1,8 +1,8 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 });
 
 export const loginSchema = z.object({
@@ -24,7 +24,6 @@ export interface AuthUser {
 }
 
 export interface AuthResponse {
-
   token: string;
 
   refreshToken: string;

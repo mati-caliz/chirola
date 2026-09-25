@@ -1,5 +1,5 @@
-import { View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { View } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Divider = ({ inset = 0 }: { inset?: number }) => {
   const theme = useTheme();

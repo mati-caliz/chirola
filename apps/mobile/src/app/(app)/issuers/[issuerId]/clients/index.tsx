@@ -1,18 +1,33 @@
-import { UserPlus, Users } from 'lucide-react-native';
-import { Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { documentTypeName } from '@chirola/shared';
-import { Banner, Button, Card, Divider, EmptyState, ListItem, Loading, Screen } from '@/components/ds';
-import { listClients, type Client } from '@/lib/resources';
-import { useTheme } from '@/hooks/use-theme';
+import { UserPlus, Users } from "lucide-react-native";
+import { Text, View } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { documentTypeName } from "@chirola/shared";
+import { Banner, Button, Card, Divider, EmptyState, ListItem, Loading, Screen } from "@/components/ds";
+import { listClients, type Client } from "@/lib/resources";
+import { useTheme } from "@/hooks/use-theme";
 
 const Avatar = ({ name }: { name: string }) => {
   const theme = useTheme();
-  const initial = name.trim().charAt(0).toUpperCase() || '?';
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
-    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.surfaceBrandSubtle, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.callout, color: theme.colors.textBrand }}>
+    <View
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: theme.colors.surfaceBrandSubtle,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: theme.font.bold,
+          fontSize: theme.fontSize.callout,
+          color: theme.colors.textBrand,
+        }}
+      >
         {initial}
       </Text>
     </View>
@@ -24,7 +39,7 @@ export default function ClientsScreen() {
   const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
   const router = useRouter();
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['clients', issuerId],
+    queryKey: ["clients", issuerId],
     queryFn: () => listClients(issuerId),
   });
 
@@ -32,7 +47,7 @@ export default function ClientsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Clientes' }} />
+      <Stack.Screen options={{ title: "Clientes" }} />
       <Screen>
         {isLoading ? (
           <Loading />
@@ -65,7 +80,12 @@ export default function ClientsScreen() {
                 );
               })}
             </Card>
-            <Button variant="secondary" full icon={<UserPlus size={18} color={theme.colors.actionSecondaryText} strokeWidth={2} />} onPress={goNew}>
+            <Button
+              variant="secondary"
+              full
+              icon={<UserPlus size={18} color={theme.colors.actionSecondaryText} strokeWidth={2} />}
+              onPress={goNew}
+            >
               Nuevo cliente
             </Button>
           </>

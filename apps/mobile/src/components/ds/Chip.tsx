@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
-import { Pressable, Text } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { type ReactNode } from "react";
+import { Pressable, Text } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Chip = ({
   label,
@@ -19,8 +19,8 @@ export const Chip = ({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         gap: 6,
         height: 36,
         paddingHorizontal: 14,

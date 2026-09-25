@@ -1,7 +1,7 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { ClientsService } from './clients.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { ConflictException, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { ClientsService } from "./clients.service";
+import { PrismaService } from "../prisma/prisma.service";
 
 type Row = Record<string, unknown>;
 
@@ -14,9 +14,9 @@ function fakePrisma(): PrismaService {
       create: async ({ data }: { data: Row }) => {
         for (const r of store.values()) {
           if (key(r) === key(data)) {
-            throw new Prisma.PrismaClientKnownRequestError('dup', {
-              code: 'P2002',
-              clientVersion: 'test',
+            throw new Prisma.PrismaClientKnownRequestError("dup", {
+              code: "P2002",
+              clientVersion: "test",
             });
           }
         }
@@ -33,9 +33,7 @@ function fakePrisma(): PrismaService {
       findMany: async ({ where }: { where: { issuerId: string } }) =>
         [...store.values()].filter((r) => r.issuerId === where.issuerId),
       findFirst: async ({ where }: { where: { id: string; issuerId: string } }) =>
-        [...store.values()].find(
-          (r) => r.id === where.id && r.issuerId === where.issuerId,
-        ) ?? null,
+        [...store.values()].find((r) => r.id === where.id && r.issuerId === where.issuerId) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Row }) => {
         const row: Row = { ...store.get(where.id) };
         for (const [k, v] of Object.entries(data)) {
@@ -52,49 +50,49 @@ function fakePrisma(): PrismaService {
   } as unknown as PrismaService;
 }
 
-describe('ClientsService', () => {
-  const ISSUER = 'em1';
+describe("ClientsService", () => {
+  const ISSUER = "em1";
   let svc: ClientsService;
 
   beforeEach(() => {
     svc = new ClientsService(fakePrisma());
   });
 
-  it('crea y lista clientes de un emisor', async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: '30707153745', legalName: 'Acme' });
-    await svc.create(ISSUER, { docType: 96, docNumber: '12345678', legalName: 'Beta' });
+  it("crea y lista clientes de un emisor", async () => {
+    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745", legalName: "Acme" });
+    await svc.create(ISSUER, { docType: 96, docNumber: "12345678", legalName: "Beta" });
     const lista = await svc.list(ISSUER);
     expect(lista).toHaveLength(2);
   });
 
-  it('rechaza documento duplicado en el mismo emisor con 409', async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: '30707153745' });
-    await expect(
-      svc.create(ISSUER, { docType: 80, docNumber: '30707153745' }),
-    ).rejects.toBeInstanceOf(ConflictException);
+  it("rechaza documento duplicado en el mismo emisor con 409", async () => {
+    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
+    await expect(svc.create(ISSUER, { docType: 80, docNumber: "30707153745" })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
-  it('el mismo documento en otro emisor sí se permite', async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: '30707153745' });
-    await expect(
-      svc.create('em2', { docType: 80, docNumber: '30707153745' }),
-    ).resolves.toMatchObject({ issuerId: 'em2' });
+  it("el mismo documento en otro emisor sí se permite", async () => {
+    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
+    await expect(svc.create("em2", { docType: 80, docNumber: "30707153745" })).resolves.toMatchObject({
+      issuerId: "em2",
+    });
   });
 
-  it('no encuentra un cliente de otro emisor (aislamiento)', async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: '30707153745' });
-    await expect(svc.get('em2', c.id)).rejects.toBeInstanceOf(NotFoundException);
+  it("no encuentra un cliente de otro emisor (aislamiento)", async () => {
+    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
+    await expect(svc.get("em2", c.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('actualiza sólo los campos provistos', async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: '30707153745', legalName: 'Acme' });
-    const upd = await svc.update(ISSUER, c.id, { email: 'x@acme.com' });
-    expect(upd.email).toBe('x@acme.com');
-    expect(upd.legalName).toBe('Acme');
+  it("actualiza sólo los campos provistos", async () => {
+    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745", legalName: "Acme" });
+    const upd = await svc.update(ISSUER, c.id, { email: "x@acme.com" });
+    expect(upd.email).toBe("x@acme.com");
+    expect(upd.legalName).toBe("Acme");
   });
 
-  it('elimina un cliente propio', async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: '30707153745' });
+  it("elimina un cliente propio", async () => {
+    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
     await expect(svc.delete(ISSUER, c.id)).resolves.toEqual({ ok: true });
     await expect(svc.get(ISSUER, c.id)).rejects.toBeInstanceOf(NotFoundException);
   });

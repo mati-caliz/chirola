@@ -1,17 +1,17 @@
-import { useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { useTheme, type Theme } from '@/hooks/use-theme';
+import { useState, type ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
+import { useTheme, type Theme } from "@/hooks/use-theme";
 
-export type BannerKind = 'error' | 'warning' | 'success' | 'info';
+export type BannerKind = "error" | "warning" | "success" | "info";
 
 function kindColors(theme: Theme, kind: BannerKind) {
   const { colors } = theme;
   switch (kind) {
-    case 'warning':
+    case "warning":
       return { bg: colors.statusObservadoBg, fg: colors.statusObservadoFg };
-    case 'success':
+    case "success":
       return { bg: colors.statusAprobadoBg, fg: colors.statusAprobadoFg };
-    case 'info':
+    case "info":
       return { bg: colors.surfaceBrandSubtle, fg: colors.textBrand };
     default:
       return { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg };
@@ -19,7 +19,7 @@ function kindColors(theme: Theme, kind: BannerKind) {
 }
 
 export const Banner = ({
-  kind = 'error',
+  kind = "error",
   title,
   body,
   detail,
@@ -35,8 +35,17 @@ export const Banner = ({
   const [open, setOpen] = useState(false);
   const { bg, fg } = kindColors(theme, kind);
   return (
-    <View style={{ backgroundColor: bg, borderRadius: theme.radius.md, paddingHorizontal: 16, paddingVertical: 14 }}>
-      <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.callout, color: fg }}>{title}</Text>
+    <View
+      style={{
+        backgroundColor: bg,
+        borderRadius: theme.radius.md,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+      }}
+    >
+      <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.callout, color: fg }}>
+        {title}
+      </Text>
       {body ? (
         <Text
           style={{
@@ -58,15 +67,22 @@ export const Banner = ({
               fontFamily: theme.font.semibold,
               fontSize: theme.fontSize.caption,
               color: fg,
-              textDecorationLine: 'underline',
+              textDecorationLine: "underline",
             }}
           >
-            {open ? 'Ocultar detalle técnico' : 'Ver detalle técnico'}
+            {open ? "Ocultar detalle técnico" : "Ver detalle técnico"}
           </Text>
         </Pressable>
       ) : null}
       {detail && open ? (
-        <Text style={{ marginTop: 6, fontFamily: theme.font.monoRegular, fontSize: theme.fontSize.micro, color: fg }}>
+        <Text
+          style={{
+            marginTop: 6,
+            fontFamily: theme.font.monoRegular,
+            fontSize: theme.fontSize.micro,
+            color: fg,
+          }}
+        >
           {detail}
         </Text>
       ) : null}

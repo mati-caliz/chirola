@@ -1,13 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import type { AuthUser } from '@chirola/shared';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AuthUser } from "@chirola/shared";
 import {
   clearSession,
   loadSession,
@@ -16,8 +8,8 @@ import {
   registerRequest,
   setSession,
   setUnauthorizedHandler,
-} from './api';
-import { unregisterPushNotifications } from './push-notifications';
+} from "./api";
+import { unregisterPushNotifications } from "./push-notifications";
 
 interface AuthState {
   user: AuthUser | null;
@@ -73,6 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth debe usarse dentro de <AuthProvider>.');
+  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>.");
   return ctx;
 }

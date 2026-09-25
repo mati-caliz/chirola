@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { IssuersService } from './issuers.service';
-import { ArcaParamsService } from './arca-params.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { IssuersService } from "./issuers.service";
+import { ArcaParamsService } from "./arca-params.service";
 
 @Injectable()
 export class SalesPointsService {
@@ -19,7 +19,7 @@ export class SalesPointsService {
   listForIssuer(issuerId: string) {
     return this.prisma.salesPoint.findMany({
       where: { issuerId },
-      orderBy: { number: 'asc' },
+      orderBy: { number: "asc" },
       select: { id: true, number: true, description: true },
     });
   }

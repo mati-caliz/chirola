@@ -1,5 +1,5 @@
-import type { ArcaCallLogEntry } from './arca-call-log.service';
-import type { ArcaCallRecorder } from './arca-soap.util';
+import type { ArcaCallLogEntry } from "./arca-call-log.service";
+import type { ArcaCallRecorder } from "./arca-soap.util";
 
 export class RecordedArcaCalls implements ArcaCallRecorder {
   readonly entries: ArcaCallLogEntry[] = [];

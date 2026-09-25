@@ -1,19 +1,19 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   exportItemTotal,
   exportVoucherTotal,
   TaxTreatment,
   VoucherStatus,
   type IssueExportVoucher,
-} from '@chirola/shared';
-import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { WsfexService } from '../arca/wsfex/wsfex.service';
-import type { ExportCaeRequest } from '../arca/wsfex/wsfex.types';
-import { buildQrUrl } from './qr.util';
-import { IssuerLockService } from './issuer-lock.service';
+} from "@chirola/shared";
+import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { WsfexService } from "../arca/wsfex/wsfex.service";
+import type { ExportCaeRequest } from "../arca/wsfex/wsfex.types";
+import { buildQrUrl } from "./qr.util";
+import { IssuerLockService } from "./issuer-lock.service";
 
-const EXPORT_SERVICE = 'wsfex';
+const EXPORT_SERVICE = "wsfex";
 const NO_IVA_RATE = 0;
 const FOREIGN_RECIPIENT_DOC_TYPE = 80;
 const EXPORT_CONCEPT = 1;
@@ -34,10 +34,10 @@ export class ExportVouchersService {
       where: { id: input.issuerId },
     });
     if (!issuer) {
-      throw new NotFoundException('Emisor inexistente.');
+      throw new NotFoundException("Emisor inexistente.");
     }
     if (issuer.userId !== userId) {
-      throw new NotFoundException('Emisor inexistente.');
+      throw new NotFoundException("Emisor inexistente.");
     }
 
     return this.issuerLock.runExclusive(issuer.id, async () => {
@@ -129,16 +129,11 @@ export class ExportVouchersService {
         totalAmount,
         currency: input.currency,
         exchangeRate: input.exchangeRate,
-        status:
-          cae.observations.length > 0
-            ? VoucherStatus.OBSERVED
-            : VoucherStatus.APPROVED,
+        status: cae.observations.length > 0 ? VoucherStatus.OBSERVED : VoucherStatus.APPROVED,
         cae: cae.cae,
         caeExpiration: cae.caeVto,
         arcaObservations:
-          cae.observations.length > 0
-            ? (cae.observations as { code: string; message: string }[])
-            : undefined,
+          cae.observations.length > 0 ? (cae.observations as { code: string; message: string }[]) : undefined,
         qrData,
         associatedVouchers:
           input.associatedVouchers && input.associatedVouchers.length > 0
@@ -171,5 +166,4 @@ export class ExportVouchersService {
       include: { items: true, salesPoint: true },
     });
   }
-
 }

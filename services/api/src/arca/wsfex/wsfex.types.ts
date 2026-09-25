@@ -1,5 +1,5 @@
-import type { ExportItem, ShippingPermit } from '@chirola/shared';
-import type { ArcaObservation, AuthContext } from '../wsfe/wsfe.types';
+import type { ExportItem, ShippingPermit } from "@chirola/shared";
+import type { ArcaObservation, AuthContext } from "../wsfe/wsfe.types";
 
 export interface ExportCaeRequest {
   requestId: number;

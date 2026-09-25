@@ -1,5 +1,5 @@
-import { describeVoucher } from '../vouchers/pdf.util';
-import type { PushMessage } from './push-notification.service';
+import { describeVoucher } from "../vouchers/pdf.util";
+import type { PushMessage } from "./push-notification.service";
 
 const MAX_REASON_LENGTH = 140;
 
@@ -12,26 +12,25 @@ export function queuedVoucherAuthorizedMessage(voucher: {
   number: number;
 }): PushMessage {
   return {
-    title: 'Comprobante autorizado',
+    title: "Comprobante autorizado",
     body: `${describeVoucher(voucher.voucherType, voucher.salesPoint, voucher.number)} ya tiene CAE: ARCA lo aprobó en el reintento.`,
     data: { voucherId: voucher.id },
   };
 }
 
 export function queuedVoucherFailedMessage(pendingVoucherId: string, reason: string): PushMessage {
-  const shortReason =
-    reason.length > MAX_REASON_LENGTH ? `${reason.slice(0, MAX_REASON_LENGTH)}…` : reason;
+  const shortReason = reason.length > MAX_REASON_LENGTH ? `${reason.slice(0, MAX_REASON_LENGTH)}…` : reason;
   return {
-    title: 'No se pudo emitir un comprobante',
+    title: "No se pudo emitir un comprobante",
     body: `Quedó sin CAE: ${shortReason}`,
     data: { pendingVoucherId },
   };
 }
 
 export function certificateExpiringMessage(issuerId: string, daysToExpiry: number): PushMessage {
-  const when = daysToExpiry === 1 ? 'mañana' : `en ${daysToExpiry} días`;
+  const when = daysToExpiry === 1 ? "mañana" : `en ${daysToExpiry} días`;
   return {
-    title: 'Tu certificado de ARCA vence pronto',
+    title: "Tu certificado de ARCA vence pronto",
     body: `Vence ${when}. Renovalo para seguir facturando.`,
     data: { issuerId },
   };

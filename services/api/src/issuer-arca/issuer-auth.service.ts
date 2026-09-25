@@ -1,16 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CertsService } from '../certs/certs.service';
-import { WsaaService } from '../arca/wsaa/wsaa.service';
-import type { ArcaService } from '../arca/wsaa/wsaa.types';
-import type { ArcaIssuer } from '../arca/arca-environment';
-import type { AuthContext } from '../arca/wsfe/wsfe.types';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { CertsService } from "../certs/certs.service";
+import { WsaaService } from "../arca/wsaa/wsaa.service";
+import type { ArcaService } from "../arca/wsaa/wsaa.types";
+import type { ArcaIssuer } from "../arca/arca-environment";
+import type { AuthContext } from "../arca/wsfe/wsfe.types";
 import {
   assertCertificateBelongsToIssuer,
   expectedCertificateHolderCuit,
-} from './issuer-certificate-invariant';
+} from "./issuer-certificate-invariant";
 
-const DEFAULT_ARCA_SERVICE: ArcaService = 'wsfe';
+const DEFAULT_ARCA_SERVICE: ArcaService = "wsfe";
 
 @Injectable()
 export class IssuerAuthService {
@@ -22,10 +22,7 @@ export class IssuerAuthService {
     private readonly wsaa: WsaaService,
   ) {}
 
-  async buildAuth(
-    issuer: ArcaIssuer,
-    service: ArcaService = DEFAULT_ARCA_SERVICE,
-  ): Promise<AuthContext> {
+  async buildAuth(issuer: ArcaIssuer, service: ArcaService = DEFAULT_ARCA_SERVICE): Promise<AuthContext> {
     const credentials = await this.certs.getCredentials(issuer.id);
     const holderCuit = this.resolveHolderCuit(issuer, credentials.holderCuit);
     const accessTicket = await this.wsaa.getAccessTicket({
@@ -60,10 +57,7 @@ export class IssuerAuthService {
     return this.buildAuth(issuer, service);
   }
 
-  private resolveHolderCuit(
-    issuer: ArcaIssuer,
-    holderCuit: string | null,
-  ): string {
+  private resolveHolderCuit(issuer: ArcaIssuer, holderCuit: string | null): string {
     if (holderCuit) {
       assertCertificateBelongsToIssuer(issuer, holderCuit);
       return holderCuit;

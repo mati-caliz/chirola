@@ -1,7 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { FixedWindowLimiter } from '../common/fixed-window-limiter';
-import type { RequestWithApiClient } from './service-auth.guard';
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { FixedWindowLimiter } from "../common/fixed-window-limiter";
+import type { RequestWithApiClient } from "./service-auth.guard";
 
 const DEFAULT_MAX_REQUESTS = 120;
 const DEFAULT_WINDOW_MS = 60_000;
@@ -12,8 +12,8 @@ export class RateLimitGuard implements CanActivate {
 
   constructor(config: ConfigService) {
     this.limiter = new FixedWindowLimiter(
-      config.get<number>('SERVICE_RATE_LIMIT_MAX', DEFAULT_MAX_REQUESTS),
-      config.get<number>('SERVICE_RATE_LIMIT_WINDOW_MS', DEFAULT_WINDOW_MS),
+      config.get<number>("SERVICE_RATE_LIMIT_MAX", DEFAULT_MAX_REQUESTS),
+      config.get<number>("SERVICE_RATE_LIMIT_WINDOW_MS", DEFAULT_WINDOW_MS),
     );
   }
 

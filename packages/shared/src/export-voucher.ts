@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { VoucherType } from './voucher-type';
+import { z } from "zod";
+import { VoucherType } from "./voucher-type";
 
 export const ExportType = {
   GOODS: 1,
@@ -10,9 +10,9 @@ export const ExportType = {
 export type ExportTypeName = (typeof ExportType)[keyof typeof ExportType];
 
 export const exportTypeName: Record<number, string> = {
-  1: 'Exportación definitiva de bienes',
-  2: 'Servicios',
-  4: 'Otros',
+  1: "Exportación definitiva de bienes",
+  2: "Servicios",
+  4: "Otros",
 };
 
 export const VoucherLanguage = {
@@ -21,13 +21,12 @@ export const VoucherLanguage = {
   PORTUGUESE: 3,
 } as const;
 
-export type VoucherLanguageName =
-  (typeof VoucherLanguage)[keyof typeof VoucherLanguage];
+export type VoucherLanguageName = (typeof VoucherLanguage)[keyof typeof VoucherLanguage];
 
 export const voucherLanguageName: Record<number, string> = {
-  1: 'Español',
-  2: 'Inglés',
-  3: 'Portugués',
+  1: "Español",
+  2: "Inglés",
+  3: "Portugués",
 };
 
 export function requiresShippingPermit(exportType: number): boolean {
@@ -63,7 +62,7 @@ export const issueExportVoucherSchema = z
       z.literal(ExportType.OTHER),
     ]),
     destinationCountryId: z.number().int().positive(),
-    countryTaxId: z.string().regex(/^\d{11}$/, 'CUIT país inválido'),
+    countryTaxId: z.string().regex(/^\d{11}$/, "CUIT país inválido"),
     client: z.object({
       legalName: z.string().min(1),
       address: z.string().min(1),
@@ -99,17 +98,16 @@ export const issueExportVoucherSchema = z
     if (!requiresShippingPermit(data.exportType) && permits.length > 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['shippingPermits'],
-        message:
-          'El permiso de embarque sólo corresponde a la exportación de bienes.',
+        path: ["shippingPermits"],
+        message: "El permiso de embarque sólo corresponde a la exportación de bienes.",
       });
     }
 
     if (data.exportType === ExportType.GOODS && !data.incoterm) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['incoterm'],
-        message: 'La exportación de bienes requiere el Incoterm.',
+        path: ["incoterm"],
+        message: "La exportación de bienes requiere el Incoterm.",
       });
     }
   });
@@ -118,11 +116,7 @@ export type IssueExportVoucher = z.infer<typeof issueExportVoucherSchema>;
 export type ExportItem = z.infer<typeof exportItemSchema>;
 export type ShippingPermit = z.infer<typeof shippingPermitSchema>;
 
-export function exportItemTotal(item: {
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-}): number {
+export function exportItemTotal(item: { quantity: number; unitPrice: number; discount: number }): number {
   const gross = item.quantity * item.unitPrice - item.discount;
   return Math.round((gross + Number.EPSILON) * 100) / 100;
 }

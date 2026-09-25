@@ -1,12 +1,12 @@
-import { fakeIssuerAuth } from '../issuer-arca/issuer-arca.fixture';
-import { ReconciliationService } from './reconciliation.service';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { WsfeService } from '../arca/wsfe/wsfe.service';
+import { fakeIssuerAuth } from "../issuer-arca/issuer-arca.fixture";
+import { ReconciliationService } from "./reconciliation.service";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { WsfeService } from "../arca/wsfe/wsfe.service";
 
 const issuer = {
-  id: 'issuer-1',
-  cuit: '20111111112',
-  environment: 'homologacion',
+  id: "issuer-1",
+  cuit: "20111111112",
+  environment: "homologacion",
   representativeCuit: null,
 };
 
@@ -16,41 +16,34 @@ interface Group {
   _max: { number: number | null };
 }
 
-function build(options: {
-  groups?: Group[];
-  lastInArca?: Record<number, number>;
-}) {
+function build(options: { groups?: Group[]; lastInArca?: Record<number, number> }) {
   const prisma = {
     voucher: {
       groupBy: async () => options.groups ?? [],
     },
     salesPoint: {
-      findMany: async () => [{ id: 'sp-1', number: 1 }],
+      findMany: async () => [{ id: "sp-1", number: 1 }],
     },
   } as unknown as PrismaService;
 
   const wsfe = {
-    getLastAuthorized: async (
-      _auth: unknown,
-      _salesPoint: number,
-      voucherType: number,
-    ) => options.lastInArca?.[voucherType] ?? 0,
+    getLastAuthorized: async (_auth: unknown, _salesPoint: number, voucherType: number) =>
+      options.lastInArca?.[voucherType] ?? 0,
   } as unknown as WsfeService;
-
 
   return new ReconciliationService(prisma, fakeIssuerAuth(), wsfe);
 }
 
-describe('ReconciliationService', () => {
-  it('no consulta ARCA si el emisor no tiene comprobantes', async () => {
+describe("ReconciliationService", () => {
+  it("no consulta ARCA si el emisor no tiene comprobantes", async () => {
     const service = build({ groups: [] });
 
     expect(await service.checkNumbering(issuer)).toEqual([]);
   });
 
-  it('reporta cero faltantes cuando la base está al día', async () => {
+  it("reporta cero faltantes cuando la base está al día", async () => {
     const service = build({
-      groups: [{ salesPointId: 'sp-1', voucherType: 11, _max: { number: 42 } }],
+      groups: [{ salesPointId: "sp-1", voucherType: 11, _max: { number: 42 } }],
       lastInArca: { 11: 42 },
     });
 
@@ -61,9 +54,9 @@ describe('ReconciliationService', () => {
     expect(status.lastInDatabase).toBe(42);
   });
 
-  it('detecta comprobantes que ARCA autorizó y la base no tiene', async () => {
+  it("detecta comprobantes que ARCA autorizó y la base no tiene", async () => {
     const service = build({
-      groups: [{ salesPointId: 'sp-1', voucherType: 11, _max: { number: 40 } }],
+      groups: [{ salesPointId: "sp-1", voucherType: 11, _max: { number: 40 } }],
       lastInArca: { 11: 43 },
     });
 
@@ -72,9 +65,9 @@ describe('ReconciliationService', () => {
     expect(status.missingInDatabase).toBe(3);
   });
 
-  it('no reporta faltantes negativos si la base va adelante', async () => {
+  it("no reporta faltantes negativos si la base va adelante", async () => {
     const service = build({
-      groups: [{ salesPointId: 'sp-1', voucherType: 11, _max: { number: 50 } }],
+      groups: [{ salesPointId: "sp-1", voucherType: 11, _max: { number: 50 } }],
       lastInArca: { 11: 42 },
     });
 
@@ -83,11 +76,11 @@ describe('ReconciliationService', () => {
     expect(status.missingInDatabase).toBe(0);
   });
 
-  it('revisa cada combinación de punto de venta y tipo', async () => {
+  it("revisa cada combinación de punto de venta y tipo", async () => {
     const service = build({
       groups: [
-        { salesPointId: 'sp-1', voucherType: 11, _max: { number: 10 } },
-        { salesPointId: 'sp-1', voucherType: 13, _max: { number: 2 } },
+        { salesPointId: "sp-1", voucherType: 11, _max: { number: 10 } },
+        { salesPointId: "sp-1", voucherType: 13, _max: { number: 2 } },
       ],
       lastInArca: { 11: 12, 13: 2 },
     });
@@ -99,9 +92,9 @@ describe('ReconciliationService', () => {
     expect(statuses[1].missingInDatabase).toBe(0);
   });
 
-  it('ignora grupos cuyo punto de venta ya no existe', async () => {
+  it("ignora grupos cuyo punto de venta ya no existe", async () => {
     const service = build({
-      groups: [{ salesPointId: 'sp-borrado', voucherType: 11, _max: { number: 5 } }],
+      groups: [{ salesPointId: "sp-borrado", voucherType: 11, _max: { number: 5 } }],
       lastInArca: { 11: 9 },
     });
 

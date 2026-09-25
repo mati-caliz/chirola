@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Search, X } from 'lucide-react-native';
-import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useState } from "react";
+import { Search, X } from "lucide-react-native";
+import { Pressable, TextInput, View, type ViewStyle } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const SearchBar = ({
   value,
   onChangeText,
-  placeholder = 'Buscar',
+  placeholder = "Buscar",
   onClear,
   style,
 }: {
@@ -22,15 +22,15 @@ export const SearchBar = ({
     <View
       style={[
         {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 8,
           height: 44,
           paddingHorizontal: 12,
           borderRadius: theme.radius.pill,
           backgroundColor: theme.colors.bgSunken,
           borderWidth: 1.5,
-          borderColor: focused ? theme.colors.borderFocus : 'transparent',
+          borderColor: focused ? theme.colors.borderFocus : "transparent",
         },
         style,
       ]}
@@ -60,8 +60,8 @@ export const SearchBar = ({
             width: 20,
             height: 20,
             borderRadius: 10,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: "center",
+            justifyContent: "center",
             backgroundColor: theme.colors.borderStrong,
           }}
         >

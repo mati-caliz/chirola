@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { ArcaIssuer } from '../arca/arca-environment';
-import { IssuerAuthService } from '../issuer-arca/issuer-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { WsfeService } from '../arca/wsfe/wsfe.service';
+import { Injectable, Logger } from "@nestjs/common";
+import type { ArcaIssuer } from "../arca/arca-environment";
+import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { WsfeService } from "../arca/wsfe/wsfe.service";
 
 export interface NumberingStatus {
   salesPoint: number;
@@ -24,7 +24,7 @@ export class ReconciliationService {
 
   async checkNumbering(issuer: ArcaIssuer): Promise<NumberingStatus[]> {
     const grouped = await this.prisma.voucher.groupBy({
-      by: ['salesPointId', 'voucherType'],
+      by: ["salesPointId", "voucherType"],
       where: { issuerId: issuer.id },
       _max: { number: true },
     });
@@ -44,11 +44,7 @@ export class ReconciliationService {
       const salesPointNumber = numberById.get(group.salesPointId);
       if (salesPointNumber === undefined) continue;
 
-      const lastInArca = await this.wsfe.getLastAuthorized(
-        auth,
-        salesPointNumber,
-        group.voucherType,
-      );
+      const lastInArca = await this.wsfe.getLastAuthorized(auth, salesPointNumber, group.voucherType);
       const lastInDatabase = group._max.number ?? 0;
       const missingInDatabase = Math.max(lastInArca - lastInDatabase, 0);
 
@@ -69,5 +65,4 @@ export class ReconciliationService {
 
     return statuses;
   }
-
 }

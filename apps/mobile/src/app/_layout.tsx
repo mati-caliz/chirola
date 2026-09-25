@@ -1,10 +1,6 @@
-import { useEffect } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from '@react-navigation/native';
+import { useEffect } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import {
   Onest_400Regular,
   Onest_500Medium,
@@ -12,22 +8,22 @@ import {
   Onest_700Bold,
   Onest_800ExtraBold,
   useFonts,
-} from '@expo-google-fonts/onest';
+} from "@expo-google-fonts/onest";
 import {
   SplineSansMono_400Regular,
   SplineSansMono_500Medium,
   SplineSansMono_600SemiBold,
-} from '@expo-google-fonts/spline-sans-mono';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+} from "@expo-google-fonts/spline-sans-mono";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { Loading } from '@/components/ui';
-import { AuthProvider, useAuth } from '@/lib/auth-context';
-import { queryClient } from '@/lib/query';
-import { ThemeModeProvider, useThemeMode } from '@/theme/theme-mode';
+import { Loading } from "@/components/ui";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { queryClient } from "@/lib/query";
+import { ThemeModeProvider, useThemeMode } from "@/theme/theme-mode";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -69,8 +65,8 @@ function ThemedRoot() {
   if (!ready) return null;
 
   return (
-    <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <RootNavigator />
     </ThemeProvider>
   );
@@ -83,11 +79,11 @@ function RootNavigator() {
 
   useEffect(() => {
     if (loading) return;
-    const inAuth = segments[0] === '(auth)';
+    const inAuth = segments[0] === "(auth)";
     if (!user && !inAuth) {
-      router.replace('/(auth)/login');
+      router.replace("/(auth)/login");
     } else if (user && inAuth) {
-      router.replace('/(app)/(tabs)');
+      router.replace("/(app)/(tabs)");
     }
   }, [user, loading, segments, router]);
 

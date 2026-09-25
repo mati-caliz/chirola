@@ -1,19 +1,19 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 const cuitRegex = /^\d{11}$/;
 const nonNegative = z.number().nonnegative().default(0);
 
 export const purchaseInvoiceSchema = z.object({
   issuerId: z.string().min(1),
-  supplierCuit: z.string().regex(cuitRegex, 'CUIT del proveedor inválido'),
+  supplierCuit: z.string().regex(cuitRegex, "CUIT del proveedor inválido"),
   supplierName: z.string().min(1),
   invoiceType: z.number().int().positive(),
   salesPoint: z.number().int().positive(),
   number: z.number().int().positive(),
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD)'),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-DD)"),
   dueDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD)')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-DD)")
     .optional(),
   netAmount21: nonNegative,
   iva21: nonNegative,
@@ -27,7 +27,7 @@ export const purchaseInvoiceSchema = z.object({
 
 export const importPurchaseInvoicesSchema = z.object({
   issuerId: z.string().min(1),
-  csv: z.string().min(1, 'El archivo está vacío'),
+  csv: z.string().min(1, "El archivo está vacío"),
 });
 
 export const updatePurchaseInvoiceSchema = purchaseInvoiceSchema.partial().extend({
@@ -35,12 +35,8 @@ export const updatePurchaseInvoiceSchema = purchaseInvoiceSchema.partial().exten
 });
 
 export type PurchaseInvoiceInput = z.infer<typeof purchaseInvoiceSchema>;
-export type ImportPurchaseInvoicesInput = z.infer<
-  typeof importPurchaseInvoicesSchema
->;
-export type UpdatePurchaseInvoiceInput = z.infer<
-  typeof updatePurchaseInvoiceSchema
->;
+export type ImportPurchaseInvoicesInput = z.infer<typeof importPurchaseInvoicesSchema>;
+export type UpdatePurchaseInvoiceInput = z.infer<typeof updatePurchaseInvoiceSchema>;
 
 export function purchaseInvoiceTotal(input: {
   netAmount21: number;

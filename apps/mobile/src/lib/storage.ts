@@ -1,13 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const PREFIX = 'chirola:';
+const PREFIX = "chirola:";
 
 export const preferenceKeys = {
-  activeIssuerId: 'activeIssuerId',
-  colorSchemeOverride: 'colorSchemeOverride',
-  onboardingSeen: 'onboardingSeen',
-  biometricLock: 'biometricLock',
-  pushToken: 'pushToken',
+  activeIssuerId: "activeIssuerId",
+  colorSchemeOverride: "colorSchemeOverride",
+  onboardingSeen: "onboardingSeen",
+  biometricLock: "biometricLock",
+  pushToken: "pushToken",
 } as const;
 
 export type PreferenceKey = (typeof preferenceKeys)[keyof typeof preferenceKeys];

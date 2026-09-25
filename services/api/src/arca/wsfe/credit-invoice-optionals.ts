@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException } from "@nestjs/common";
 import {
   ArcaOptionalType,
   CANCELLATION_NO,
@@ -6,8 +6,8 @@ import {
   isCreditInvoice,
   TransmissionType,
   type TransmissionTypeName,
-} from '@chirola/shared';
-import type { ArcaOptional } from './wsfe.types';
+} from "@chirola/shared";
+import type { ArcaOptional } from "./wsfe.types";
 
 export interface PaymentAccountHolder {
   cbu: string | null;
@@ -29,7 +29,7 @@ export function buildCreditInvoiceOptionals(
 
   if (!issuer.cbu) {
     throw new BadRequestException(
-      'Para emitir una Factura de Crédito Electrónica MiPyME hay que cargar el CBU del emisor.',
+      "Para emitir una Factura de Crédito Electrónica MiPyME hay que cargar el CBU del emisor.",
     );
   }
 

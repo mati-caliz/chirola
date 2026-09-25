@@ -1,22 +1,15 @@
-import { PrismaClient } from '@prisma/client';
-import {
-  decryptField,
-  parseEncryptionKey,
-  reencryptField,
-} from '../src/crypto/field-cipher';
+import { PrismaClient } from "@prisma/client";
+import { decryptField, parseEncryptionKey, reencryptField } from "../src/crypto/field-cipher";
 
-const CURRENT_KEY_VARIABLE = 'CERT_ENCRYPTION_KEY';
-const NEW_KEY_VARIABLE = 'CERT_ENCRYPTION_KEY_NEW';
-const APPLY_FLAG = '--apply';
+const CURRENT_KEY_VARIABLE = "CERT_ENCRYPTION_KEY";
+const NEW_KEY_VARIABLE = "CERT_ENCRYPTION_KEY_NEW";
+const APPLY_FLAG = "--apply";
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  const currentKey = parseEncryptionKey(
-    process.env[CURRENT_KEY_VARIABLE] ?? '',
-    CURRENT_KEY_VARIABLE,
-  );
-  const newKey = parseEncryptionKey(process.env[NEW_KEY_VARIABLE] ?? '', NEW_KEY_VARIABLE);
+  const currentKey = parseEncryptionKey(process.env[CURRENT_KEY_VARIABLE] ?? "", CURRENT_KEY_VARIABLE);
+  const newKey = parseEncryptionKey(process.env[NEW_KEY_VARIABLE] ?? "", NEW_KEY_VARIABLE);
   if (currentKey.equals(newKey)) {
     throw new Error(`${NEW_KEY_VARIABLE} es igual a la clave actual: no hay nada que rotar.`);
   }

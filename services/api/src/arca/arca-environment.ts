@@ -1,4 +1,4 @@
-const PRODUCTION_ENVIRONMENT = 'produccion';
+const PRODUCTION_ENVIRONMENT = "produccion";
 
 export interface ArcaIssuer {
   id: string;

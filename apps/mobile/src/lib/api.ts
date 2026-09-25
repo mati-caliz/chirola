@@ -1,10 +1,10 @@
-import * as SecureStore from 'expo-secure-store';
-import type { AuthResponse, AuthUser } from '@chirola/shared';
-import { API_URL } from './config';
+import * as SecureStore from "expo-secure-store";
+import type { AuthResponse, AuthUser } from "@chirola/shared";
+import { API_URL } from "./config";
 
-const ACCESS_KEY = 'chirola.accessToken';
-const REFRESH_KEY = 'chirola.refreshToken';
-const USER_KEY = 'chirola.user';
+const ACCESS_KEY = "chirola.accessToken";
+const REFRESH_KEY = "chirola.refreshToken";
+const USER_KEY = "chirola.user";
 
 export class ApiError extends Error {
   constructor(
@@ -12,7 +12,7 @@ export class ApiError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -63,8 +63,8 @@ export async function clearSession(): Promise<void> {
 async function tryRefresh(): Promise<boolean> {
   if (!refreshToken) return false;
   const res = await fetch(`${API_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
   });
   if (!res.ok) return false;
@@ -82,11 +82,11 @@ interface RawRequest {
 
 async function request(path: string, opts: RawRequest): Promise<Response> {
   const headers: Record<string, string> = {};
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const res = await fetch(`${API_URL}${path}`, {
-    method: opts.method ?? 'GET',
+    method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
@@ -107,18 +107,13 @@ async function parseError(res: Response): Promise<never> {
   try {
     const data = await res.json();
     if (data?.message) {
-      message = Array.isArray(data.message) ? data.message.join(', ') : data.message;
+      message = Array.isArray(data.message) ? data.message.join(", ") : data.message;
     }
-  } catch {
-
-  }
+  } catch {}
   throw new ApiError(res.status, message);
 }
 
-export async function apiFetch<T>(
-  path: string,
-  opts: RawRequest = {},
-): Promise<T> {
+export async function apiFetch<T>(path: string, opts: RawRequest = {}): Promise<T> {
   const res = await request(path, opts);
   if (!res.ok) await parseError(res);
   if (res.status === 204) return undefined as T;
@@ -127,7 +122,7 @@ export async function apiFetch<T>(
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
-  let binary = '';
+  let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
@@ -142,22 +137,16 @@ export async function apiFetchBase64(path: string): Promise<string> {
   return arrayBufferToBase64(await res.arrayBuffer());
 }
 
-export async function registerRequest(
-  email: string,
-  password: string,
-): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>('/auth/register', {
-    method: 'POST',
+export async function registerRequest(email: string, password: string): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>("/auth/register", {
+    method: "POST",
     body: { email, password },
   });
 }
 
-export async function loginRequest(
-  email: string,
-  password: string,
-): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>('/auth/login', {
-    method: 'POST',
+export async function loginRequest(email: string, password: string): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>("/auth/login", {
+    method: "POST",
     body: { email, password },
   });
 }
@@ -166,8 +155,6 @@ export async function logoutRequest(): Promise<void> {
   const token = refreshToken;
   if (!token) return;
   try {
-    await apiFetch('/auth/logout', { method: 'POST', body: { refreshToken: token } });
-  } catch {
-
-  }
+    await apiFetch("/auth/logout", { method: "POST", body: { refreshToken: token } });
+  } catch {}
 }

@@ -13,8 +13,8 @@ import type {
   CreateIssuer,
   IssueVoucher,
   TaxpayerInfo,
-} from '@chirola/shared';
-import { apiFetch, apiFetchBase64 } from './api';
+} from "@chirola/shared";
+import { apiFetch, apiFetchBase64 } from "./api";
 
 export interface Issuer {
   id: string;
@@ -104,8 +104,7 @@ export interface VoucherSummary {
   client: { legalName: string | null; docNumber: string } | null;
 }
 
-export const listVouchers = (issuerId: string) =>
-  apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
+export const listVouchers = (issuerId: string) => apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
 
 export interface IvaRateBreakdown {
   rate: number;
@@ -123,7 +122,7 @@ export interface IvaPosition {
   balance: number;
 }
 
-export type VencimientoStatus = 'OVERDUE' | 'DUE_SOON' | 'UPCOMING';
+export type VencimientoStatus = "OVERDUE" | "DUE_SOON" | "UPCOMING";
 
 export interface Vencimiento {
   type: string;
@@ -156,44 +155,38 @@ export const listSalesPoints = (issuerId: string) =>
   apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points`);
 
 export const syncSalesPoints = (issuerId: string) =>
-  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points/sync`, { method: 'POST' });
+  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points/sync`, { method: "POST" });
 
 export const updateSalesPoint = (issuerId: string, number: number, description: string) =>
   apiFetch<SalesPoint>(`/issuers/${issuerId}/sales-points/${number}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: { description },
   });
 
-export const listIssuers = () => apiFetch<Issuer[]>('/issuers');
+export const listIssuers = () => apiFetch<Issuer[]>("/issuers");
 
-export const createIssuer = (body: CreateIssuer) =>
-  apiFetch<Issuer>('/issuers', { method: 'POST', body });
+export const createIssuer = (body: CreateIssuer) => apiFetch<Issuer>("/issuers", { method: "POST", body });
 
 export const generateCsr = (issuerId: string, alias?: string) =>
   apiFetch<{ csrPem: string }>(`/issuers/${issuerId}/csr`, {
-    method: 'POST',
+    method: "POST",
     body: alias ? { alias } : {},
   });
 
 export const matchCertificate = (issuerId: string, certPem: string) =>
   apiFetch<{ ok: true }>(`/issuers/${issuerId}/certificate`, {
-    method: 'PUT',
+    method: "PUT",
     body: { certPem },
   });
 
-export const listClients = (issuerId: string) =>
-  apiFetch<Client[]>(`/issuers/${issuerId}/clients`);
+export const listClients = (issuerId: string) => apiFetch<Client[]>(`/issuers/${issuerId}/clients`);
 
 export const createClient = (issuerId: string, body: CreateClient) =>
-  apiFetch<Client>(`/issuers/${issuerId}/clients`, { method: 'POST', body });
+  apiFetch<Client>(`/issuers/${issuerId}/clients`, { method: "POST", body });
 
-export const updateClient = (
-  issuerId: string,
-  id: string,
-  body: UpdateClient,
-) =>
+export const updateClient = (issuerId: string, id: string, body: UpdateClient) =>
   apiFetch<Client>(`/issuers/${issuerId}/clients/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body,
   });
 
@@ -208,8 +201,7 @@ export interface ExchangeRate {
   date: string;
 }
 
-export const listCurrencies = (issuerId: string) =>
-  apiFetch<Currency[]>(`/issuers/${issuerId}/currencies`);
+export const listCurrencies = (issuerId: string) => apiFetch<Currency[]>(`/issuers/${issuerId}/currencies`);
 
 export const getExchangeRate = (issuerId: string, currencyId: string) =>
   apiFetch<ExchangeRate>(`/issuers/${issuerId}/exchange-rate/${currencyId}`);
@@ -221,13 +213,12 @@ export const lookupTaxpayer = (issuerId: string, cuit: string) =>
   apiFetch<TaxpayerInfo>(`/issuers/${issuerId}/taxpayers/${cuit}`);
 
 export const issueVoucher = (body: IssueVoucher) =>
-  apiFetch<IssuedVoucher>('/vouchers', { method: 'POST', body });
+  apiFetch<IssuedVoucher>("/vouchers", { method: "POST", body });
 
-export const getVoucher = (id: string) =>
-  apiFetch<VoucherDetail>(`/vouchers/${id}`);
+export const getVoucher = (id: string) => apiFetch<VoucherDetail>(`/vouchers/${id}`);
 
 export const dryRunVoucher = (body: IssueVoucher) =>
-  apiFetch<EmissionPlan>('/vouchers/dry-run', { method: 'POST', body });
+  apiFetch<EmissionPlan>("/vouchers/dry-run", { method: "POST", body });
 
 export const getCreditNoteDraft = (voucherId: string) =>
   apiFetch<IssueVoucher>(`/vouchers/${voucherId}/credit-note-draft`);
@@ -236,10 +227,10 @@ export const listPendingVouchers = (issuerId: string) =>
   apiFetch<PendingVoucherSummary[]>(`/issuers/${issuerId}/pending-vouchers`);
 
 export const retryPendingVoucher = (issuerId: string, id: string) =>
-  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}/retry`, { method: 'POST' });
+  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}/retry`, { method: "POST" });
 
 export const discardPendingVoucher = (issuerId: string, id: string) =>
-  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}`, { method: 'DELETE' });
+  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}`, { method: "DELETE" });
 
 const periodQuery = (issuerId: string, year: number, month: number) =>
   `issuerId=${issuerId}&year=${year}&month=${month}`;
@@ -250,14 +241,13 @@ export const getSalesBook = (issuerId: string, year: number, month: number) =>
 export const downloadSalesBookCsv = (issuerId: string, year: number, month: number) =>
   apiFetchBase64(`/fiscal/sales-book/csv?${periodQuery(issuerId, year, month)}`);
 
-export const getArcaHealth = (issuerId: string) =>
-  apiFetch<ArcaHealth>(`/issuers/${issuerId}/arca-health`);
+export const getArcaHealth = (issuerId: string) => apiFetch<ArcaHealth>(`/issuers/${issuerId}/arca-health`);
 
 export const registerPushToken = (body: PushTokenInput) =>
-  apiFetch<void>('/push-tokens', { method: 'POST', body });
+  apiFetch<void>("/push-tokens", { method: "POST", body });
 
 export const removePushToken = (token: string) =>
-  apiFetch<void>('/push-tokens', { method: 'DELETE', body: { token } });
+  apiFetch<void>("/push-tokens", { method: "DELETE", body: { token } });
 
 export const calculateDraftAmounts = (body: DraftAmountsInput) =>
-  apiFetch<DraftAmounts>('/vouchers/amounts', { method: 'POST', body });
+  apiFetch<DraftAmounts>("/vouchers/amounts", { method: "POST", body });

@@ -1,4 +1,4 @@
-import { RecipientIvaCondition } from './recipient-iva-condition';
+import { RecipientIvaCondition } from "./recipient-iva-condition";
 
 export const ArcaTaxId = {
   VAT: 30,
@@ -7,8 +7,8 @@ export const ArcaTaxId = {
 } as const;
 
 export const TaxpayerStatus = {
-  ACTIVE: 'ACTIVO',
-  INACTIVE: 'INACTIVO',
+  ACTIVE: "ACTIVO",
+  INACTIVE: "INACTIVO",
 } as const;
 
 export type TaxpayerAddress = {

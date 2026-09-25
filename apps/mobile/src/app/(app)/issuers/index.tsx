@@ -1,6 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { Pressable, Text, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   Badge,
   BodyText,
@@ -12,16 +12,16 @@ import {
   Screen,
   Subtitle,
   Title,
-} from '@/components/ui';
-import { useAuth } from '@/lib/auth-context';
-import { listIssuers, type Issuer } from '@/lib/resources';
-import { formatDate } from '@/lib/format';
+} from "@/components/ui";
+import { useAuth } from "@/lib/auth-context";
+import { listIssuers, type Issuer } from "@/lib/resources";
+import { formatDate } from "@/lib/format";
 
 export default function IssuersScreen() {
   const router = useRouter();
   const { logout } = useAuth();
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['issuers'],
+    queryKey: ["issuers"],
     queryFn: listIssuers,
   });
 
@@ -29,10 +29,10 @@ export default function IssuersScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Emisores',
+          title: "Emisores",
           headerRight: () => (
             <Pressable onPress={logout} hitSlop={8}>
-              <Text style={{ color: brandColor, fontWeight: '600' }}>Salir</Text>
+              <Text style={{ color: brandColor, fontWeight: "600" }}>Salir</Text>
             </Pressable>
           ),
         }}
@@ -47,7 +47,7 @@ export default function IssuersScreen() {
           <Loading />
         ) : isError ? (
           <Centered>
-            <BodyText>{error instanceof Error ? error.message : 'Error al cargar.'}</BodyText>
+            <BodyText>{error instanceof Error ? error.message : "Error al cargar."}</BodyText>
             <Button title="Reintentar" variant="secondary" onPress={() => refetch()} />
           </Centered>
         ) : data && data.length > 0 ? (
@@ -64,7 +64,7 @@ export default function IssuersScreen() {
           </Centered>
         )}
 
-        <Button title="+ Nuevo emisor" onPress={() => router.push('/(app)/issuers/new')} />
+        <Button title="+ Nuevo emisor" onPress={() => router.push("/(app)/issuers/new")} />
       </Screen>
     </>
   );
@@ -74,14 +74,18 @@ function IssuerCard({ issuer, onPress }: { issuer: Issuer; onPress: () => void }
   const certificate = issuer.certificate;
   return (
     <Card onPress={onPress}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <BodyText>{issuer.legalName}</BodyText>
         <Badge text={issuer.environment} tone="neutral" />
       </View>
       <Subtitle>CUIT {issuer.cuit}</Subtitle>
       {certificate ? (
         <Badge
-          text={certificate.validUntil ? `Cert. vence ${formatDate(certificate.validUntil)}` : 'Certificado cargado'}
+          text={
+            certificate.validUntil
+              ? `Cert. vence ${formatDate(certificate.validUntil)}`
+              : "Certificado cargado"
+          }
           tone="ok"
         />
       ) : (

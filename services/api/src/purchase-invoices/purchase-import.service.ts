@@ -1,21 +1,20 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { ivaRates, purchaseInvoiceTotal } from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { ivaRates, purchaseInvoiceTotal } from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
 import {
   CsvFormatError,
   parseMisComprobantesCsv,
   type InvalidPurchaseRow,
   type ParsedPurchaseRow,
-} from './mis-comprobantes-csv';
+} from "./mis-comprobantes-csv";
 
 export const ImportRowStatus = {
-  IMPORTABLE: 'IMPORTABLE',
-  DUPLICATE: 'DUPLICATE',
-  NEEDS_REVIEW: 'NEEDS_REVIEW',
+  IMPORTABLE: "IMPORTABLE",
+  DUPLICATE: "DUPLICATE",
+  NEEDS_REVIEW: "NEEDS_REVIEW",
 } as const;
 
-export type ImportRowStatusName =
-  (typeof ImportRowStatus)[keyof typeof ImportRowStatus];
+export type ImportRowStatusName = (typeof ImportRowStatus)[keyof typeof ImportRowStatus];
 
 export interface ClassifiedRow {
   line: number;
@@ -53,9 +52,7 @@ function inferIvaRate(row: ParsedPurchaseRow): number | null {
   if (row.netTaxed === 0) return null;
 
   const ratio = row.ivaAmount / row.netTaxed;
-  const match = ivaRates.find(
-    (rate) => rate > 0 && Math.abs(ratio - rate / 100) < RATE_TOLERANCE,
-  );
+  const match = ivaRates.find((rate) => rate > 0 && Math.abs(ratio - rate / 100) < RATE_TOLERANCE);
   return match ?? null;
 }
 
@@ -132,10 +129,7 @@ export class PurchaseImportService {
     return `${row.supplierCuit}|${row.invoiceType}|${row.salesPoint}|${row.number}`;
   }
 
-  private async findExistingKeys(
-    issuerId: string,
-    rows: ParsedPurchaseRow[],
-  ): Promise<Set<string>> {
+  private async findExistingKeys(issuerId: string, rows: ParsedPurchaseRow[]): Promise<Set<string>> {
     if (rows.length === 0) return new Set();
     const stored = await this.prisma.purchaseInvoice.findMany({
       where: {
@@ -152,10 +146,7 @@ export class PurchaseImportService {
     return new Set(stored.map((invoice) => this.rowKey(invoice)));
   }
 
-  private classify(
-    row: ParsedPurchaseRow,
-    existing: Set<string>,
-  ): ClassifiedRow {
+  private classify(row: ParsedPurchaseRow, existing: Set<string>): ClassifiedRow {
     const ivaRate = inferIvaRate(row);
     const base = {
       line: row.line,
@@ -176,8 +167,7 @@ export class PurchaseImportService {
       return {
         ...base,
         status: ImportRowStatus.NEEDS_REVIEW,
-        reason:
-          'El IVA no corresponde a una sola alícuota; cargalo a mano indicando el desglose.',
+        reason: "El IVA no corresponde a una sola alícuota; cargalo a mano indicando el desglose.",
       };
     }
     const rebuiltTotal = purchaseInvoiceTotal(amountsForRate(row, ivaRate));
@@ -191,10 +181,7 @@ export class PurchaseImportService {
     return { ...base, status: ImportRowStatus.IMPORTABLE };
   }
 
-  private summarize(
-    rows: ClassifiedRow[],
-    invalid: InvalidPurchaseRow[],
-  ): ImportPreview {
+  private summarize(rows: ClassifiedRow[], invalid: InvalidPurchaseRow[]): ImportPreview {
     const countOf = (status: ImportRowStatusName): number =>
       rows.filter((row) => row.status === status).length;
     return {

@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
-} from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import {
   creditNoteTypeFor,
   isAuthorizedStatus,
@@ -13,15 +13,12 @@ import {
   voucherConceptSchema,
   type IssueVoucher,
   type VoucherConceptType,
-} from '@chirola/shared';
-import { PrismaService } from '../prisma/prisma.service';
-import {
-  ApiClientService,
-  type AuthenticatedApiClient,
-} from '../service-auth/api-client.service';
-import { toArcaDate, toLocalIsoDate } from '../arca/arca-date';
-import { recipientFromQr } from './qr-image.util';
-import { parseTaxTreatment } from './stored-tax-treatment';
+} from "@chirola/shared";
+import { PrismaService } from "../prisma/prisma.service";
+import { ApiClientService, type AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { toArcaDate, toLocalIsoDate } from "../arca/arca-date";
+import { recipientFromQr } from "./qr-image.util";
+import { parseTaxTreatment } from "./stored-tax-treatment";
 
 type LoadedVoucher = Prisma.VoucherGetPayload<{
   include: { items: true; salesPoint: true; client: true; issuer: true };
@@ -56,15 +53,12 @@ export interface CreditNoteSourceVoucher {
   }[];
 }
 
-function recipientOf(voucher: CreditNoteSourceVoucher): IssueVoucher['recipient'] {
+function recipientOf(voucher: CreditNoteSourceVoucher): IssueVoucher["recipient"] {
   const fromQr = voucher.qrData ? recipientFromQr(voucher.qrData) : null;
   const docType = voucher.recipientDocType ?? voucher.client?.docType ?? fromQr?.docType;
-  const docNumber =
-    voucher.recipientDocNumber ?? voucher.client?.docNumber ?? fromQr?.docNumber;
+  const docNumber = voucher.recipientDocNumber ?? voucher.client?.docNumber ?? fromQr?.docNumber;
   if (docType === undefined || docNumber === undefined) {
-    throw new UnprocessableEntityException(
-      'No se pudo identificar al receptor del comprobante original.',
-    );
+    throw new UnprocessableEntityException("No se pudo identificar al receptor del comprobante original.");
   }
   const legalName = voucher.recipientName ?? voucher.client?.legalName ?? undefined;
   return { docType, docNumber, legalName };
@@ -73,29 +67,23 @@ function recipientOf(voucher: CreditNoteSourceVoucher): IssueVoucher['recipient'
 function conceptOf(voucher: CreditNoteSourceVoucher): VoucherConceptType {
   const parsed = voucherConceptSchema.safeParse(voucher.concept);
   if (!parsed.success) {
-    throw new UnprocessableEntityException('El comprobante original tiene un concepto desconocido.');
+    throw new UnprocessableEntityException("El comprobante original tiene un concepto desconocido.");
   }
   return parsed.data;
 }
 
-export function buildCreditNoteDraft(
-  voucher: CreditNoteSourceVoucher,
-  today: Date,
-): IssueVoucher {
+export function buildCreditNoteDraft(voucher: CreditNoteSourceVoucher, today: Date): IssueVoucher {
   const creditNoteType = creditNoteTypeFor(voucher.voucherType);
   if (creditNoteType === null) {
-    throw new UnprocessableEntityException(
-      'Este comprobante no admite una nota de crédito desde la app.',
-    );
+    throw new UnprocessableEntityException("Este comprobante no admite una nota de crédito desde la app.");
   }
   if (!isAuthorizedStatus(voucher.status)) {
     throw new UnprocessableEntityException(
-      'Sólo se puede anular con nota de crédito un comprobante autorizado por ARCA.',
+      "Sólo se puede anular con nota de crédito un comprobante autorizado por ARCA.",
     );
   }
 
-  const needsPaymentDueDate =
-    requiresServicePeriod(voucher.concept) || isCreditInvoice(creditNoteType);
+  const needsPaymentDueDate = requiresServicePeriod(voucher.concept) || isCreditInvoice(creditNoteType);
   const servicePeriod =
     requiresServicePeriod(voucher.concept) && voucher.serviceFrom && voucher.serviceTo
       ? { from: toLocalIsoDate(voucher.serviceFrom), to: toLocalIsoDate(voucher.serviceTo) }
@@ -140,15 +128,12 @@ export class CreditNoteDraftService {
   async draftForUser(userId: string, voucherId: string): Promise<IssueVoucher> {
     const voucher = await this.load(voucherId);
     if (voucher.issuer.userId !== userId) {
-      throw new ForbiddenException('El comprobante no pertenece al usuario.');
+      throw new ForbiddenException("El comprobante no pertenece al usuario.");
     }
     return buildCreditNoteDraft(voucher, new Date());
   }
 
-  async draftForApiClient(
-    apiClient: AuthenticatedApiClient,
-    voucherId: string,
-  ): Promise<IssueVoucher> {
+  async draftForApiClient(apiClient: AuthenticatedApiClient, voucherId: string): Promise<IssueVoucher> {
     const voucher = await this.load(voucherId);
     await this.apiClients.assertIssuerGranted(apiClient.id, voucher.issuerId);
     return buildCreditNoteDraft(voucher, new Date());
@@ -160,7 +145,7 @@ export class CreditNoteDraftService {
       include: { items: true, salesPoint: true, client: true, issuer: true },
     });
     if (!voucher) {
-      throw new NotFoundException('Comprobante inexistente.');
+      throw new NotFoundException("Comprobante inexistente.");
     }
     return voucher;
   }

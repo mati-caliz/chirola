@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react-native';
-import { Pressable, Text, View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { type ReactNode } from "react";
+import { ChevronRight } from "lucide-react-native";
+import { Pressable, Text, View } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const ListItem = ({
   title,
@@ -22,20 +22,24 @@ export const ListItem = ({
   const content = (pressed: boolean) => (
     <View
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         gap: 12,
         minHeight: 56,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: pressed ? theme.colors.bgSunken : 'transparent',
+        backgroundColor: pressed ? theme.colors.bgSunken : "transparent",
       }}
     >
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           numberOfLines={1}
-          style={{ fontFamily: theme.font.medium, fontSize: theme.fontSize.body, color: theme.colors.textPrimary }}
+          style={{
+            fontFamily: theme.font.medium,
+            fontSize: theme.fontSize.body,
+            color: theme.colors.textPrimary,
+          }}
         >
           {title}
         </Text>

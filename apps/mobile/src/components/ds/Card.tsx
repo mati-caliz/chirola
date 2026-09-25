@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { type ReactNode } from "react";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Card = ({
   children,
@@ -18,7 +18,7 @@ export const Card = ({
     backgroundColor: theme.colors.surfaceCard,
     borderRadius: theme.radius.lg,
     padding: pad,
-    borderWidth: theme.scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderWidth: theme.scheme === "dark" ? StyleSheet.hairlineWidth : 0,
     borderColor: theme.colors.borderSubtle,
     ...theme.shadow.card,
   };
@@ -26,11 +26,7 @@ export const Card = ({
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [
-          base,
-          pressed ? { backgroundColor: theme.colors.bgSunken } : null,
-          style,
-        ]}
+        style={({ pressed }) => [base, pressed ? { backgroundColor: theme.colors.bgSunken } : null, style]}
       >
         {children}
       </Pressable>

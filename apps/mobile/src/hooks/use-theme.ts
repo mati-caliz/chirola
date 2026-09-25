@@ -10,8 +10,8 @@ import {
   spacing,
   type ShadowSet,
   type ThemeColors,
-} from '@/theme/tokens';
-import { useThemeMode, type ColorScheme } from '@/theme/theme-mode';
+} from "@/theme/tokens";
+import { useThemeMode, type ColorScheme } from "@/theme/theme-mode";
 
 export type { ColorScheme };
 
@@ -27,7 +27,7 @@ export type Theme = {
 };
 
 const lightTheme: Theme = {
-  scheme: 'light',
+  scheme: "light",
   colors: lightColors,
   spacing,
   radius,
@@ -38,7 +38,7 @@ const lightTheme: Theme = {
 };
 
 const darkTheme: Theme = {
-  scheme: 'dark',
+  scheme: "dark",
   colors: darkColors,
   spacing,
   radius,
@@ -50,5 +50,5 @@ const darkTheme: Theme = {
 
 export function useTheme(): Theme {
   const { scheme } = useThemeMode();
-  return scheme === 'dark' ? darkTheme : lightTheme;
+  return scheme === "dark" ? darkTheme : lightTheme;
 }

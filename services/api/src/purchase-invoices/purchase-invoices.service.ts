@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from "@nestjs/common";
 import {
   purchaseInvoiceTotal,
   type PurchaseInvoiceInput,
   type UpdatePurchaseInvoiceInput,
-} from '@chirola/shared';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+} from "@chirola/shared";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 
 interface Amounts {
   netAmount21: number;
@@ -19,14 +19,14 @@ interface Amounts {
 }
 
 const AMOUNT_KEYS: (keyof Amounts)[] = [
-  'netAmount21',
-  'iva21',
-  'netAmount105',
-  'iva105',
-  'netAmount27',
-  'iva27',
-  'exempt',
-  'untaxed',
+  "netAmount21",
+  "iva21",
+  "netAmount105",
+  "iva105",
+  "netAmount27",
+  "iva27",
+  "exempt",
+  "untaxed",
 ];
 
 @Injectable()
@@ -67,17 +67,14 @@ export class PurchaseInvoicesService {
     }
     const invoices = await this.prisma.purchaseInvoice.findMany({
       where,
-      orderBy: { issueDate: 'desc' },
+      orderBy: { issueDate: "desc" },
     });
 
     const summary = invoices.reduce(
       (acc, invoice) => {
         const netAmount =
-          Number(invoice.netAmount21) +
-          Number(invoice.netAmount105) +
-          Number(invoice.netAmount27);
-        const ivaAmount =
-          Number(invoice.iva21) + Number(invoice.iva105) + Number(invoice.iva27);
+          Number(invoice.netAmount21) + Number(invoice.netAmount105) + Number(invoice.netAmount27);
+        const ivaAmount = Number(invoice.iva21) + Number(invoice.iva105) + Number(invoice.iva27);
         return {
           count: acc.count + 1,
           netAmount: acc.netAmount + netAmount,
@@ -91,11 +88,7 @@ export class PurchaseInvoicesService {
     return { invoices, summary };
   }
 
-  async update(
-    issuerId: string,
-    id: string,
-    input: UpdatePurchaseInvoiceInput,
-  ) {
+  async update(issuerId: string, id: string, input: UpdatePurchaseInvoiceInput) {
     const existing = await this.getScoped(issuerId, id);
     const merged: Amounts = AMOUNT_KEYS.reduce((acc, key) => {
       acc[key] = input[key] ?? Number(existing[key]);
@@ -129,7 +122,7 @@ export class PurchaseInvoicesService {
       where: { id, issuerId },
     });
     if (!invoice) {
-      throw new NotFoundException('Factura de compra inexistente.');
+      throw new NotFoundException("Factura de compra inexistente.");
     }
     return invoice;
   }

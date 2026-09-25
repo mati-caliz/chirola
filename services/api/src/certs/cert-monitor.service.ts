@@ -1,14 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../prisma/prisma.service';
-import { WebhookService } from '../webhooks/webhook.service';
-import { WebhookEvent } from '../webhooks/webhook-events';
-import { PushNotificationService } from '../notifications/push-notification.service';
-import {
-  CERTIFICATE_EXPIRY_PUSH_DAYS,
-  certificateExpiringMessage,
-} from '../notifications/push-messages';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../prisma/prisma.service";
+import { WebhookService } from "../webhooks/webhook.service";
+import { WebhookEvent } from "../webhooks/webhook-events";
+import { PushNotificationService } from "../notifications/push-notification.service";
+import { CERTIFICATE_EXPIRY_PUSH_DAYS, certificateExpiringMessage } from "../notifications/push-messages";
 
 const DEFAULT_WARNING_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -24,10 +21,7 @@ export class CertMonitorService {
     private readonly push: PushNotificationService,
     config: ConfigService,
   ) {
-    this.warningDays = config.get<number>(
-      'CERT_EXPIRY_WARNING_DAYS',
-      DEFAULT_WARNING_DAYS,
-    );
+    this.warningDays = config.get<number>("CERT_EXPIRY_WARNING_DAYS", DEFAULT_WARNING_DAYS);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_7AM)
@@ -41,21 +35,13 @@ export class CertMonitorService {
       if (!certificate.validUntil) {
         continue;
       }
-      const daysToExpiry = Math.ceil(
-        (certificate.validUntil.getTime() - Date.now()) / MS_PER_DAY,
-      );
-      this.logger.warn(
-        `Certificado del emisor ${certificate.issuerId} vence en ${daysToExpiry} días.`,
-      );
-      await this.webhooks.dispatch(
-        certificate.issuerId,
-        WebhookEvent.CERTIFICATE_EXPIRING,
-        {
-          issuerId: certificate.issuerId,
-          validUntil: certificate.validUntil.toISOString(),
-          daysToExpiry,
-        },
-      );
+      const daysToExpiry = Math.ceil((certificate.validUntil.getTime() - Date.now()) / MS_PER_DAY);
+      this.logger.warn(`Certificado del emisor ${certificate.issuerId} vence en ${daysToExpiry} días.`);
+      await this.webhooks.dispatch(certificate.issuerId, WebhookEvent.CERTIFICATE_EXPIRING, {
+        issuerId: certificate.issuerId,
+        validUntil: certificate.validUntil.toISOString(),
+        daysToExpiry,
+      });
       if (CERTIFICATE_EXPIRY_PUSH_DAYS.includes(daysToExpiry)) {
         await this.push.notifyIssuerOwner(
           certificate.issuerId,

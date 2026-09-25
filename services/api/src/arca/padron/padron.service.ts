@@ -1,11 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   inferRecipientIvaCondition,
   TaxpayerStatus,
   type TaxpayerAddress,
   type TaxpayerInfo,
-} from '@chirola/shared';
+} from "@chirola/shared";
 import {
   ArcaSoapFaultError,
   callSoap,
@@ -14,14 +14,14 @@ import {
   ARCA_CALL_RECORDER,
   type ArcaCallLogContext,
   type ArcaCallRecorder,
-} from '../arca-soap.util';
-import { isProduction } from '../arca-environment';
-import type { AuthContext } from '../wsfe/wsfe.types';
+} from "../arca-soap.util";
+import { isProduction } from "../arca-environment";
+import type { AuthContext } from "../wsfe/wsfe.types";
 
-const PADRON_A5_NS = 'http://a5.soap.ws.server.puc.sr/';
-const PADRON_SERVICE = 'ws_sr_constancia_inscripcion';
-const NOT_FOUND_FAULT = 'No existe persona con ese Id';
-const NATURAL_PERSON = 'FISICA';
+const PADRON_A5_NS = "http://a5.soap.ws.server.puc.sr/";
+const PADRON_SERVICE = "ws_sr_constancia_inscripcion";
+const NOT_FOUND_FAULT = "No existe persona con ese Id";
+const NATURAL_PERSON = "FISICA";
 
 @Injectable()
 export class PadronService {
@@ -44,38 +44,34 @@ export class PadronService {
   private padronUrl(environment: string): string {
     return isProduction(environment)
       ? this.config.get<string>(
-          'ARCA_PADRON_A5_URL_PROD',
-          'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5',
+          "ARCA_PADRON_A5_URL_PROD",
+          "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5",
         )
       : this.config.get<string>(
-          'ARCA_PADRON_A5_URL_HOMO',
-          'https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5',
+          "ARCA_PADRON_A5_URL_HOMO",
+          "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5",
         );
   }
 
   async getTaxpayer(auth: AuthContext, cuit: string): Promise<TaxpayerInfo> {
     const envelope =
       `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:a5="${PADRON_A5_NS}">` +
-      '<soapenv:Header/>' +
-      '<soapenv:Body>' +
-      '<a5:getPersona>' +
+      "<soapenv:Header/>" +
+      "<soapenv:Body>" +
+      "<a5:getPersona>" +
       `<token>${escapeXml(auth.token)}</token>` +
       `<sign>${escapeXml(auth.sign)}</sign>` +
       `<cuitRepresentada>${auth.cuit}</cuitRepresentada>` +
       `<idPersona>${cuit}</idPersona>` +
-      '</a5:getPersona>' +
-      '</soapenv:Body>' +
-      '</soapenv:Envelope>';
+      "</a5:getPersona>" +
+      "</soapenv:Body>" +
+      "</soapenv:Envelope>";
 
     const response = await this.callPadron(envelope, cuit, auth);
     return this.parseTaxpayer(response, cuit);
   }
 
-  private async callPadron(
-    envelope: string,
-    cuit: string,
-    auth: AuthContext,
-  ): Promise<string> {
+  private async callPadron(envelope: string, cuit: string, auth: AuthContext): Promise<string> {
     try {
       return await callSoap(
         this.padronUrl(auth.environment),
@@ -84,10 +80,7 @@ export class PadronService {
         this.logContext(auth.issuerId),
       );
     } catch (err) {
-      if (
-        err instanceof ArcaSoapFaultError &&
-        err.faultString().includes(NOT_FOUND_FAULT)
-      ) {
+      if (err instanceof ArcaSoapFaultError && err.faultString().includes(NOT_FOUND_FAULT)) {
         throw new NotFoundException(`No existe un contribuyente con CUIT ${cuit}.`);
       }
       throw err;
@@ -98,15 +91,15 @@ export class PadronService {
     const xml = new ParsedXml(response);
 
     const taxIds = xml
-      .all('idImpuesto')
+      .all("idImpuesto")
       .map(Number)
       .filter((id) => !Number.isNaN(id));
-    const hasMonotributo = xml.has('categoriaMonotributo');
+    const hasMonotributo = xml.has("categoriaMonotributo");
 
     const taxpayer: TaxpayerInfo = {
       cuit,
       legalName: this.parseLegalName(xml),
-      status: xml.optional('estadoClave', TaxpayerStatus.INACTIVE),
+      status: xml.optional("estadoClave", TaxpayerStatus.INACTIVE),
       ivaConditionId: inferRecipientIvaCondition({ taxIds, hasMonotributo }),
       address: this.parseAddress(xml),
     };
@@ -115,23 +108,23 @@ export class PadronService {
   }
 
   private parseLegalName(xml: ParsedXml): string {
-    const businessName = xml.optional('razonSocial', '');
+    const businessName = xml.optional("razonSocial", "");
     if (businessName) return businessName;
 
-    const personType = xml.optional('tipoPersona', '');
-    const lastName = xml.optional('apellido', '');
-    const firstName = xml.optional('nombre', '');
+    const personType = xml.optional("tipoPersona", "");
+    const lastName = xml.optional("apellido", "");
+    const firstName = xml.optional("nombre", "");
     if (personType === NATURAL_PERSON || lastName || firstName) {
-      return [lastName, firstName].filter(Boolean).join(' ').trim();
+      return [lastName, firstName].filter(Boolean).join(" ").trim();
     }
-    return '';
+    return "";
   }
 
   private parseAddress(xml: ParsedXml): TaxpayerAddress | null {
-    const street = xml.optional('direccion', '');
-    const city = xml.optional('localidad', '');
-    const postalCode = xml.optional('codPostal', '');
-    const province = xml.optional('descripcionProvincia', '');
+    const street = xml.optional("direccion", "");
+    const city = xml.optional("localidad", "");
+    const postalCode = xml.optional("codPostal", "");
+    const province = xml.optional("descripcionProvincia", "");
     if (!street && !city && !postalCode && !province) return null;
     return {
       street: street || null,

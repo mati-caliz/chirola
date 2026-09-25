@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { z } from 'zod';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { z } from "zod";
+import { PrismaService } from "../prisma/prisma.service";
 
-const DEFAULT_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
+const DEFAULT_PUSH_API_URL = "https://exp.host/--/api/v2/push/send";
 const DEFAULT_TIMEOUT_MS = 10_000;
-const UNREGISTERED_DEVICE_ERROR = 'DeviceNotRegistered';
+const UNREGISTERED_DEVICE_ERROR = "DeviceNotRegistered";
 
 export interface PushMessage {
   title: string;
@@ -32,8 +32,8 @@ export class PushNotificationService {
     private readonly prisma: PrismaService,
     config: ConfigService,
   ) {
-    this.apiUrl = config.get<string>('PUSH_API_URL', DEFAULT_PUSH_API_URL);
-    this.timeoutMs = config.get<number>('PUSH_TIMEOUT_MS', DEFAULT_TIMEOUT_MS);
+    this.apiUrl = config.get<string>("PUSH_API_URL", DEFAULT_PUSH_API_URL);
+    this.timeoutMs = config.get<number>("PUSH_TIMEOUT_MS", DEFAULT_TIMEOUT_MS);
   }
 
   async notifyIssuerOwner(issuerId: string, message: PushMessage): Promise<void> {
@@ -43,7 +43,10 @@ export class PushNotificationService {
         select: { token: true },
       });
       if (tokens.length > 0) {
-        await this.send(tokens.map(({ token }) => token), message);
+        await this.send(
+          tokens.map(({ token }) => token),
+          message,
+        );
       }
     } catch (err) {
       this.logger.warn(
@@ -54,9 +57,9 @@ export class PushNotificationService {
 
   private async send(tokens: string[], message: PushMessage): Promise<void> {
     const response = await fetch(this.apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(tokens.map((to) => ({ to, sound: 'default', ...message }))),
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(tokens.map((to) => ({ to, sound: "default", ...message }))),
       signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!response.ok) {

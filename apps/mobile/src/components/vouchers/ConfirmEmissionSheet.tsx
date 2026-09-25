@@ -1,8 +1,8 @@
-import { ActivityIndicator, Text, View } from 'react-native';
-import type { EmissionPlan } from '@chirola/shared';
-import { Amount, Banner, BottomSheet, Button } from '@/components/ds';
-import { formatCurrency, formatVoucherNumber } from '@/lib/format';
-import { useTheme } from '@/hooks/use-theme';
+import { ActivityIndicator, Text, View } from "react-native";
+import type { EmissionPlan } from "@chirola/shared";
+import { Amount, Banner, BottomSheet, Button } from "@/components/ds";
+import { formatCurrency, formatVoucherNumber } from "@/lib/format";
+import { useTheme } from "@/hooks/use-theme";
 
 interface ConfirmEmissionSheetProps {
   open: boolean;
@@ -30,13 +30,35 @@ export const ConfirmEmissionSheet = ({
   const theme = useTheme();
   return (
     <BottomSheet open={open} title="Revisá antes de emitir" onClose={onClose}>
-      <View style={{ backgroundColor: theme.colors.surfaceBrandSubtle, borderRadius: theme.radius.md, padding: 16, alignItems: 'center', marginBottom: 14 }}>
-        <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.callout, color: theme.colors.textSecondary }}>
+      <View
+        style={{
+          backgroundColor: theme.colors.surfaceBrandSubtle,
+          borderRadius: theme.radius.md,
+          padding: 16,
+          alignItems: "center",
+          marginBottom: 14,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: theme.font.regular,
+            fontSize: theme.fontSize.callout,
+            color: theme.colors.textSecondary,
+          }}
+        >
           Vas a emitir
         </Text>
-        <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.subhead, color: theme.colors.textPrimary, marginTop: 2, textAlign: 'center' }}>
+        <Text
+          style={{
+            fontFamily: theme.font.bold,
+            fontSize: theme.fontSize.subhead,
+            color: theme.colors.textPrimary,
+            marginTop: 2,
+            textAlign: "center",
+          }}
+        >
           {typeLabel}
-          {plan ? ` ${formatVoucherNumber(plan.salesPoint, plan.number)}` : ''}
+          {plan ? ` ${formatVoucherNumber(plan.salesPoint, plan.number)}` : ""}
         </Text>
         {planLoading ? (
           <ActivityIndicator style={{ marginTop: 12 }} color={theme.colors.actionPrimary} />
@@ -45,7 +67,14 @@ export const ConfirmEmissionSheet = ({
             <Amount value={formatCurrency(plan.totalAmount, currency)} size="xl" />
           </View>
         ) : null}
-        <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary, marginTop: 6 }}>
+        <Text
+          style={{
+            fontFamily: theme.font.regular,
+            fontSize: theme.fontSize.caption,
+            color: theme.colors.textSecondary,
+            marginTop: 6,
+          }}
+        >
           a {clientLabel} · IVA incluido
         </Text>
       </View>
@@ -58,7 +87,14 @@ export const ConfirmEmissionSheet = ({
           />
         </View>
       ) : null}
-      <Text style={{ fontFamily: theme.font.regular, fontSize: theme.fontSize.caption, color: theme.colors.textSecondary, marginBottom: 12 }}>
+      <Text
+        style={{
+          fontFamily: theme.font.regular,
+          fontSize: theme.fontSize.caption,
+          color: theme.colors.textSecondary,
+          marginBottom: 12,
+        }}
+      >
         Una vez emitida es un documento legal: si hay un error, después se corrige con una Nota de Crédito.
       </Text>
       <Button variant="primary" full disabled={planLoading} onPress={onConfirm}>

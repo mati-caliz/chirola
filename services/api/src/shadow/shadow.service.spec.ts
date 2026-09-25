@@ -1,11 +1,11 @@
-import { IssuerOnboardingStatus, type EmissionPlan } from '@chirola/shared';
-import { ShadowService } from './shadow.service';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { ApiClientService } from '../service-auth/api-client.service';
-import type { VouchersService } from '../vouchers/vouchers.service';
-import type { ShadowCompareInput } from '@chirola/shared';
+import { IssuerOnboardingStatus, type EmissionPlan } from "@chirola/shared";
+import { ShadowService } from "./shadow.service";
+import type { PrismaService } from "../prisma/prisma.service";
+import type { ApiClientService } from "../service-auth/api-client.service";
+import type { VouchersService } from "../vouchers/vouchers.service";
+import type { ShadowCompareInput } from "@chirola/shared";
 
-const API_CLIENT = { id: 'client-1', name: 'gastronova' };
+const API_CLIENT = { id: "client-1", name: "gastronova" };
 
 function buildHarness(plan: EmissionPlan) {
   const stored: { matched: boolean }[] = [];
@@ -42,23 +42,21 @@ function plan(overrides: Partial<EmissionPlan> = {}): EmissionPlan {
     verification: {
       onboardingStatus: IssuerOnboardingStatus.ISSUING_CONFIRMED,
       confirmsIssuing: true,
-      note: 'nota de verificación',
+      note: "nota de verificación",
     },
     ...overrides,
   };
 }
 
-function compareInput(
-  expected: ShadowCompareInput['expected'],
-): ShadowCompareInput {
+function compareInput(expected: ShadowCompareInput["expected"]): ShadowCompareInput {
   return {
-    voucher: { issuerId: 'issuer-1' } as ShadowCompareInput['voucher'],
+    voucher: { issuerId: "issuer-1" } as ShadowCompareInput["voucher"],
     expected,
   };
 }
 
-describe('ShadowService', () => {
-  it('matched=true cuando número y montos coinciden', async () => {
+describe("ShadowService", () => {
+  it("matched=true cuando número y montos coinciden", async () => {
     const { service, stored } = buildHarness(plan());
     const result = await service.compare(
       API_CLIENT,
@@ -69,7 +67,7 @@ describe('ShadowService', () => {
     expect(stored[0].matched).toBe(true);
   });
 
-  it('reporta las diferencias de número y montos', async () => {
+  it("reporta las diferencias de número y montos", async () => {
     const { service } = buildHarness(plan({ number: 43 }));
     const result = await service.compare(
       API_CLIENT,
@@ -77,10 +75,10 @@ describe('ShadowService', () => {
     );
     expect(result.matched).toBe(false);
     const fields = result.differences.map((d) => d.field);
-    expect(fields).toEqual(['number', 'ivaAmount']);
+    expect(fields).toEqual(["number", "ivaAmount"]);
   });
 
-  it('tolera diferencias de centavos dentro del umbral', async () => {
+  it("tolera diferencias de centavos dentro del umbral", async () => {
     const { service } = buildHarness(plan({ ivaAmount: 210.004 }));
     const result = await service.compare(
       API_CLIENT,
@@ -89,17 +87,11 @@ describe('ShadowService', () => {
     expect(result.matched).toBe(true);
   });
 
-  it('summary calcula el match rate de la ventana reciente', async () => {
+  it("summary calcula el match rate de la ventana reciente", async () => {
     const { service } = buildHarness(plan());
-    await service.compare(
-      API_CLIENT,
-      compareInput({ netAmount: 1000, ivaAmount: 210, totalAmount: 1210 }),
-    );
-    await service.compare(
-      API_CLIENT,
-      compareInput({ netAmount: 999, ivaAmount: 210, totalAmount: 1210 }),
-    );
-    const summary = await service.summary(API_CLIENT, 'issuer-1');
+    await service.compare(API_CLIENT, compareInput({ netAmount: 1000, ivaAmount: 210, totalAmount: 1210 }));
+    await service.compare(API_CLIENT, compareInput({ netAmount: 999, ivaAmount: 210, totalAmount: 1210 }));
+    const summary = await service.summary(API_CLIENT, "issuer-1");
     expect(summary.total).toBe(2);
     expect(summary.matched).toBe(1);
     expect(summary.matchRate).toBe(50);

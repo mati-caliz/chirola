@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 const recipientDocTypes = [80, 86, 96, 99] as const;
 
@@ -9,7 +9,7 @@ const baseClient = {
     .number()
     .int()
     .refine((v) => (recipientDocTypes as readonly number[]).includes(v), {
-      message: 'Tipo de documento no soportado',
+      message: "Tipo de documento no soportado",
     }),
   docNumber: z.string().min(1),
   legalName: z.string().min(1).optional(),
@@ -17,10 +17,7 @@ const baseClient = {
   email: z.string().email().optional(),
 };
 
-function validateDocNumber(
-  data: { docType: number; docNumber?: string },
-  ctx: z.RefinementCtx,
-): void {
+function validateDocNumber(data: { docType: number; docNumber?: string }, ctx: z.RefinementCtx): void {
   if (
     data.docNumber != null &&
     elevenDigitDocTypes.includes(data.docType) &&
@@ -28,15 +25,13 @@ function validateDocNumber(
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['docNumber'],
-      message: 'CUIT/CUIL debe tener 11 dígitos',
+      path: ["docNumber"],
+      message: "CUIT/CUIL debe tener 11 dígitos",
     });
   }
 }
 
-export const createClientSchema = z
-  .object(baseClient)
-  .superRefine(validateDocNumber);
+export const createClientSchema = z.object(baseClient).superRefine(validateDocNumber);
 
 export const updateClientSchema = z
   .object({
