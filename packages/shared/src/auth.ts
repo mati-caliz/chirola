@@ -18,14 +18,17 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
 
-export interface AuthUser {
-  id: string;
-  email: string;
-}
+export const authUserSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+});
 
-export interface AuthResponse {
-  token: string;
+export type AuthUser = z.infer<typeof authUserSchema>;
 
-  refreshToken: string;
-  user: AuthUser;
-}
+export const authResponseSchema = z.object({
+  token: z.string(),
+  refreshToken: z.string(),
+  user: authUserSchema,
+});
+
+export type AuthResponse = z.infer<typeof authResponseSchema>;

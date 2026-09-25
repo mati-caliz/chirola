@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as forge from "node-forge";
-import { XMLParser } from "fast-xml-parser";
 import { PrismaService } from "../../prisma/prisma.service";
 import { isProduction } from "../arca-environment";
 import { ArcaCallOutcome } from "../arca-call-log.service";
 import { ARCA_CALL_RECORDER, type ArcaCallRecorder } from "../arca-soap.util";
+import { findByTag, parseXml, xmlText } from "../arca-xml";
 import { wsaaFaultMessage } from "./wsaa-fault";
 import { AccessTicketRequest, CertificateCredentials, ArcaService, AccessTicket } from "./wsaa.types";
 
@@ -13,11 +13,25 @@ const TICKET_RENEWAL_MARGIN_MS = 10 * 60_000;
 const WSAA_OPERATION = "loginCms";
 const WSAA_SERVICE = "wsaa";
 const NO_HTTP_RESPONSE = 0;
+const MILLISECONDS_PER_SECOND = 1000;
+const LOGIN_TICKET_CLOCK_SKEW_MS = 10 * 60_000;
+
+function requiredOid(name: string): string {
+  const oid = forge.pki.oids[name];
+  if (oid === undefined) {
+    throw new Error(`node-forge no conoce el OID ${name}.`);
+  }
+  return oid;
+}
+
+function faultSuffix(fault: unknown): string {
+  const hasFault = Boolean(fault);
+  return hasFault ? `: ${xmlText(fault)}` : "";
+}
 
 @Injectable()
 export class WsaaService {
   private readonly logger = new Logger(WsaaService.name);
-  private readonly parser = new XMLParser({ ignoreAttributes: false });
 
   constructor(
     private readonly config: ConfigService,
@@ -74,9 +88,9 @@ export class WsaaService {
 
   private buildLoginTicketRequest(service: ArcaService): string {
     const now = Date.now();
-    const uniqueId = Math.floor(now / 1000);
-    const gen = new Date(now - 10 * 60_000);
-    const exp = new Date(now + 10 * 60_000);
+    const uniqueId = Math.floor(now / MILLISECONDS_PER_SECOND);
+    const gen = new Date(now - LOGIN_TICKET_CLOCK_SKEW_MS);
+    const exp = new Date(now + LOGIN_TICKET_CLOCK_SKEW_MS);
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<loginTicketRequest version="1.0">',
@@ -101,11 +115,11 @@ export class WsaaService {
       p7.addSigner({
         key: privateKey,
         certificate: cert,
-        digestAlgorithm: forge.pki.oids.sha256,
+        digestAlgorithm: requiredOid("sha256"),
         authenticatedAttributes: [
-          { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
-          { type: forge.pki.oids.messageDigest },
-          { type: forge.pki.oids.signingTime, value: new Date().toString() },
+          { type: requiredOid("contentType"), value: requiredOid("data") },
+          { type: requiredOid("messageDigest") },
+          { type: requiredOid("signingTime"), value: new Date().toString() },
         ],
       });
       p7.sign();
@@ -113,7 +127,7 @@ export class WsaaService {
       const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
       return forge.util.encode64(der);
     } catch (err) {
-      this.logger.error("Error firmando CMS", err as Error);
+      this.logger.error("Error firmando CMS", err);
       throw new InternalServerErrorException("No se pudo firmar el pedido de autenticación (CMS).");
     }
   }
@@ -176,18 +190,18 @@ export class WsaaService {
   }
 
   private parseLoginResponse(soapXml: string): AccessTicket {
-    const soap = this.parser.parse(soapXml) as Record<string, unknown>;
-    const loginReturn = this.deepFind(soap, "loginCmsReturn");
+    const soap = parseXml(soapXml);
+    const loginReturn = findByTag(soap, "loginCmsReturn");
     if (typeof loginReturn !== "string") {
-      const fault = this.deepFind(soap, "faultstring");
-      throw new InternalServerErrorException(`WSAA no devolvió un TA${fault ? `: ${String(fault)}` : ""}.`);
+      const fault = findByTag(soap, "faultstring");
+      throw new InternalServerErrorException(`WSAA no devolvió un TA${faultSuffix(fault)}.`);
     }
 
-    const inner = this.parser.parse(loginReturn) as Record<string, unknown>;
-    const token = this.deepFind(inner, "token");
-    const sign = this.deepFind(inner, "sign");
-    const expiration = this.deepFind(inner, "expirationTime");
-    const generation = this.deepFind(inner, "generationTime");
+    const inner = parseXml(loginReturn);
+    const token = findByTag(inner, "token");
+    const sign = findByTag(inner, "sign");
+    const expiration = findByTag(inner, "expirationTime");
+    const generation = findByTag(inner, "generationTime");
 
     if (typeof token !== "string" || typeof sign !== "string") {
       throw new InternalServerErrorException("No se pudieron extraer token/sign de la respuesta de WSAA.");
@@ -199,17 +213,5 @@ export class WsaaService {
       expiration: new Date(String(expiration)),
       generation: new Date(String(generation)),
     };
-  }
-
-  private deepFind(obj: unknown, key: string): unknown {
-    if (obj == null || typeof obj !== "object") return undefined;
-    if (key in (obj as Record<string, unknown>)) {
-      return (obj as Record<string, unknown>)[key];
-    }
-    for (const value of Object.values(obj as Record<string, unknown>)) {
-      const found = this.deepFind(value, key);
-      if (found !== undefined) return found;
-    }
-    return undefined;
   }
 }

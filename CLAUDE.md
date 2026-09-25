@@ -66,6 +66,5 @@ Rigen las reglas globales de estilo. Lo propio de este repo:
 pnpm db:up          # PostgreSQL en Docker
 pnpm api:dev        # backend NestJS en watch
 pnpm mobile:dev     # Expo dev server
-pnpm -r lint        # lint de todos los paquetes
-pnpm -r test        # tests de todos los paquetes
+pnpm verify         # el gate: estándar de dotfiles/quality en los tres paquetes
 ```

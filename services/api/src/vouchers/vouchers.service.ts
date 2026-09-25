@@ -1,299 +1,68 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { Prisma, type PendingVoucher } from "@prisma/client";
-import { z } from "zod";
-import {
-  associatedVoucherSchema,
-  defaultRecipientIvaCondition,
-  issueVoucherSchema,
-  IssuerOnboardingStatus,
-  PendingVoucherStatus,
-  VoucherStatus,
-  type EmissionPlan,
-  type EmissionPlanVerification,
-  type IssueVoucher,
-} from "@chirola/shared";
-import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
-import { ArcaConfirmation, IssuerOnboardingService } from "../issuer-arca/issuer-onboarding.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { WsfeService } from "../arca/wsfe/wsfe.service";
-import type { ArcaIssuer } from "../arca/arca-environment";
-import type {
-  AuthContext,
-  AuthorizedVoucherDetail,
-  CaeRequest,
-  CaeResult,
-  VoucherAmounts,
-} from "../arca/wsfe/wsfe.types";
-import { ArcaRejectionError, ARCA_DUPLICATE_NUMBER_CODE } from "../arca/wsfe/arca-errors";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { hasText, type EmissionPlan, type IssueVoucher } from "@chirola/shared";
+import type { VoucherAmounts } from "../arca/wsfe/wsfe.types";
 import { calculateAmounts } from "../arca/wsfe/iva-calculator";
-import { buildCreditInvoiceOptionals } from "../arca/wsfe/credit-invoice-optionals";
-import { ApiClientService, AuthenticatedApiClient } from "../service-auth/api-client.service";
-import { WebhookService } from "../webhooks/webhook.service";
-import { WebhookEvent } from "../webhooks/webhook-events";
-import { PushNotificationService } from "../notifications/push-notification.service";
-import { queuedVoucherAuthorizedMessage, queuedVoucherFailedMessage } from "../notifications/push-messages";
-import { IssuerLockService } from "./issuer-lock.service";
-import { VoucherQueuedException } from "./voucher-queued.exception";
-import { CaeAttemptError } from "./cae-attempt.error";
-import { buildQrUrl } from "./qr.util";
-import { renderQrPng, recipientFromQr } from "./qr-image.util";
-import { renderVoucherPdf, type TributePdf } from "./pdf.util";
-import { parseTaxTreatment } from "./stored-tax-treatment";
-import { buildFiscalTransparency } from "./fiscal-transparency";
+import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
+import { renderQrPng } from "./qr-image.util";
+import { renderVoucherPdf } from "./pdf.util";
+import { buildVoucherPdfData } from "./voucher-pdf-data";
+import { VoucherAccessService } from "./voucher-access.service";
+import { VoucherEmissionService } from "./voucher-emission.service";
+import { EmissionPlanService } from "./emission-plan.service";
+import type { IssuedVoucher } from "./voucher-emission.types";
+import type { VoucherDetail, VoucherListEntry } from "./voucher-tables";
 
-interface CaeWithNumber {
-  result: CaeResult;
-  number: number;
-}
-
-interface EmissionOutcome {
-  cae: CaeResult;
-  number: number;
-  amounts: VoucherAmounts;
-  date: Date;
-  recovered: boolean;
-}
-
-type PendingVoucherRow = PendingVoucher;
-
-function emittedStatus(outcome: EmissionOutcome): string {
-  if (outcome.recovered) return VoucherStatus.RECOVERED;
-  return outcome.cae.observations.length > 0 ? VoucherStatus.OBSERVED : VoucherStatus.APPROVED;
-}
-
-type EmissionIssuer = ArcaIssuer & {
-  cbu: string | null;
-  paymentAlias: string | null;
-};
-
-const storedTributesSchema = z.array(
-  z.object({
-    id: z.number().int().positive().optional(),
-    description: z.string(),
-    amount: z.number(),
-  }),
-);
-
-type StoredTribute = z.infer<typeof storedTributesSchema>[number];
-
-const storedAssociatedVouchersSchema = z.array(associatedVoucherSchema);
-
-function parseStoredTributes(stored: Prisma.JsonValue | null): StoredTribute[] {
-  const parsed = storedTributesSchema.safeParse(stored);
-  return parsed.success ? parsed.data : [];
-}
-
-function toTributePdf(tribute: StoredTribute): TributePdf {
-  return { description: tribute.description, amount: tribute.amount };
-}
-
-function parseStoredAssociatedVouchers(stored: Prisma.JsonValue | null) {
-  const parsed = storedAssociatedVouchersSchema.safeParse(stored);
-  return parsed.success ? parsed.data : [];
-}
-
-function parseIsoDate(iso: string): Date {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-const AMOUNT_TOLERANCE = 0.01;
-
-const DEFAULT_MAX_RETRIES = 8;
-const DEFAULT_RETRY_BASE_MS = 60_000;
-const RETRY_BATCH_SIZE = 25;
-
-const DEFAULT_VOUCHER_LIST_LIMIT = 20;
-const MAX_VOUCHER_LIST_LIMIT = 100;
-
-export interface IssuedVoucher {
-  id: string;
-  voucherType: number;
-  salesPoint: number;
-  number: number;
-  cae: string;
-  caeExpiration: Date;
-  netAmount: number;
-  ivaAmount: number;
-  totalAmount: number;
-  qrData: string;
-}
-
-const DRY_RUN_VERIFICATION_NOTE =
-  "El dry-run confirma que el certificado y la autorización de ARCA funcionan, no que el " +
-  "contribuyente esté habilitado para facturar: ARCA valida más cosas al autorizar un " +
-  "comprobante que al consultar el último número.";
+export type { IssuedVoucher } from "./voucher-emission.types";
 
 @Injectable()
 export class VouchersService {
-  private readonly logger = new Logger(VouchersService.name);
-
-  private readonly maxRetries: number;
-  private readonly retryBaseMs: number;
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly issuerAuth: IssuerAuthService,
-    private readonly onboarding: IssuerOnboardingService,
-    private readonly wsfe: WsfeService,
-    private readonly issuerLock: IssuerLockService,
-    private readonly apiClients: ApiClientService,
-    private readonly webhooks: WebhookService,
-    private readonly push: PushNotificationService,
-    config: ConfigService,
-  ) {
-    this.maxRetries = config.get<number>("VOUCHER_MAX_RETRIES", DEFAULT_MAX_RETRIES);
-    this.retryBaseMs = config.get<number>("VOUCHER_RETRY_BASE_MS", DEFAULT_RETRY_BASE_MS);
+    private readonly access: VoucherAccessService,
+    private readonly emission: VoucherEmissionService,
+    private readonly plans: EmissionPlanService,
+  ) {}
+
+  get(userId: string, id: string): Promise<VoucherDetail> {
+    return this.access.get(userId, id);
   }
 
-  private async loadVoucher(id: string) {
-    const voucher = await this.prisma.voucher.findUnique({
-      where: { id },
-      include: { items: true, client: true, salesPoint: true, issuer: true },
-    });
-    if (!voucher) {
-      throw new NotFoundException("Comprobante inexistente.");
-    }
-    return voucher;
+  getForApiClient(apiClient: AuthenticatedApiClient, id: string): Promise<VoucherDetail> {
+    return this.access.getForApiClient(apiClient, id);
   }
 
-  async get(userId: string, id: string) {
-    const voucher = await this.loadVoucher(id);
-    if (voucher.issuer.userId !== userId) {
-      throw new ForbiddenException("El comprobante no pertenece al usuario.");
-    }
-    return voucher;
+  async listByIssuer(userId: string, issuerId: string): Promise<VoucherListEntry[]> {
+    await this.access.findOwnedIssuer(userId, issuerId);
+    return await this.access.listForIssuer(issuerId);
   }
 
-  async listByIssuer(userId: string, issuerId: string) {
-    const issuer = await this.prisma.issuer.findUnique({ where: { id: issuerId } });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
-    }
-    return this.listForIssuer(issuerId);
-  }
-
-  listForIssuer(issuerId: string, limit?: number) {
-    const take =
-      limit === undefined || !Number.isFinite(limit) || limit < 1
-        ? DEFAULT_VOUCHER_LIST_LIMIT
-        : Math.min(Math.trunc(limit), MAX_VOUCHER_LIST_LIMIT);
-
-    return this.prisma.voucher.findMany({
-      where: { issuerId },
-      orderBy: [{ voucherDate: "desc" }, { number: "desc" }],
-      take,
-      select: {
-        id: true,
-        voucherType: true,
-        number: true,
-        voucherDate: true,
-        status: true,
-        cae: true,
-        totalAmount: true,
-        currency: true,
-        recipientName: true,
-        salesPoint: { select: { number: true } },
-        client: { select: { legalName: true, docNumber: true } },
-      },
-    });
-  }
-
-  async listForApiClient(apiClient: AuthenticatedApiClient, issuerId: string, limit?: number) {
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    return this.listForIssuer(issuerId, limit);
-  }
-
-  async getForApiClient(apiClient: AuthenticatedApiClient, id: string) {
-    const voucher = await this.loadVoucher(id);
-    await this.apiClients.assertIssuerGranted(apiClient.id, voucher.issuerId);
-    return voucher;
+  async listForApiClient(
+    apiClient: AuthenticatedApiClient,
+    issuerId: string,
+    limit?: number,
+  ): Promise<VoucherListEntry[]> {
+    await this.access.assertGranted(apiClient, issuerId);
+    return await this.access.listForIssuer(issuerId, limit);
   }
 
   async buildQrPngBuffer(userId: string, id: string): Promise<Buffer> {
     const voucher = await this.get(userId, id);
-    if (!voucher.qrData) {
+    if (!hasText(voucher.qrData)) {
       throw new NotFoundException("El comprobante no tiene QR (no autorizado).");
     }
-    return renderQrPng(voucher.qrData);
+    return await renderQrPng(voucher.qrData);
   }
 
   async renderPdf(userId: string, id: string): Promise<Buffer> {
-    return this.buildPdf(await this.get(userId, id));
+    return await this.buildPdf(await this.get(userId, id));
   }
 
   async renderPdfForApiClient(apiClient: AuthenticatedApiClient, id: string): Promise<Buffer> {
-    return this.buildPdf(await this.getForApiClient(apiClient, id));
-  }
-
-  private async buildPdf(voucher: Awaited<ReturnType<VouchersService["loadVoucher"]>>): Promise<Buffer> {
-    if (!voucher.qrData || !voucher.cae) {
-      throw new NotFoundException("El comprobante no está autorizado todavía (sin CAE/QR).");
-    }
-    const qrPng = await renderQrPng(voucher.qrData);
-    const tributes = parseStoredTributes(voucher.tributes);
-    const items = voucher.items.map((it) => ({
-      description: it.description,
-      quantity: Number(it.quantity),
-      unitPrice: Number(it.unitPrice),
-      ivaRate: Number(it.ivaRate),
-      taxTreatment: parseTaxTreatment(it.taxTreatment),
-      subtotal: Number(it.subtotal),
-    }));
-    const ivaAmount = Number(voucher.ivaAmount);
-    return renderVoucherPdf({
-      issuer: {
-        legalName: voucher.issuer.legalName,
-        commercialAddress: voucher.issuer.commercialAddress,
-        cuit: voucher.issuer.cuit,
-        ivaCondition: voucher.issuer.ivaCondition,
-      },
-      recipient: recipientFromQr(voucher.qrData),
-      voucherType: voucher.voucherType,
-      salesPoint: voucher.salesPoint.number,
-      number: voucher.number,
-      date: voucher.voucherDate,
-      currency: voucher.currency,
-      netAmount: Number(voucher.netAmount),
-      ivaAmount,
-      exemptAmount: Number(voucher.exemptAmount),
-      untaxedAmount: Number(voucher.untaxedAmount),
-      totalAmount: Number(voucher.totalAmount),
-      tributes: tributes.map(toTributePdf),
-      cae: voucher.cae,
-      caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
-      items,
-      servicePeriod:
-        voucher.serviceFrom && voucher.serviceTo
-          ? { from: voucher.serviceFrom, to: voucher.serviceTo }
-          : null,
-      paymentDueDate: voucher.paymentDueDate,
-      associatedVouchers: parseStoredAssociatedVouchers(voucher.associatedVouchers),
-      fiscalTransparency: buildFiscalTransparency({
-        voucherType: voucher.voucherType,
-        ivaAmount,
-        items,
-        tributes,
-      }),
-      qrPng,
-    });
+    return await this.buildPdf(await this.getForApiClient(apiClient, id));
   }
 
   async issue(userId: string, input: IssueVoucher, idempotencyKey?: string): Promise<IssuedVoucher> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
-    });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
-    }
-    return this.issueAuthorized(issuer, input, idempotencyKey);
+    const issuer = await this.access.findOwnedIssuer(userId, input.issuerId);
+    return await this.emission.issueAuthorized(issuer, input, idempotencyKey);
   }
 
   async issueForApiClient(
@@ -301,541 +70,42 @@ export class VouchersService {
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
-    });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuer.id);
-    return this.issueAuthorized(issuer, input, idempotencyKey);
+    const issuer = await this.access.findIssuer(input.issuerId);
+    await this.access.assertGranted(apiClient, issuer.id);
+    return await this.emission.issueAuthorized(issuer, input, idempotencyKey);
   }
 
   async previewForUser(userId: string, input: IssueVoucher): Promise<VoucherAmounts> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
-    });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
-    }
+    await this.access.findOwnedIssuer(userId, input.issuerId);
     return calculateAmounts(input.voucherType, input.items, input.tributes);
   }
 
   async previewForApiClient(apiClient: AuthenticatedApiClient, input: IssueVoucher): Promise<VoucherAmounts> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
+    await this.access.assertGranted(apiClient, input.issuerId);
     return calculateAmounts(input.voucherType, input.items, input.tributes);
   }
 
   async computeEmissionPlanForUser(userId: string, input: IssueVoucher): Promise<EmissionPlan> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
-    });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
-    }
-    return this.computeEmissionPlan(issuer, input);
+    const issuer = await this.access.findOwnedIssuer(userId, input.issuerId);
+    return await this.plans.computeEmissionPlan(issuer, input);
   }
 
   async computeEmissionPlanForApiClient(
     apiClient: AuthenticatedApiClient,
     input: IssueVoucher,
   ): Promise<EmissionPlan> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, input.issuerId);
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
-    });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
+    await this.access.assertGranted(apiClient, input.issuerId);
+    const issuer = await this.access.findIssuer(input.issuerId);
+    return await this.plans.computeEmissionPlan(issuer, input);
+  }
+
+  private async buildPdf(voucher: VoucherDetail): Promise<Buffer> {
+    if (!hasText(voucher.qrData) || !hasText(voucher.cae)) {
+      throw new NotFoundException("El comprobante no está autorizado todavía (sin CAE/QR).");
     }
-    return this.computeEmissionPlan(issuer, input);
-  }
-
-  private async describeVerification(issuerId: string): Promise<EmissionPlanVerification> {
-    const issuer = await this.prisma.issuer.findUniqueOrThrow({
-      where: { id: issuerId },
-      select: { onboardingStatus: true },
-    });
-    return {
-      onboardingStatus: issuer.onboardingStatus,
-      confirmsIssuing: issuer.onboardingStatus === IssuerOnboardingStatus.ISSUING_CONFIRMED,
-      note: DRY_RUN_VERIFICATION_NOTE,
-    };
-  }
-
-  private async computeEmissionPlan(issuer: EmissionIssuer, input: IssueVoucher): Promise<EmissionPlan> {
-    const last = await this.onboarding.track(issuer.id, ArcaConfirmation.READ_ONLY, async () => {
-      const auth = await this.issuerAuth.buildAuth(issuer);
-      return this.wsfe.getLastAuthorized(auth, input.salesPoint, input.voucherType);
-    });
-    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
-    return {
-      verification: await this.describeVerification(issuer.id),
-      salesPoint: input.salesPoint,
-      voucherType: input.voucherType,
-      number: last + 1,
-      netAmount: amounts.netAmount,
-      ivaAmount: amounts.ivaAmount,
-      totalAmount: amounts.totalAmount,
-      rates: amounts.rates,
-    };
-  }
-
-  private async issueAuthorized(
-    issuer: EmissionIssuer,
-    input: IssueVoucher,
-    idempotencyKey?: string,
-  ): Promise<IssuedVoucher> {
-    if (idempotencyKey) {
-      const replay = await this.replayOrQueued(issuer.id, idempotencyKey);
-      if (replay) {
-        return replay;
-      }
-    }
-
-    return this.issuerLock.runExclusive(issuer.id, async () => {
-      if (idempotencyKey) {
-        const replay = await this.replayOrQueued(issuer.id, idempotencyKey);
-        if (replay) {
-          return replay;
-        }
-      }
-      return this.emit(issuer, input, idempotencyKey);
-    });
-  }
-
-  private async emit(
-    issuer: EmissionIssuer,
-    input: IssueVoucher,
-    idempotencyKey?: string,
-  ): Promise<IssuedVoucher> {
-    let outcome: EmissionOutcome;
-    try {
-      outcome = await this.attemptCae(issuer, input);
-    } catch (err) {
-      if (err instanceof ArcaRejectionError) {
-        throw err;
-      }
-      const pending = await this.queuePending(
-        issuer.id,
-        input,
-        idempotencyKey,
-        this.errorMessage(err),
-        err instanceof CaeAttemptError ? err.attemptedNumber : null,
-      );
-      throw new VoucherQueuedException(pending.id);
-    }
-    return this.persistIssuedVoucher(issuer, input, outcome, idempotencyKey);
-  }
-
-  private attemptCae(issuer: EmissionIssuer, input: IssueVoucher): Promise<EmissionOutcome> {
-    return this.onboarding.track(issuer.id, ArcaConfirmation.ISSUE, () => this.requestCae(issuer, input));
-  }
-
-  private async requestCae(issuer: EmissionIssuer, input: IssueVoucher): Promise<EmissionOutcome> {
-    const auth = await this.issuerAuth.buildAuth(issuer);
-
-    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
-    const date = new Date();
-    const ivaConditionId = input.recipient.ivaConditionId ?? defaultRecipientIvaCondition(input.voucherType);
-    const optionals = buildCreditInvoiceOptionals(input.voucherType, issuer, input.transmissionType);
-
-    const buildRequest = (voucherNumber: number): CaeRequest => ({
-      salesPoint: input.salesPoint,
-      voucherType: input.voucherType,
-      concept: input.concept,
-      number: voucherNumber,
-      date,
-      recipient: {
-        docType: input.recipient.docType,
-        docNumber: input.recipient.docNumber,
-        ivaConditionId,
-      },
-      amounts,
-      currency: input.currency,
-      exchangeRate: input.exchangeRate,
-      associatedVouchers: input.associatedVouchers,
-      servicePeriod: input.servicePeriod,
-      paymentDueDate: input.paymentDueDate,
-      optionals,
-    });
-
-    const { result: cae, number } = await this.requestCaeWithRecovery(auth, buildRequest);
-    return { cae, number, amounts, date, recovered: false };
-  }
-
-  private async persistIssuedVoucher(
-    issuer: EmissionIssuer,
-    input: IssueVoucher,
-    outcome: EmissionOutcome,
-    idempotencyKey?: string,
-  ): Promise<IssuedVoucher> {
-    const { cae, number, amounts, date } = outcome;
-    const qrData = buildQrUrl({
-      date,
-      issuerCuit: issuer.cuit,
-      salesPoint: input.salesPoint,
-      voucherType: input.voucherType,
-      number,
-      totalAmount: amounts.totalAmount,
-      currency: input.currency,
-      exchangeRate: input.exchangeRate,
-      recipientDocType: input.recipient.docType,
-      recipientDocNumber: input.recipient.docNumber,
-      cae: cae.cae,
-    });
-
-    const salesPoint = await this.prisma.salesPoint.upsert({
-      where: { issuerId_number: { issuerId: issuer.id, number: input.salesPoint } },
-      create: { issuerId: issuer.id, number: input.salesPoint },
-      update: {},
-    });
-
-    const client = await this.prisma.client.findUnique({
-      where: {
-        issuerId_docType_docNumber: {
-          issuerId: issuer.id,
-          docType: input.recipient.docType,
-          docNumber: input.recipient.docNumber,
-        },
-      },
-      select: { id: true, legalName: true },
-    });
-
-    const voucher = await this.prisma.voucher.create({
-      data: {
-        issuerId: issuer.id,
-        salesPointId: salesPoint.id,
-        clientId: client?.id ?? null,
-        recipientDocType: input.recipient.docType,
-        recipientDocNumber: input.recipient.docNumber,
-        recipientName: input.recipient.legalName ?? client?.legalName ?? null,
-        voucherType: input.voucherType,
-        number,
-        voucherDate: date,
-        concept: input.concept,
-        serviceFrom: input.servicePeriod ? parseIsoDate(input.servicePeriod.from) : null,
-        serviceTo: input.servicePeriod ? parseIsoDate(input.servicePeriod.to) : null,
-        paymentDueDate: input.paymentDueDate ? parseIsoDate(input.paymentDueDate) : null,
-        netAmount: amounts.netAmount,
-        ivaAmount: amounts.ivaAmount,
-        exemptAmount: amounts.exemptAmount,
-        untaxedAmount: amounts.untaxedAmount,
-        tributeAmount: amounts.tributeAmount,
-        totalAmount: amounts.totalAmount,
-        tributes: amounts.tributes.length > 0 ? amounts.tributes : undefined,
-        currency: input.currency,
-        exchangeRate: input.exchangeRate,
-        status: emittedStatus(outcome),
-        cae: cae.cae,
-        caeExpiration: cae.caeVto,
-        arcaObservations: cae.observations.length > 0 ? cae.observations : undefined,
-        qrData,
-        associatedVouchers: input.associatedVouchers ?? undefined,
-        items: {
-          create: input.items.map((it) => ({
-            description: it.description,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            ivaRate: it.ivaRate,
-            taxTreatment: it.taxTreatment,
-            subtotal: Math.round(it.quantity * it.unitPrice * 100) / 100,
-          })),
-        },
-      },
-    });
-
-    if (idempotencyKey) {
-      await this.prisma.idempotencyRecord.create({
-        data: { issuerId: issuer.id, key: idempotencyKey, voucherId: voucher.id },
-      });
-    }
-
-    this.logger.log(`Comprobante ${input.voucherType}-${input.salesPoint}-${number} emitido, CAE ${cae.cae}`);
-
-    void this.webhooks.dispatch(issuer.id, WebhookEvent.VOUCHER_ISSUED, {
-      voucherId: voucher.id,
-      voucherType: input.voucherType,
-      salesPoint: input.salesPoint,
-      number,
-      cae: cae.cae,
-      caeExpiration: cae.caeVto.toISOString(),
-      totalAmount: amounts.totalAmount,
-    });
-
-    return {
-      id: voucher.id,
-      voucherType: input.voucherType,
-      salesPoint: input.salesPoint,
-      number,
-      cae: cae.cae,
-      caeExpiration: cae.caeVto,
-      netAmount: amounts.netAmount,
-      ivaAmount: amounts.ivaAmount,
-      totalAmount: amounts.totalAmount,
-      qrData,
-    };
-  }
-
-  private async requestCaeWithRecovery(
-    auth: AuthContext,
-    buildRequest: (number: number) => CaeRequest,
-  ): Promise<CaeWithNumber> {
-    const { salesPoint } = buildRequest(0);
-    let attemptedNumber: number | null = null;
-    try {
-      return await this.requestCaeAttempt(auth, buildRequest, (candidate) => {
-        attemptedNumber = candidate;
-      });
-    } catch (err) {
-      if (err instanceof ArcaRejectionError) {
-        throw err;
-      }
-      throw new CaeAttemptError(err, salesPoint, attemptedNumber);
-    }
-  }
-
-  private async requestCaeAttempt(
-    auth: AuthContext,
-    buildRequest: (number: number) => CaeRequest,
-    onNumberChosen: (number: number) => void,
-  ): Promise<CaeWithNumber> {
-    const { salesPoint, voucherType } = buildRequest(0);
-    const last = await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType);
-    const number = last + 1;
-    onNumberChosen(number);
-    try {
-      const result = await this.wsfe.requestCae(auth, buildRequest(number));
-      return { result, number };
-    } catch (err) {
-      if (!(err instanceof ArcaRejectionError) || !err.hasCode(ARCA_DUPLICATE_NUMBER_CODE)) {
-        throw err;
-      }
-      const existing = await this.wsfe.queryVoucher(auth, salesPoint, voucherType, number);
-      if (existing) {
-        this.logger.warn(`CAE recuperado tras duplicado ${voucherType}-${salesPoint}-${number}`);
-        return { result: existing, number };
-      }
-      const freshNumber = (await this.wsfe.getLastAuthorized(auth, salesPoint, voucherType)) + 1;
-      onNumberChosen(freshNumber);
-      this.logger.warn(
-        `Número duplicado ${voucherType}-${salesPoint}-${number}, reintentando con ${freshNumber}`,
-      );
-      const result = await this.wsfe.requestCae(auth, buildRequest(freshNumber));
-      return { result, number: freshNumber };
-    }
-  }
-
-  private async replayOrQueued(issuerId: string, key: string): Promise<IssuedVoucher | null> {
-    const record = await this.prisma.idempotencyRecord.findUnique({
-      where: { issuerId_key: { issuerId, key } },
-    });
-    if (record) {
-      const voucher = await this.prisma.voucher.findUnique({
-        where: { id: record.voucherId },
-        include: { salesPoint: true },
-      });
-      if (voucher && voucher.cae) {
-        return {
-          id: voucher.id,
-          voucherType: voucher.voucherType,
-          salesPoint: voucher.salesPoint.number,
-          number: voucher.number,
-          cae: voucher.cae,
-          caeExpiration: voucher.caeExpiration ?? voucher.voucherDate,
-          netAmount: Number(voucher.netAmount),
-          ivaAmount: Number(voucher.ivaAmount),
-          totalAmount: Number(voucher.totalAmount),
-          qrData: voucher.qrData ?? "",
-        };
-      }
-    }
-
-    const pending = await this.prisma.pendingVoucher.findUnique({
-      where: { issuerId_idempotencyKey: { issuerId, idempotencyKey: key } },
-    });
-    if (pending && pending.status === PendingVoucherStatus.PENDING) {
-      throw new VoucherQueuedException(pending.id);
-    }
-    return null;
-  }
-
-  private async queuePending(
-    issuerId: string,
-    input: IssueVoucher,
-    idempotencyKey: string | undefined,
-    lastError: string,
-    attemptedNumber: number | null,
-  ): Promise<PendingVoucherRow> {
-    const payload = JSON.parse(JSON.stringify(input)) as Prisma.InputJsonObject;
-    const nextRetryAt = new Date(Date.now() + this.retryBaseMs);
-    try {
-      return await this.prisma.pendingVoucher.create({
-        data: {
-          issuerId,
-          idempotencyKey,
-          payload,
-          nextRetryAt,
-          lastError,
-          attemptedNumber,
-          attemptedSalesPoint: attemptedNumber === null ? null : input.salesPoint,
-          attemptedAt: attemptedNumber === null ? null : new Date(),
-        },
-      });
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002" && idempotencyKey) {
-        const existing = await this.prisma.pendingVoucher.findUnique({
-          where: { issuerId_idempotencyKey: { issuerId, idempotencyKey } },
-        });
-        if (existing) {
-          return existing;
-        }
-      }
-      throw err;
-    }
-  }
-
-  async retryPendingVouchers(): Promise<void> {
-    const due = await this.prisma.pendingVoucher.findMany({
-      where: {
-        status: PendingVoucherStatus.PENDING,
-        nextRetryAt: { lte: new Date() },
-      },
-      take: RETRY_BATCH_SIZE,
-    });
-    for (const pending of due) {
-      await this.processPending(pending);
-    }
-  }
-
-  private async processPending(pending: PendingVoucherRow): Promise<void> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: pending.issuerId },
-    });
-    if (!issuer) {
-      await this.failPending(pending, "Emisor inexistente.", true);
-      return;
-    }
-    const input = issueVoucherSchema.parse(pending.payload);
-
-    await this.issuerLock.runExclusive(issuer.id, async () => {
-      let outcome: EmissionOutcome;
-      try {
-        outcome =
-          (await this.recoverAlreadyAuthorized(issuer, input, pending)) ??
-          (await this.attemptCae(issuer, input));
-      } catch (err) {
-        if (err instanceof ArcaRejectionError) {
-          await this.failPending(pending, err.message, true);
-        } else {
-          await this.bumpPending(pending, this.errorMessage(err));
-        }
-        return;
-      }
-      const issued = await this.persistIssuedVoucher(
-        issuer,
-        input,
-        outcome,
-        pending.idempotencyKey ?? undefined,
-      );
-      await this.prisma.pendingVoucher.delete({ where: { id: pending.id } });
-      void this.push.notifyIssuerOwner(issuer.id, queuedVoucherAuthorizedMessage(issued));
-    });
-  }
-
-  private async recoverAlreadyAuthorized(
-    issuer: EmissionIssuer,
-    input: IssueVoucher,
-    pending: PendingVoucherRow,
-  ): Promise<EmissionOutcome | null> {
-    if (pending.attemptedNumber === null || pending.attemptedSalesPoint === null) {
-      return null;
-    }
-
-    const auth = await this.issuerAuth.buildAuth(issuer);
-    const authorized = await this.wsfe.queryVoucherDetail(
-      auth,
-      pending.attemptedSalesPoint,
-      input.voucherType,
-      pending.attemptedNumber,
+    const qrPng = await renderQrPng(voucher.qrData);
+    return await renderVoucherPdf(
+      buildVoucherPdfData({ ...voucher, qrData: voucher.qrData, cae: voucher.cae }, qrPng),
     );
-    if (!authorized) {
-      return null;
-    }
-
-    const amounts = calculateAmounts(input.voucherType, input.items, input.tributes);
-    if (!this.matchesPendingVoucher(authorized, input, amounts)) {
-      this.logger.warn(
-        `El comprobante ${input.voucherType}-${pending.attemptedSalesPoint}-${pending.attemptedNumber} ya existe en ARCA pero no coincide con el encolado ${pending.id}; se emite uno nuevo.`,
-      );
-      return null;
-    }
-
-    this.logger.warn(
-      `Comprobante encolado ${pending.id} ya tenía CAE en ARCA (${authorized.cae.cae}); se adopta en vez de re-emitir.`,
-    );
-    return {
-      cae: authorized.cae,
-      number: authorized.number,
-      amounts,
-      date: authorized.date,
-      recovered: true,
-    };
-  }
-
-  private matchesPendingVoucher(
-    authorized: AuthorizedVoucherDetail,
-    input: IssueVoucher,
-    amounts: VoucherAmounts,
-  ): boolean {
-    const sameTotal = Math.abs(authorized.totalAmount - amounts.totalAmount) < AMOUNT_TOLERANCE;
-    const sameRecipient =
-      authorized.recipientDocType === input.recipient.docType &&
-      authorized.recipientDocNumber.replace(/\D/g, "") === input.recipient.docNumber.replace(/\D/g, "");
-    return sameTotal && sameRecipient;
-  }
-
-  private async bumpPending(pending: PendingVoucherRow, lastError: string): Promise<void> {
-    const retryCount = pending.retryCount + 1;
-    if (retryCount >= this.maxRetries) {
-      await this.failPending(pending, lastError, false);
-      return;
-    }
-    const nextRetryAt = new Date(Date.now() + this.retryBaseMs * 2 ** retryCount);
-    await this.prisma.pendingVoucher.update({
-      where: { id: pending.id },
-      data: { retryCount, nextRetryAt, lastError },
-    });
-    this.logger.warn(
-      `Comprobante encolado ${pending.id} reintentará (intento ${retryCount}) tras ${lastError}`,
-    );
-  }
-
-  private async failPending(pending: PendingVoucherRow, reason: string, permanent: boolean): Promise<void> {
-    await this.prisma.pendingVoucher.update({
-      where: { id: pending.id },
-      data: {
-        status: PendingVoucherStatus.FAILED,
-        lastError: reason,
-        retryCount: pending.retryCount + 1,
-      },
-    });
-    this.logger.error(`Comprobante encolado ${pending.id} falló definitivamente: ${reason}`);
-    void this.push.notifyIssuerOwner(pending.issuerId, queuedVoucherFailedMessage(pending.id, reason));
-    void this.webhooks.dispatch(pending.issuerId, WebhookEvent.VOUCHER_FAILED, {
-      pendingVoucherId: pending.id,
-      reason,
-      permanent,
-      exhausted: !permanent,
-    });
-  }
-
-  private errorMessage(err: unknown): string {
-    return err instanceof Error ? err.message : String(err);
   }
 }

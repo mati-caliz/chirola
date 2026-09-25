@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Pressable } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { opacity } from "@/theme/tokens";
 
 const TRACK_WIDTH = 52;
 const TRACK_HEIGHT = 32;
@@ -17,7 +18,7 @@ export const Switch = ({
   onChange?: (value: boolean) => void;
   disabled?: boolean;
   label?: string;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const position = useRef(new Animated.Value(checked ? 1 : 0)).current;
 
@@ -42,7 +43,7 @@ export const Switch = ({
         borderRadius: TRACK_HEIGHT / 2,
         padding: 3,
         justifyContent: "center",
-        opacity: disabled ? 0.45 : 1,
+        opacity: disabled ? opacity.disabled : 1,
         backgroundColor: checked ? theme.colors.actionPrimary : theme.colors.borderStrong,
       }}
     >

@@ -1,7 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 
+const REFRESH_TOKEN_BYTES = 32;
+
 export function generarRefreshToken(): string {
-  return randomBytes(32).toString("base64url");
+  return randomBytes(REFRESH_TOKEN_BYTES).toString("base64url");
 }
 
 export function hashRefreshToken(token: string): string {

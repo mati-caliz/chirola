@@ -7,6 +7,7 @@ import {
 import type { Prisma } from "@prisma/client";
 import {
   creditNoteTypeFor,
+  hasText,
   isAuthorizedStatus,
   isCreditInvoice,
   requiresServicePeriod,
@@ -17,7 +18,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ApiClientService, type AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { toArcaDate, toLocalIsoDate } from "../arca/arca-date";
-import { recipientFromQr } from "./qr-image.util";
+import { recipientFromQr, type QrRecipient } from "./qr-image.util";
 import { parseTaxTreatment } from "./stored-tax-treatment";
 
 type LoadedVoucher = Prisma.VoucherGetPayload<{
@@ -53,10 +54,22 @@ export interface CreditNoteSourceVoucher {
   }[];
 }
 
+function qrRecipientOf(voucher: CreditNoteSourceVoucher): QrRecipient | null {
+  return hasText(voucher.qrData) ? recipientFromQr(voucher.qrData) : null;
+}
+
+function documentTypeOf(voucher: CreditNoteSourceVoucher, fromQr: QrRecipient | null): number | undefined {
+  return voucher.recipientDocType ?? voucher.client?.docType ?? fromQr?.docType;
+}
+
+function documentNumberOf(voucher: CreditNoteSourceVoucher, fromQr: QrRecipient | null): string | undefined {
+  return voucher.recipientDocNumber ?? voucher.client?.docNumber ?? fromQr?.docNumber;
+}
+
 function recipientOf(voucher: CreditNoteSourceVoucher): IssueVoucher["recipient"] {
-  const fromQr = voucher.qrData ? recipientFromQr(voucher.qrData) : null;
-  const docType = voucher.recipientDocType ?? voucher.client?.docType ?? fromQr?.docType;
-  const docNumber = voucher.recipientDocNumber ?? voucher.client?.docNumber ?? fromQr?.docNumber;
+  const fromQr = qrRecipientOf(voucher);
+  const docType = documentTypeOf(voucher, fromQr);
+  const docNumber = documentNumberOf(voucher, fromQr);
   if (docType === undefined || docNumber === undefined) {
     throw new UnprocessableEntityException("No se pudo identificar al receptor del comprobante original.");
   }

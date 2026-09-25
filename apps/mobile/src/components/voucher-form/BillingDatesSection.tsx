@@ -3,6 +3,7 @@ import type { ServicePeriod, TransmissionTypeName } from "@chirola/shared";
 import { Card, Input, Segmented } from "@/components/ds";
 import { useTheme } from "@/hooks/use-theme";
 import { transmissionOptions } from "./form-model";
+import type { ReactNode } from "react";
 
 interface BillingDatesSectionProps {
   needsServicePeriod: boolean;
@@ -26,7 +27,7 @@ export const BillingDatesSection = ({
   onServicePeriodChange,
   onPaymentDueDateChange,
   onTransmissionTypeChange,
-}: BillingDatesSectionProps) => {
+}: BillingDatesSectionProps): ReactNode => {
   const theme = useTheme();
   return (
     <>
@@ -47,7 +48,9 @@ export const BillingDatesSection = ({
               <Input
                 label="Desde"
                 value={servicePeriod.from}
-                onChangeText={(from) => onServicePeriodChange({ ...servicePeriod, from })}
+                onChangeText={(from) => {
+                  onServicePeriodChange({ ...servicePeriod, from });
+                }}
                 placeholder="AAAA-MM-DD"
                 mono
               />
@@ -56,7 +59,9 @@ export const BillingDatesSection = ({
               <Input
                 label="Hasta"
                 value={servicePeriod.to}
-                onChangeText={(to) => onServicePeriodChange({ ...servicePeriod, to })}
+                onChangeText={(to) => {
+                  onServicePeriodChange({ ...servicePeriod, to });
+                }}
                 placeholder="AAAA-MM-DD"
                 mono
               />

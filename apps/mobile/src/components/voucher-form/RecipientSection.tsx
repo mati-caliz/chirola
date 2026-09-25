@@ -1,9 +1,10 @@
 import { ScrollView, Text, View } from "react-native";
 import { DocumentType, recipientIvaConditionName, voucherTypeName } from "@chirola/shared";
 import { Banner, Button, Card, Chip, Input, Segmented } from "@/components/ds";
-import type { Client } from "@/lib/resources";
+import type { Client } from "@chirola/shared";
 import { useTheme } from "@/hooks/use-theme";
 import { docTypeOptions } from "./form-model";
+import type { ReactNode } from "react";
 
 interface RecipientSectionProps {
   clients: Client[] | undefined;
@@ -35,7 +36,7 @@ export const RecipientSection = ({
   onDocNumberChange,
   onLegalNameChange,
   onPadronLookup,
-}: RecipientSectionProps) => {
+}: RecipientSectionProps): ReactNode => {
   const theme = useTheme();
   return (
     <Card>
@@ -60,7 +61,9 @@ export const RecipientSection = ({
               key={client.id}
               label={client.legalName ?? client.docNumber}
               selected={docNumber === client.docNumber}
-              onPress={() => onChooseClient(client)}
+              onPress={() => {
+                onChooseClient(client);
+              }}
             />
           ))}
         </ScrollView>

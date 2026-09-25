@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { ChevronRight } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
 
 export const ListItem = ({
   title,
@@ -17,9 +18,9 @@ export const ListItem = ({
   trailing?: ReactNode;
   chevron?: boolean;
   onPress?: () => void;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
-  const content = (pressed: boolean) => (
+  const content = (pressed: boolean): ReactNode => (
     <View
       style={{
         flexDirection: "row",
@@ -43,7 +44,7 @@ export const ListItem = ({
         >
           {title}
         </Text>
-        {subtitle ? (
+        {hasText(subtitle) ? (
           <Text
             numberOfLines={1}
             style={{
@@ -61,8 +62,8 @@ export const ListItem = ({
       {chevron ? <ChevronRight size={18} color={theme.colors.textTertiary} strokeWidth={2} /> : null}
     </View>
   );
-  if (onPress) {
-    return <Pressable onPress={onPress}>{({ pressed }) => content(pressed)}</Pressable>;
+  if (onPress === undefined) {
+    return <>{content(false)}</>;
   }
-  return content(false);
+  return <Pressable onPress={onPress}>{({ pressed }) => content(pressed)}</Pressable>;
 };

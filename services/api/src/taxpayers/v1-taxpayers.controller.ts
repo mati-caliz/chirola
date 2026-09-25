@@ -7,6 +7,7 @@ import { ApiClientService } from "../service-auth/api-client.service";
 import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { IssuersService } from "../issuers/issuers.service";
 import { TaxpayersService } from "./taxpayers.service";
+import { TaxpayerInfo } from "@chirola/shared";
 
 @Controller("v1/taxpayers")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
@@ -23,9 +24,9 @@ export class V1TaxpayersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Query("issuerId") issuerId: string,
     @Param("cuit") cuit: string,
-  ) {
+  ): Promise<TaxpayerInfo> {
     await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
     const issuer = await this.issuers.getById(issuerId);
-    return this.taxpayers.lookup(issuer, cuit);
+    return await this.taxpayers.lookup(issuer, cuit);
   }
 }

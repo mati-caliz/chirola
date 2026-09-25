@@ -11,15 +11,17 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { issueVoucherSchema, type IssueVoucher } from "@chirola/shared";
+import { EmissionPlan, issueVoucherSchema, type IssueVoucher } from "@chirola/shared";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
 import { RateLimitGuard } from "../service-auth/rate-limit.guard";
 import { ServiceAuditInterceptor } from "../service-auth/service-audit.interceptor";
 import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
 import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
-import { VouchersService } from "./vouchers.service";
+import { VouchersService, type IssuedVoucher } from "./vouchers.service";
 import { CreditNoteDraftService } from "./credit-note-draft.service";
+import { VoucherAmounts } from "../arca/wsfe/wsfe.types";
+import type { VoucherDetail, VoucherListEntry } from "./voucher-tables";
 
 @Controller("v1/vouchers")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
@@ -35,7 +37,7 @@ export class V1VouchersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
     @Headers("idempotency-key") idempotencyKey?: string,
-  ) {
+  ): Promise<IssuedVoucher> {
     return this.vouchers.issueForApiClient(apiClient, body, idempotencyKey);
   }
 
@@ -43,7 +45,7 @@ export class V1VouchersController {
   preview(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
-  ) {
+  ): Promise<VoucherAmounts> {
     return this.vouchers.previewForApiClient(apiClient, body);
   }
 
@@ -51,7 +53,7 @@ export class V1VouchersController {
   dryRun(
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Body(new ZodValidationPipe(issueVoucherSchema)) body: IssueVoucher,
-  ) {
+  ): Promise<EmissionPlan> {
     return this.vouchers.computeEmissionPlanForApiClient(apiClient, body);
   }
 
@@ -60,7 +62,7 @@ export class V1VouchersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Query("issuerId") issuerId: string,
     @Query("limit") limit?: string,
-  ) {
+  ): Promise<VoucherListEntry[]> {
     return this.vouchers.listForApiClient(
       apiClient,
       issuerId,
@@ -73,7 +75,7 @@ export class V1VouchersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Param("id") id: string,
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     const pdf = await this.vouchers.renderPdfForApiClient(apiClient, id);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="voucher-${id}.pdf"`);
@@ -81,12 +83,18 @@ export class V1VouchersController {
   }
 
   @Get(":id/credit-note-draft")
-  creditNoteDraft(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
+  creditNoteDraft(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param("id") id: string,
+  ): Promise<IssueVoucher> {
     return this.creditNoteDrafts.draftForApiClient(apiClient, id);
   }
 
   @Get(":id")
-  get(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Param("id") id: string) {
+  get(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Param("id") id: string,
+  ): Promise<VoucherDetail> {
     return this.vouchers.getForApiClient(apiClient, id);
   }
 }

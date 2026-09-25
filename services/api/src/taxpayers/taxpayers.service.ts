@@ -1,26 +1,26 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { z } from "zod";
-import type { TaxpayerAddress, TaxpayerInfo } from "@chirola/shared";
+import type { Prisma } from "@prisma/client";
+import { taxpayerAddressSchema, type TaxpayerAddress, type TaxpayerInfo } from "@chirola/shared";
 import type { ArcaIssuer } from "../arca/arca-environment";
 import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { PadronService } from "../arca/padron/padron.service";
+import { MS_PER_DAY } from "../common/time";
+import { optionalField } from "../common/optional-field";
 
 const CUIT_LENGTH = 11;
 const DEFAULT_CACHE_TTL_DAYS = 30;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-const addressSchema = z.object({
-  street: z.string().nullable(),
-  city: z.string().nullable(),
-  postalCode: z.string().nullable(),
-  province: z.string().nullable(),
-});
 
 function parseAddress(stored: unknown): TaxpayerAddress | null {
-  const parsed = addressSchema.safeParse(stored);
+  const parsed = taxpayerAddressSchema.safeParse(stored);
   return parsed.success ? parsed.data : null;
+}
+
+function toStoredAddress(address: TaxpayerAddress | null): Prisma.InputJsonObject | undefined {
+  if (address === null) return undefined;
+  const { street, city, postalCode, province } = address;
+  return { street, city, postalCode, province };
 }
 
 function normalizeCuit(cuit: string): string {
@@ -68,14 +68,14 @@ export class TaxpayersService {
         legalName: taxpayer.legalName,
         status: taxpayer.status,
         ivaConditionId: taxpayer.ivaConditionId,
-        address: taxpayer.address ?? undefined,
+        ...optionalField("address", toStoredAddress(taxpayer.address)),
         fetchedAt: new Date(),
       },
       update: {
         legalName: taxpayer.legalName,
         status: taxpayer.status,
         ivaConditionId: taxpayer.ivaConditionId,
-        address: taxpayer.address ?? undefined,
+        ...optionalField("address", toStoredAddress(taxpayer.address)),
         fetchedAt: new Date(),
       },
     });

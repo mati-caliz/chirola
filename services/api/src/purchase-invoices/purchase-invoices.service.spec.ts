@@ -1,35 +1,51 @@
 import { NotFoundException } from "@nestjs/common";
 import type { PurchaseInvoiceInput } from "@chirola/shared";
 import { PurchaseInvoicesService } from "./purchase-invoices.service";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
-type Row = Record<string, unknown>;
+interface NewInvoice {
+  issuerId: string;
+  [field: string]: unknown;
+}
 
-function fakePrisma(): PrismaService {
-  const store = new Map<string, Row>();
-  let seq = 0;
+interface StoredInvoice extends NewInvoice {
+  id: string;
+}
+
+function fakePrisma() {
+  const store = new Map<string, StoredInvoice>();
+  let sequence = 0;
   return {
     purchaseInvoice: {
-      create: async ({ data }: { data: Row }) => {
-        const row: Row = { id: `pi-${++seq}`, ...data };
-        store.set(row.id as string, row);
-        return row;
+      create: ({ data }: { data: NewInvoice }) => {
+        const row: StoredInvoice = { ...data, id: `pi-${String(++sequence)}` };
+        store.set(row.id, row);
+        return Promise.resolve(row);
       },
-      findMany: async ({ where }: { where: { issuerId: string } }) =>
-        [...store.values()].filter((r) => r.issuerId === where.issuerId),
-      findFirst: async ({ where }: { where: { id: string; issuerId: string } }) =>
-        [...store.values()].find((r) => r.id === where.id && r.issuerId === where.issuerId) ?? null,
-      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
-        const row = { ...store.get(where.id), ...data };
+      findMany: ({ where }: { where: { issuerId: string } }) =>
+        Promise.resolve([...store.values()].filter((row) => row.issuerId === where.issuerId)),
+      findFirst: ({ where }: { where: { id: string; issuerId: string } }) =>
+        Promise.resolve(
+          [...store.values()].find((row) => row.id === where.id && row.issuerId === where.issuerId) ?? null,
+        ),
+      update: ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const existing = store.get(where.id);
+        if (existing === undefined) return Promise.reject(new Error("Factura inexistente en el doble."));
+        const row: StoredInvoice = { ...existing, ...data, id: existing.id, issuerId: existing.issuerId };
         store.set(where.id, row);
-        return row;
+        return Promise.resolve(row);
       },
-      delete: async ({ where }: { where: { id: string } }) => {
+      delete: ({ where }: { where: { id: string } }) => {
         store.delete(where.id);
-        return {};
+        return Promise.resolve({});
       },
     },
-  } as unknown as PrismaService;
+  };
+}
+
+function createService(): Promise<PurchaseInvoicesService> {
+  return instantiateWithDoubles(PurchaseInvoicesService, [{ token: PrismaService, value: fakePrisma() }]);
 }
 
 function input(overrides: Partial<PurchaseInvoiceInput> = {}): PurchaseInvoiceInput {
@@ -57,15 +73,15 @@ describe("PurchaseInvoicesService", () => {
   const ISSUER = "issuer-1";
 
   it("calcula el total a partir de netos + IVA + exento + no gravado", async () => {
-    const svc = new PurchaseInvoicesService(fakePrisma());
-    const created = await svc.create(ISSUER, input({ exempt: 50, untaxed: 40 }));
+    const service = await createService();
+    const created = await service.create(ISSUER, input({ exempt: 50, untaxed: 40 }));
     expect(Number(created.total)).toBe(1300);
   });
 
   it("lista con resumen (neto, iva, total, cantidad) del emisor", async () => {
-    const svc = new PurchaseInvoicesService(fakePrisma());
-    await svc.create(ISSUER, input());
-    await svc.create(
+    const service = await createService();
+    await service.create(ISSUER, input());
+    await service.create(
       ISSUER,
       input({
         number: 11,
@@ -75,7 +91,7 @@ describe("PurchaseInvoicesService", () => {
         iva105: 21,
       }),
     );
-    const { invoices, summary } = await svc.list(ISSUER);
+    const { invoices, summary } = await service.list(ISSUER);
     expect(invoices).toHaveLength(2);
     expect(summary.count).toBe(2);
     expect(summary.netAmount).toBe(1200);
@@ -84,9 +100,9 @@ describe("PurchaseInvoicesService", () => {
   });
 
   it("recalcula el total al actualizar campos parciales", async () => {
-    const svc = new PurchaseInvoicesService(fakePrisma());
-    const created = await svc.create(ISSUER, input());
-    const updated = await svc.update(ISSUER, created.id, {
+    const service = await createService();
+    const created = await service.create(ISSUER, input());
+    const updated = await service.update(ISSUER, created.id, {
       issuerId: ISSUER,
       iva21: 105,
       netAmount21: 500,
@@ -95,8 +111,8 @@ describe("PurchaseInvoicesService", () => {
   });
 
   it("no permite ver una factura de otro emisor (aislamiento)", async () => {
-    const svc = new PurchaseInvoicesService(fakePrisma());
-    const created = await svc.create(ISSUER, input());
-    await expect(svc.remove("otro-issuer", created.id)).rejects.toBeInstanceOf(NotFoundException);
+    const service = await createService();
+    const created = await service.create(ISSUER, input());
+    await expect(service.remove("otro-issuer", created.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -13,16 +13,16 @@ export interface ExportCaeRequest {
   client: {
     legalName: string;
     address: string;
-    taxId?: string;
+    taxId?: string | undefined;
   };
   currency: string;
   exchangeRate: number;
   language: number;
-  incoterm?: string;
-  incotermDescription?: string;
-  paymentMethod?: string;
-  commercialNotes?: string;
-  notes?: string;
+  incoterm?: string | undefined;
+  incotermDescription?: string | undefined;
+  paymentMethod?: string | undefined;
+  commercialNotes?: string | undefined;
+  notes?: string | undefined;
   shippingPermits: ShippingPermit[];
   items: ExportItem[];
   totalAmount: number;

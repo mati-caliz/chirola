@@ -1,13 +1,20 @@
 import { InternalServerErrorException, Logger } from "@nestjs/common";
-import { XMLParser } from "fast-xml-parser";
 import { ArcaCallOutcome, type ArcaCallLogEntry } from "./arca-call-log.service";
+import {
+  asList,
+  collectScalarsByTag,
+  findByTag,
+  isXmlRecord,
+  parseXml,
+  xmlText,
+  type XmlRecord,
+} from "./arca-xml";
 import type { ArcaService } from "./wsaa/wsaa.types";
 
 const logger = new Logger("ArcaSoap");
-const parser = new XMLParser({ ignoreAttributes: false });
 
 export function escapeXml(value: string | null | undefined): string {
-  if (value == null) return "";
+  if (value === undefined || value === null) return "";
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -36,8 +43,8 @@ export class ArcaSoapFaultError extends InternalServerErrorException {
   }
 
   faultString(): string {
-    const match = this.body.match(/<faultstring>([\s\S]*?)<\/faultstring>/);
-    return match ? match[1].trim() : "";
+    const match = /<faultstring>([\s\S]*?)<\/faultstring>/.exec(this.body);
+    return match?.[1]?.trim() ?? "";
   }
 }
 
@@ -56,9 +63,9 @@ export interface ArcaCallLogContext {
 const NO_HTTP_RESPONSE = 0;
 
 export function responseErrorCodes(xml: string): string[] {
-  const errorsBlock = xml.match(/<Errors>([\s\S]*?)<\/Errors>/);
-  if (!errorsBlock) return [];
-  return [...errorsBlock[1].matchAll(/<Code>(\d+)<\/Code>/g)].map((match) => match[1]);
+  const errorsBlock = /<Errors>([\s\S]*?)<\/Errors>/.exec(xml)?.[1];
+  if (errorsBlock === undefined) return [];
+  return [...errorsBlock.matchAll(/<Code>(\d+)<\/Code>/g)].flatMap((match) => match[1] ?? []);
 }
 
 export async function callSoap(
@@ -123,32 +130,42 @@ export async function callSoap(
   return text;
 }
 
-export type CodedEntry = {
+export interface CodedEntry {
   code: string;
   message: string;
-};
+}
+
+function isMissing(value: unknown): value is null | undefined {
+  return value === undefined || value === null;
+}
+
+function codedEntry(entry: unknown): CodedEntry[] {
+  if (!isXmlRecord(entry)) return [];
+  const message = xmlText(entry["Msg"]);
+  return message === "" ? [] : [{ code: xmlText(entry["Code"]), message }];
+}
 
 export class ParsedXml {
-  private readonly root: Record<string, unknown>;
+  private readonly root: XmlRecord;
 
   constructor(xml: string) {
-    this.root = parser.parse(xml) as Record<string, unknown>;
+    this.root = parseXml(xml);
   }
 
   required(tag: string): string {
     const value = this.find(tag);
-    if (value == null) {
+    if (isMissing(value)) {
       throw new InternalServerErrorException(`Respuesta de ARCA sin el campo esperado <${tag}>.`);
     }
-    return String(value);
+    return xmlText(value);
   }
 
   optional(tag: string, fallback: string): string {
     const value = this.find(tag);
-    return value == null ? fallback : String(value);
+    return isMissing(value) ? fallback : xmlText(value);
   }
 
-  raw(): Record<string, unknown> {
+  raw(): XmlRecord {
     return this.root;
   }
 
@@ -157,25 +174,11 @@ export class ParsedXml {
   }
 
   all(tag: string): string[] {
-    const out: string[] = [];
-    const walk = (node: unknown): void => {
-      if (node == null || typeof node !== "object") return;
-      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-        if (key === tag) {
-          for (const entry of Array.isArray(value) ? value : [value]) {
-            if (entry != null && typeof entry !== "object") out.push(String(entry));
-          }
-        } else {
-          walk(value);
-        }
-      }
-    };
-    walk(this.root);
-    return out;
+    return collectScalarsByTag(this.root, tag);
   }
 
   errors(): string[] {
-    return this.errorEntries().map(({ code, message }) => (code ? `(${code}) ${message}` : message));
+    return this.errorEntries().map(({ code, message }) => (code === "" ? message : `(${code}) ${message}`));
   }
 
   errorCodes(): string[] {
@@ -194,30 +197,11 @@ export class ParsedXml {
 
   private codedEntries(rootTag: string, itemTag: string): CodedEntry[] {
     const root = this.find(rootTag);
-    if (root == null || typeof root !== "object") return [];
-    const out: CodedEntry[] = [];
-    const collect = (entry: unknown): void => {
-      if (entry == null || typeof entry !== "object") return;
-      const record = entry as Record<string, unknown>;
-      const code = record.Code != null ? String(record.Code) : "";
-      const message = record.Msg != null ? String(record.Msg) : "";
-      if (message) out.push({ code, message });
-    };
-    const itemNode = (root as Record<string, unknown>)[itemTag];
-    if (Array.isArray(itemNode)) itemNode.forEach(collect);
-    else collect(itemNode);
-    return out;
+    if (!isXmlRecord(root)) return [];
+    return asList(root[itemTag]).flatMap(codedEntry);
   }
 
-  private find(tag: string, obj: unknown = this.root): unknown {
-    if (obj == null || typeof obj !== "object") return undefined;
-    const rec = obj as Record<string, unknown>;
-    if (tag in rec && typeof rec[tag] !== "object") return rec[tag];
-    if (tag in rec) return rec[tag];
-    for (const value of Object.values(rec)) {
-      const found = this.find(tag, value);
-      if (found !== undefined) return found;
-    }
-    return undefined;
+  private find(tag: string): unknown {
+    return findByTag(this.root, tag);
   }
 }

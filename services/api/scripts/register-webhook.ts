@@ -1,16 +1,21 @@
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { hasText } from "@chirola/shared";
+
+const API_CLIENT_ARGUMENT_INDEX = 2;
+const URL_ARGUMENT_INDEX = 3;
+const WEBHOOK_SECRET_BYTES = 32;
 
 async function main(): Promise<void> {
-  const apiClientId = process.argv[2];
-  const url = process.argv[3];
-  if (!apiClientId || !url) {
+  const apiClientId = process.argv[API_CLIENT_ARGUMENT_INDEX];
+  const url = process.argv[URL_ARGUMENT_INDEX];
+  if (!hasText(apiClientId) || !hasText(url)) {
     throw new Error("Uso: ts-node scripts/register-webhook.ts <apiClientId> <url>");
   }
 
   const prisma = new PrismaClient();
   try {
-    const secret = randomBytes(32).toString("base64url");
+    const secret = randomBytes(WEBHOOK_SECRET_BYTES).toString("base64url");
     const endpoint = await prisma.webhookEndpoint.create({
       data: { apiClientId, url, secret },
     });

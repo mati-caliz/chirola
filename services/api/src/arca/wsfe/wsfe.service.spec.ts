@@ -1,8 +1,9 @@
 import { ConfigService } from "@nestjs/config";
-import { VoucherConcept } from "@chirola/shared";
 import { WsfeService } from "./wsfe.service";
 import { RecordedArcaCalls } from "../arca-call-recorder.fixture";
-import type { CaeRequest, CaeResult } from "./wsfe.types";
+import { captureFetchRequests, stubFetchResponse } from "../fetch.fixture";
+import { baseCaeRequest } from "./wsfe-request.fixture";
+import type { CaeResult } from "./wsfe.types";
 
 const AUTH = {
   issuerId: "issuer-1",
@@ -15,239 +16,8 @@ const AUTH = {
 const recordedCalls = new RecordedArcaCalls();
 
 function service(): WsfeService {
-  const config = {
-    get: (_k: string, def?: string) => def,
-  } as unknown as ConfigService;
-  return new WsfeService(config, recordedCalls);
+  return new WsfeService(new ConfigService(), recordedCalls);
 }
-
-function baseRequest(overrides: Partial<CaeRequest> = {}): CaeRequest {
-  return {
-    salesPoint: 1,
-    voucherType: 8,
-    concept: 1,
-    number: 5,
-    date: new Date(2026, 6, 12),
-    recipient: { docType: 80, docNumber: "20111111112", ivaConditionId: 1 },
-    amounts: {
-      netAmount: 100,
-      ivaAmount: 0,
-      exemptAmount: 0,
-      untaxedAmount: 0,
-      tributeAmount: 0,
-      totalAmount: 100,
-      rates: [],
-      tributes: [],
-    },
-    currency: "PES",
-    exchangeRate: 1,
-    ...overrides,
-  };
-}
-
-describe("WsfeService — CbtesAsoc (NC/ND)", () => {
-  const detail = (request: CaeRequest): string =>
-    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
-
-  it("no incluye CbtesAsoc cuando no hay asociados", () => {
-    expect(detail(baseRequest())).not.toContain("CbtesAsoc");
-  });
-
-  it("arma CbteAsoc con tipo/ptoVta/nro y los opcionales cuit/fecha", () => {
-    const xml = detail(
-      baseRequest({
-        associatedVouchers: [{ type: 6, salesPoint: 1, number: 42, cuit: "20111111112", date: "20260701" }],
-      }),
-    );
-    expect(xml).toContain(
-      "<ar:CbtesAsoc><ar:CbteAsoc>" +
-        "<ar:Tipo>6</ar:Tipo>" +
-        "<ar:PtoVta>1</ar:PtoVta>" +
-        "<ar:Nro>42</ar:Nro>" +
-        "<ar:Cuit>20111111112</ar:Cuit>" +
-        "<ar:CbteFch>20260701</ar:CbteFch>" +
-        "</ar:CbteAsoc></ar:CbtesAsoc>",
-    );
-  });
-
-  it("omite cuit y fecha cuando no se pasan", () => {
-    const xml = detail(baseRequest({ associatedVouchers: [{ type: 6, salesPoint: 1, number: 42 }] }));
-
-    expect(xml).toContain(
-      "<ar:CbtesAsoc><ar:CbteAsoc>" +
-        "<ar:Tipo>6</ar:Tipo>" +
-        "<ar:PtoVta>1</ar:PtoVta>" +
-        "<ar:Nro>42</ar:Nro>" +
-        "</ar:CbteAsoc></ar:CbtesAsoc>",
-    );
-  });
-
-  it("coloca CbtesAsoc después de CondicionIVAReceptorId y antes de Iva (orden XSD)", () => {
-    const xml = detail(
-      baseRequest({
-        amounts: {
-          netAmount: 100,
-          ivaAmount: 21,
-          exemptAmount: 0,
-          untaxedAmount: 0,
-          tributeAmount: 0,
-          totalAmount: 121,
-          rates: [{ id: 5, taxableBase: 100, amount: 21 }],
-          tributes: [],
-        },
-        associatedVouchers: [{ type: 1, salesPoint: 1, number: 7 }],
-      }),
-    );
-    const posCond = xml.indexOf("CondicionIVAReceptorId");
-    const posAsoc = xml.indexOf("CbtesAsoc");
-    const posIva = xml.indexOf("<ar:Iva>");
-    expect(posCond).toBeLessThan(posAsoc);
-    expect(posAsoc).toBeLessThan(posIva);
-  });
-
-  it("soporta múltiples comprobantes asociados", () => {
-    const xml = detail(
-      baseRequest({
-        associatedVouchers: [
-          { type: 6, salesPoint: 1, number: 1 },
-          { type: 6, salesPoint: 1, number: 2 },
-        ],
-      }),
-    );
-    expect(xml.match(/<ar:CbteAsoc>/g)).toHaveLength(2);
-  });
-});
-
-describe("WsfeService — importes exentos, no gravados y tributos", () => {
-  const detail = (request: CaeRequest): string =>
-    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
-
-  const withAmounts = (overrides: Partial<CaeRequest["amounts"]>): CaeRequest =>
-    baseRequest({ amounts: { ...baseRequest().amounts, ...overrides } });
-
-  it("informa ImpTotConc e ImpOpEx con los importes reales", () => {
-    const xml = detail(
-      withAmounts({
-        netAmount: 1000,
-        ivaAmount: 210,
-        exemptAmount: 500,
-        untaxedAmount: 300,
-        totalAmount: 2010,
-      }),
-    );
-
-    expect(xml).toContain("<ar:ImpTotConc>300.00</ar:ImpTotConc>");
-    expect(xml).toContain("<ar:ImpOpEx>500.00</ar:ImpOpEx>");
-    expect(xml).toContain("<ar:ImpNeto>1000.00</ar:ImpNeto>");
-  });
-
-  it("omite Tributos cuando no hay", () => {
-    expect(detail(baseRequest())).not.toContain("Tributos");
-  });
-
-  it("arma cada Tributo con Id, Desc, BaseImp, Alic e Importe", () => {
-    const xml = detail(
-      withAmounts({
-        tributeAmount: 30,
-        tributes: [
-          {
-            id: 2,
-            description: "Percepción IIBB CABA",
-            taxableBase: 1000,
-            rate: 3,
-            amount: 30,
-          },
-        ],
-      }),
-    );
-
-    expect(xml).toContain("<ar:ImpTrib>30.00</ar:ImpTrib>");
-    expect(xml).toContain(
-      "<ar:Tributos><ar:Tributo>" +
-        "<ar:Id>2</ar:Id>" +
-        "<ar:Desc>Percepción IIBB CABA</ar:Desc>" +
-        "<ar:BaseImp>1000.00</ar:BaseImp>" +
-        "<ar:Alic>3.00</ar:Alic>" +
-        "<ar:Importe>30.00</ar:Importe>" +
-        "</ar:Tributo></ar:Tributos>",
-    );
-  });
-
-  it("escapa la descripción del tributo", () => {
-    const xml = detail(
-      withAmounts({
-        tributeAmount: 10,
-        tributes: [
-          {
-            id: 99,
-            description: "Tasa <Municipal> & otros",
-            taxableBase: 100,
-            rate: 10,
-            amount: 10,
-          },
-        ],
-      }),
-    );
-
-    expect(xml).toContain("<ar:Desc>Tasa &lt;Municipal&gt; &amp; otros</ar:Desc>");
-  });
-
-  it("ubica Tributos entre CbtesAsoc e Iva, como exige el WSDL", () => {
-    const xml = detail(
-      withAmounts({
-        tributeAmount: 30,
-        rates: [{ id: 5, taxableBase: 100, amount: 21 }],
-        tributes: [{ id: 2, description: "IIBB", taxableBase: 1000, rate: 3, amount: 30 }],
-      }),
-    );
-
-    expect(xml.indexOf("CondicionIVAReceptorId")).toBeLessThan(xml.indexOf("<ar:Tributos>"));
-    expect(xml.indexOf("<ar:Tributos>")).toBeLessThan(xml.indexOf("<ar:Iva>"));
-  });
-});
-
-describe("WsfeService — período de servicios", () => {
-  const detail = (request: CaeRequest): string =>
-    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
-
-  it("omite las fechas de servicio en comprobantes de productos", () => {
-    const xml = detail(baseRequest({ concept: VoucherConcept.PRODUCTS }));
-
-    expect(xml).not.toContain("FchServDesde");
-    expect(xml).not.toContain("FchServHasta");
-    expect(xml).not.toContain("FchVtoPago");
-  });
-
-  it("emite las tres fechas en formato ARCA para comprobantes de servicios", () => {
-    const xml = detail(
-      baseRequest({
-        concept: VoucherConcept.SERVICES,
-        servicePeriod: { from: "2026-07-01", to: "2026-07-31" },
-        paymentDueDate: "2026-08-10",
-      }),
-    );
-
-    expect(xml).toContain(
-      "<ar:FchServDesde>20260701</ar:FchServDesde>" +
-        "<ar:FchServHasta>20260731</ar:FchServHasta>" +
-        "<ar:FchVtoPago>20260810</ar:FchVtoPago>",
-    );
-  });
-
-  it("ubica las fechas de servicio entre ImpIVA y MonId, como exige el WSDL", () => {
-    const xml = detail(
-      baseRequest({
-        concept: VoucherConcept.PRODUCTS_AND_SERVICES,
-        servicePeriod: { from: "2026-07-01", to: "2026-07-31" },
-        paymentDueDate: "2026-08-10",
-      }),
-    );
-
-    expect(xml.indexOf("<ar:ImpTrib>")).toBeLessThan(xml.indexOf("<ar:ImpIVA>"));
-    expect(xml.indexOf("<ar:ImpIVA>")).toBeLessThan(xml.indexOf("<ar:FchServDesde>"));
-    expect(xml.indexOf("<ar:FchVtoPago>")).toBeLessThan(xml.indexOf("<ar:MonId>"));
-  });
-});
 
 describe("WsfeService — FEParamGetPtosVenta", () => {
   const originalFetch = global.fetch;
@@ -257,12 +27,8 @@ describe("WsfeService — FEParamGetPtosVenta", () => {
 
   const auth = AUTH;
 
-  function respondWith(xml: string): void {
-    global.fetch = (async () => new Response(xml, { status: 200 })) as unknown as typeof fetch;
-  }
-
   it("devuelve sólo puntos de venta activos con emisión CAE", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetPtosVentaResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetPtosVentaResult><ResultGet>" +
         "<PtoVta><Nro>1</Nro><EmisionTipo>CAE</EmisionTipo><Bloqueado>N</Bloqueado><FchBaja></FchBaja></PtoVta>" +
@@ -277,7 +43,7 @@ describe("WsfeService — FEParamGetPtosVenta", () => {
   });
 
   it("extrae los ids de tipos de comprobante", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetTiposCbteResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetTiposCbteResult><ResultGet>" +
         "<CbteTipo><Id>1</Id><Desc>Factura A</Desc></CbteTipo>" +
@@ -300,12 +66,8 @@ describe("WsfeService — tablas de parámetros", () => {
 
   const auth = AUTH;
 
-  function respondWith(xml: string): void {
-    global.fetch = (async () => new Response(xml, { status: 200 })) as unknown as typeof fetch;
-  }
-
   it("extrae los tipos de documento vigentes", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetTiposDocResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetTiposDocResult><ResultGet>" +
         "<DocTipo><Id>80</Id><Desc>CUIT</Desc><FchHasta>NULL</FchHasta></DocTipo>" +
@@ -323,7 +85,7 @@ describe("WsfeService — tablas de parámetros", () => {
   });
 
   it("extrae los tipos de tributo", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetTiposTributosResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetTiposTributosResult><ResultGet>" +
         "<TributoTipo><Id>2</Id><Desc>Provinciales</Desc><FchHasta>NULL</FchHasta></TributoTipo>" +
@@ -336,7 +98,7 @@ describe("WsfeService — tablas de parámetros", () => {
   });
 
   it("extrae las condiciones de IVA del receptor", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetCondicionIvaReceptorResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetCondicionIvaReceptorResult><ResultGet>" +
         "<CondicionIvaReceptor><Id>1</Id><Desc>IVA Responsable Inscripto</Desc></CondicionIvaReceptor>" +
@@ -362,12 +124,8 @@ describe("WsfeService — monedas y cotización", () => {
 
   const auth = AUTH;
 
-  function respondWith(xml: string): void {
-    global.fetch = (async () => new Response(xml, { status: 200 })) as unknown as typeof fetch;
-  }
-
   it('trata FchHasta "NULL" como vigente y descarta las dadas de baja', async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetTiposMonedasResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetTiposMonedasResult><ResultGet>" +
         "<Moneda><Id>PES</Id><Desc>Pesos Argentinos</Desc><FchDesde>20090403</FchDesde><FchHasta>NULL</FchHasta></Moneda>" +
@@ -385,7 +143,7 @@ describe("WsfeService — monedas y cotización", () => {
   });
 
   it("devuelve la cotización con su fecha", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetCotizacionResult><ResultGet>" +
         "<MonId>DOL</MonId><MonCotiz>1305.5</MonCotiz><FchCotiz>20260814</FchCotiz>" +
@@ -400,88 +158,28 @@ describe("WsfeService — monedas y cotización", () => {
   });
 
   it("manda FchCotiz sólo cuando se pide una fecha", async () => {
-    let sentBody = "";
-    global.fetch = (async (_url: string, init: { body: string }) => {
-      sentBody = init.body;
-      return new Response(
-        '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
-          "<FEParamGetCotizacionResult><ResultGet>" +
-          "<MonId>DOL</MonId><MonCotiz>1305.5</MonCotiz><FchCotiz>20260814</FchCotiz>" +
-          "</ResultGet></FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>",
-        { status: 200 },
-      );
-    }) as unknown as typeof fetch;
+    const requests = captureFetchRequests(
+      '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
+        "<FEParamGetCotizacionResult><ResultGet>" +
+        "<MonId>DOL</MonId><MonCotiz>1305.5</MonCotiz><FchCotiz>20260814</FchCotiz>" +
+        "</ResultGet></FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>",
+    );
 
     await service().getExchangeRate(auth, "DOL");
-    expect(sentBody).not.toContain("FchCotiz");
+    expect(requests.at(-1)?.body).not.toContain("FchCotiz");
 
     await service().getExchangeRate(auth, "DOL", new Date(2026, 7, 14));
-    expect(sentBody).toContain("<ar:FchCotiz>20260814</ar:FchCotiz>");
+    expect(requests.at(-1)?.body).toContain("<ar:FchCotiz>20260814</ar:FchCotiz>");
   });
 
   it("propaga el rechazo de ARCA ante una moneda inexistente", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope><soap:Body><FEParamGetCotizacionResponse xmlns="http://ar.gov.afip.dif.FEV1/">' +
         "<FEParamGetCotizacionResult><Errors><Err><Code>602</Code><Msg>Sin Resultados</Msg></Err></Errors>" +
         "</FEParamGetCotizacionResult></FEParamGetCotizacionResponse></soap:Body></soap:Envelope>",
     );
 
     await expect(service().getExchangeRate(auth, "XXX")).rejects.toThrow(/Sin Resultados/);
-  });
-});
-
-describe("WsfeService — Opcionales (C.2)", () => {
-  const detail = (request: CaeRequest): string =>
-    (service() as unknown as { buildDetail(r: CaeRequest): string }).buildDetail(request);
-
-  it("omite el nodo cuando no hay opcionales", () => {
-    expect(detail(baseRequest())).not.toContain("Opcionales");
-  });
-
-  it("arma un Opcional por cada id/valor", () => {
-    const xml = detail(
-      baseRequest({
-        optionals: [
-          { id: 2101, value: "2850590940090418135201" },
-          { id: 27, value: "SCA" },
-        ],
-      }),
-    );
-
-    expect(xml).toContain(
-      "<ar:Opcionales>" +
-        "<ar:Opcional><ar:Id>2101</ar:Id>" +
-        "<ar:Valor>2850590940090418135201</ar:Valor></ar:Opcional>" +
-        "<ar:Opcional><ar:Id>27</ar:Id><ar:Valor>SCA</ar:Valor></ar:Opcional>" +
-        "</ar:Opcionales>",
-    );
-  });
-
-  it("ubica Opcionales después de Iva, como exige el WSDL", () => {
-    const xml = detail(
-      baseRequest({
-        amounts: {
-          netAmount: 100,
-          ivaAmount: 21,
-          exemptAmount: 0,
-          untaxedAmount: 0,
-          tributeAmount: 0,
-          totalAmount: 121,
-          rates: [{ id: 5, taxableBase: 100, amount: 21 }],
-          tributes: [],
-        },
-        optionals: [{ id: 27, value: "ADC" }],
-      }),
-    );
-
-    expect(xml.indexOf("<ar:Iva>")).toBeLessThan(xml.indexOf("<ar:Opcionales>"));
-  });
-
-  it("emite el vencimiento de pago sin período de servicio (FCE de productos)", () => {
-    const xml = detail(baseRequest({ concept: VoucherConcept.PRODUCTS, paymentDueDate: "2026-09-30" }));
-
-    expect(xml).not.toContain("FchServDesde");
-    expect(xml).toContain("<ar:FchVtoPago>20260930</ar:FchVtoPago>");
   });
 });
 
@@ -498,14 +196,10 @@ describe("WsfeService — entorno por emisor", () => {
     "</FEParamGetPtosVentaResponse></soap:Body></soap:Envelope>";
 
   async function urlUsedFor(environment: string): Promise<string> {
-    let calledUrl = "";
-    global.fetch = (async (url: string) => {
-      calledUrl = url;
-      return new Response(emptySalesPoints, { status: 200 });
-    }) as unknown as typeof fetch;
+    const requests = captureFetchRequests(emptySalesPoints);
 
     await service().getSalesPoints({ ...AUTH, environment });
-    return calledUrl;
+    return requests.at(-1)?.url ?? "";
   }
 
   it("usa el WSFEv1 de homologacion para un emisor de homologacion", async () => {
@@ -518,31 +212,39 @@ describe("WsfeService — entorno por emisor", () => {
 });
 
 describe("WsfeService — observaciones del CAE", () => {
-  const parse = (res: string) =>
-    (service() as unknown as { parseCaeResponse(r: string): CaeResult }).parseCaeResponse(res);
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const parse = (res: string): Promise<CaeResult> => {
+    stubFetchResponse(res);
+    return service().requestCae(AUTH, baseCaeRequest());
+  };
 
   const caeBody = "<Resultado>A</Resultado><CAE>74000000000001</CAE><CAEFchVto>20260722</CAEFchVto>";
 
-  it("devuelve el CAE sin observaciones cuando ARCA no manda ninguna", () => {
-    expect(parse(`<r>${caeBody}</r>`).observations).toEqual([]);
+  it("devuelve el CAE sin observaciones cuando ARCA no manda ninguna", async () => {
+    expect((await parse(`<r>${caeBody}</r>`)).observations).toEqual([]);
   });
 
-  it("extrae código y mensaje de cada observación", () => {
+  it("extrae código y mensaje de cada observación", async () => {
     const res =
       `<r>${caeBody}<Observaciones>` +
       "<Obs><Code>10013</Code><Msg>Fecha fuera de rango</Msg></Obs>" +
       "<Obs><Code>10071</Code><Msg>Cotización no informada</Msg></Obs>" +
       "</Observaciones></r>";
 
-    expect(parse(res).observations).toEqual([
+    expect((await parse(res)).observations).toEqual([
       { code: "10013", message: "Fecha fuera de rango" },
       { code: "10071", message: "Cotización no informada" },
     ]);
   });
 
-  it("no confunde una observación con un rechazo: el CAE se otorga igual", () => {
+  it("no confunde una observación con un rechazo: el CAE se otorga igual", async () => {
     const res = `<r>${caeBody}<Observaciones><Obs><Code>10013</Code><Msg>Aviso</Msg></Obs></Observaciones></r>`;
 
-    expect(parse(res).cae).toBe("74000000000001");
+    expect((await parse(res)).cae).toBe("74000000000001");
   });
 });

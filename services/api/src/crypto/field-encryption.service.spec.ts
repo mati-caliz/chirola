@@ -4,10 +4,7 @@ import { FieldEncryptionService } from "./field-encryption.service";
 
 function serviceConKey(): FieldEncryptionService {
   const key = randomBytes(32).toString("base64");
-  const config = {
-    get: (k: string, def?: string) => (k === "CERT_ENCRYPTION_KEY" ? key : def),
-  } as unknown as ConfigService;
-  return new FieldEncryptionService(config);
+  return new FieldEncryptionService(new ConfigService({ CERT_ENCRYPTION_KEY: key }));
 }
 
 describe("FieldEncryptionService", () => {
@@ -25,10 +22,7 @@ describe("FieldEncryptionService", () => {
   });
 
   it("rechaza una key que no sea de 32 bytes", () => {
-    const config = {
-      get: (k: string, def?: string) =>
-        k === "CERT_ENCRYPTION_KEY" ? Buffer.from("corta").toString("base64") : def,
-    } as unknown as ConfigService;
+    const config = new ConfigService({ CERT_ENCRYPTION_KEY: Buffer.from("corta").toString("base64") });
     expect(() => new FieldEncryptionService(config)).toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { ImportRowStatus, PurchaseImportService } from "./purchase-import.service";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
 const HEADER =
   "Fecha;Tipo;Punto de Venta;Número Desde;Nro. Doc. Emisor;" +
@@ -23,19 +24,22 @@ interface CreatedInvoice {
   total: number;
 }
 
-function build(existing: ExistingKey[] = []) {
+async function build(existing: ExistingKey[] = []) {
   const created: CreatedInvoice[] = [];
   const prisma = {
     purchaseInvoice: {
-      findMany: async () => existing,
-      create: async ({ data }: { data: CreatedInvoice }) => {
+      findMany: () => Promise.resolve(existing),
+      create: ({ data }: { data: CreatedInvoice }) => {
         created.push(data);
-        return data;
+        return Promise.resolve(data);
       },
     },
-  } as unknown as PrismaService;
+  };
 
-  return { service: new PurchaseImportService(prisma), created };
+  const service = await instantiateWithDoubles(PurchaseImportService, [
+    { token: PrismaService, value: prisma },
+  ]);
+  return { service, created };
 }
 
 const row = (overrides: Partial<Record<string, string>> = {}): string => {
@@ -72,52 +76,54 @@ const csvOf = (...rows: string[]): string => [HEADER, ...rows].join("\n");
 
 describe("PurchaseImportService — preview (E.1)", () => {
   it("marca como importable una factura nueva y deduce la alícuota", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     const preview = await service.preview("issuer-1", csvOf(row()));
 
-    expect(preview.rows[0].status).toBe(ImportRowStatus.IMPORTABLE);
-    expect(preview.rows[0].ivaRate).toBe(21);
+    expect(preview.rows[0]?.status).toBe(ImportRowStatus.IMPORTABLE);
+    expect(preview.rows[0]?.ivaRate).toBe(21);
     expect(preview.summary.importable).toBe(1);
   });
 
   it("deduce la alícuota del 10,5%", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     const preview = await service.preview("issuer-1", csvOf(row({ iva: "105,00", total: "1105,00" })));
 
-    expect(preview.rows[0].ivaRate).toBe(10.5);
+    expect(preview.rows[0]?.ivaRate).toBe(10.5);
   });
 
   it("marca como duplicada la factura que ya está cargada", async () => {
-    const { service } = build([{ supplierCuit: "30707153745", invoiceType: 1, salesPoint: 5, number: 123 }]);
+    const { service } = await build([
+      { supplierCuit: "30707153745", invoiceType: 1, salesPoint: 5, number: 123 },
+    ]);
 
     const preview = await service.preview("issuer-1", csvOf(row()));
 
-    expect(preview.rows[0].status).toBe(ImportRowStatus.DUPLICATE);
+    expect(preview.rows[0]?.status).toBe(ImportRowStatus.DUPLICATE);
     expect(preview.summary.duplicates).toBe(1);
   });
 
   it("manda a revisión la factura con más de una alícuota", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     const preview = await service.preview("issuer-1", csvOf(row({ iva: "160,00", total: "1160,00" })));
 
-    expect(preview.rows[0].status).toBe(ImportRowStatus.NEEDS_REVIEW);
-    expect(preview.rows[0].reason).toContain("alícuota");
+    expect(preview.rows[0]?.status).toBe(ImportRowStatus.NEEDS_REVIEW);
+    expect(preview.rows[0]?.reason).toContain("alícuota");
   });
 
   it("manda a revisión la factura cuyo total no cierra con los importes", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     const preview = await service.preview("issuer-1", csvOf(row({ total: "1500,00" })));
 
-    expect(preview.rows[0].status).toBe(ImportRowStatus.NEEDS_REVIEW);
-    expect(preview.rows[0].reason).toContain("otros tributos");
+    expect(preview.rows[0]?.status).toBe(ImportRowStatus.NEEDS_REVIEW);
+    expect(preview.rows[0]?.reason).toContain("otros tributos");
   });
 
   it("cuenta las filas ilegibles aparte", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     const preview = await service.preview("issuer-1", csvOf(row(), row({ cuit: "123", number: "124" })));
 
@@ -126,13 +132,13 @@ describe("PurchaseImportService — preview (E.1)", () => {
   });
 
   it("rechaza un archivo que no es el de Mis Comprobantes", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     await expect(service.preview("issuer-1", "a;b\n1;2")).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("no escribe nada en la vista previa", async () => {
-    const { service, created } = build();
+    const { service, created } = await build();
 
     await service.preview("issuer-1", csvOf(row()));
 
@@ -142,7 +148,7 @@ describe("PurchaseImportService — preview (E.1)", () => {
 
 describe("PurchaseImportService — import (E.1)", () => {
   it("importa sólo las filas importables", async () => {
-    const { service, created } = build([
+    const { service, created } = await build([
       { supplierCuit: "30707153745", invoiceType: 1, salesPoint: 5, number: 900 },
     ]);
 
@@ -152,7 +158,7 @@ describe("PurchaseImportService — import (E.1)", () => {
     );
 
     expect(created).toHaveLength(1);
-    expect(created[0].number).toBe(123);
+    expect(created[0]?.number).toBe(123);
     expect(result.summary).toMatchObject({
       importable: 1,
       duplicates: 1,
@@ -161,13 +167,13 @@ describe("PurchaseImportService — import (E.1)", () => {
   });
 
   it("guarda los importes en la columna de la alícuota deducida", async () => {
-    const { service, created } = build();
+    const { service, created } = await build();
 
     await service.import("issuer-1", csvOf(row({ number: "5", iva: "105,00", total: "1105,00" })));
 
-    expect(created[0].netAmount105).toBe(1000);
-    expect(created[0].iva105).toBe(105);
-    expect(created[0].netAmount21).toBe(0);
-    expect(created[0].total).toBe(1105);
+    expect(created[0]?.netAmount105).toBe(1000);
+    expect(created[0]?.iva105).toBe(105);
+    expect(created[0]?.netAmount21).toBe(0);
+    expect(created[0]?.total).toBe(1105);
   });
 });

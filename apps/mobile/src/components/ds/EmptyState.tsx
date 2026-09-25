@@ -1,7 +1,11 @@
 import { type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import { isRenderable } from "@/lib/react-node";
 import { type IconRender } from "@/components/ds/IconButton";
+
+const BODY_BOTTOM_GAP_WITH_ACTION = 20;
 
 export const EmptyState = ({
   icon,
@@ -13,7 +17,7 @@ export const EmptyState = ({
   title: string;
   body?: string;
   action?: ReactNode;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   return (
     <View style={{ alignItems: "center", paddingHorizontal: 32, paddingVertical: 40 }}>
@@ -41,7 +45,7 @@ export const EmptyState = ({
       >
         {title}
       </Text>
-      {body ? (
+      {hasText(body) ? (
         <Text
           style={{
             fontFamily: theme.font.regular,
@@ -50,7 +54,7 @@ export const EmptyState = ({
             textAlign: "center",
             lineHeight: theme.fontSize.callout * theme.lineHeight.body,
             maxWidth: 280,
-            marginBottom: action ? 20 : 0,
+            marginBottom: isRenderable(action) ? BODY_BOTTOM_GAP_WITH_ACTION : 0,
           }}
         >
           {body}

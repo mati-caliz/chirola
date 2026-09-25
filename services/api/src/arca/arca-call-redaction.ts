@@ -1,11 +1,7 @@
 const REDACTED = "[REDACTADO]";
 
-const SECRET_TAGS = ["Token", "Sign", "token", "sign", "in0", "loginCmsReturn"];
-
-const secretTagPattern = new RegExp(
-  `(<(?:\\w+:)?(?:${SECRET_TAGS.join("|")})>)([\\s\\S]*?)(</(?:\\w+:)?(?:${SECRET_TAGS.join("|")})>)`,
-  "g",
-);
+const secretTagPattern =
+  /(<(?:\w+:|)(?:Token|Sign|token|sign|in0|loginCmsReturn)>)([\s\S]*?)(<\/(?:\w+:|)(?:Token|Sign|token|sign|in0|loginCmsReturn)>)/g;
 
 export function redactArcaXml(xml: string): string {
   return xml.replace(secretTagPattern, `$1${REDACTED}$3`);

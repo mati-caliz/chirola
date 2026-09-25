@@ -1,6 +1,12 @@
 import { type ReactNode } from "react";
 import { Pressable, Text } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import type { ThemeColors } from "@/theme/tokens";
+
+function chipBackground(colors: ThemeColors, selected: boolean, pressed: boolean): string {
+  if (selected) return colors.actionSecondary;
+  return pressed ? colors.bgSunken : colors.surfaceCard;
+}
 
 export const Chip = ({
   label,
@@ -12,7 +18,7 @@ export const Chip = ({
   selected?: boolean;
   onPress?: () => void;
   icon?: ReactNode;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const { colors } = theme;
   return (
@@ -27,7 +33,7 @@ export const Chip = ({
         borderRadius: theme.radius.pill,
         borderWidth: 1.5,
         borderColor: selected ? colors.actionPrimary : colors.borderDefault,
-        backgroundColor: selected ? colors.actionSecondary : pressed ? colors.bgSunken : colors.surfaceCard,
+        backgroundColor: chipBackground(colors, selected, pressed),
         transform: pressed ? [{ scale: 0.97 }] : [{ scale: 1 }],
       })}
     >

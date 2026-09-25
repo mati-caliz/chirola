@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common";
 import { IssuerArcaModule } from "../issuer-arca/issuer-arca.module";
 import { IssuersService } from "./issuers.service";
 import { IssuersController } from "./issuers.controller";
+import { IssuerArcaParamsController } from "./issuer-arca-params.controller";
+import { IssuerCertificatesController } from "./issuer-certificates.controller";
 import { ArcaParamsService } from "./arca-params.service";
 import { ArcaParamCacheService } from "./arca-param-cache.service";
 import { SalesPointsService } from "./sales-points.service";
@@ -18,6 +20,8 @@ import { ServiceAuthModule } from "../service-auth/service-auth.module";
   imports: [IssuerArcaModule, CertsModule, ArcaModule, ServiceAuthModule],
   controllers: [
     IssuersController,
+    IssuerArcaParamsController,
+    IssuerCertificatesController,
     SalesPointsController,
     ArcaCallsController,
     V1ParamsController,

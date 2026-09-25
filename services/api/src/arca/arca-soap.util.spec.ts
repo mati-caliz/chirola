@@ -1,6 +1,7 @@
 import { callSoap, responseErrorCodes } from "./arca-soap.util";
 import { ArcaCallOutcome } from "./arca-call-log.service";
 import { RecordedArcaCalls } from "./arca-call-recorder.fixture";
+import { stubFetchResponse } from "./fetch.fixture";
 
 const URL = "https://wsfe.test/service";
 const OPERATION = "FECAESolicitar";
@@ -16,13 +17,9 @@ describe("callSoap — registro de llamadas (D.2)", () => {
     global.fetch = originalFetch;
   });
 
-  function respondWith(body: string, status = 200): void {
-    global.fetch = (async () => new Response(body, { status })) as typeof fetch;
-  }
-
   it("registra una llamada exitosa con la duración y el estado HTTP", async () => {
     const recorder = new RecordedArcaCalls();
-    respondWith("<Resultado>A</Resultado>");
+    stubFetchResponse("<Resultado>A</Resultado>");
 
     await callSoap(URL, OPERATION, "<envelope/>", logContext(recorder));
 
@@ -36,7 +33,7 @@ describe("callSoap — registro de llamadas (D.2)", () => {
 
   it("marca como rechazada la respuesta que trae Errors y guarda los códigos", async () => {
     const recorder = new RecordedArcaCalls();
-    respondWith(
+    stubFetchResponse(
       "<Resultado>R</Resultado><Errors><Err><Code>10048</Code>" +
         "<Msg>El importe no cierra</Msg></Err></Errors>",
     );
@@ -49,7 +46,7 @@ describe("callSoap — registro de llamadas (D.2)", () => {
 
   it("registra el fault HTTP antes de propagar el error", async () => {
     const recorder = new RecordedArcaCalls();
-    respondWith("<faultstring>computador no autorizado</faultstring>", 500);
+    stubFetchResponse("<faultstring>computador no autorizado</faultstring>", 500);
 
     await expect(callSoap(URL, OPERATION, "<envelope/>", logContext(recorder))).rejects.toThrow();
 
@@ -59,9 +56,7 @@ describe("callSoap — registro de llamadas (D.2)", () => {
 
   it("registra la caída de red, que es la que no deja rastro en ARCA", async () => {
     const recorder = new RecordedArcaCalls();
-    global.fetch = (async () => {
-      throw new Error("ECONNRESET");
-    }) as typeof fetch;
+    global.fetch = (): Promise<Response> => Promise.reject(new Error("ECONNRESET"));
 
     await expect(callSoap(URL, OPERATION, "<envelope/>", logContext(recorder))).rejects.toThrow("ECONNRESET");
 
@@ -71,7 +66,7 @@ describe("callSoap — registro de llamadas (D.2)", () => {
 
   it("no registra nada si no se le pasa contexto", async () => {
     const recorder = new RecordedArcaCalls();
-    respondWith("<Resultado>A</Resultado>");
+    stubFetchResponse("<Resultado>A</Resultado>");
 
     await callSoap(URL, OPERATION, "<envelope/>");
 

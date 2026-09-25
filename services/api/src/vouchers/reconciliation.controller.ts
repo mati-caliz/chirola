@@ -3,7 +3,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
 import { IssuersService } from "../issuers/issuers.service";
-import { ReconciliationService } from "./reconciliation.service";
+import { NumberingStatus, ReconciliationService } from "./reconciliation.service";
 
 @Controller("issuers/:issuerId/reconciliation")
 @UseGuards(JwtAuthGuard)
@@ -14,8 +14,11 @@ export class ReconciliationController {
   ) {}
 
   @Get("numbering")
-  async numbering(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string) {
+  async numbering(
+    @CurrentUser() user: JwtPayload,
+    @Param("issuerId") issuerId: string,
+  ): Promise<NumberingStatus[]> {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
-    return this.reconciliation.checkNumbering(issuer);
+    return await this.reconciliation.checkNumbering(issuer);
   }
 }

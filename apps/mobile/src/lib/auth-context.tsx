@@ -21,19 +21,25 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>): ReactNode {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSession()
+    void loadSession()
       .then(setUser)
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => setUser(null));
-    return () => setUnauthorizedHandler(null);
+    setUnauthorizedHandler(() => {
+      setUser(null);
+    });
+    return () => {
+      setUnauthorizedHandler(null);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

@@ -186,17 +186,17 @@ export const fontFamily = {
 
 export const trackingCaps = 0.66;
 
-export type ShadowStyle = {
+export interface ShadowStyle {
   shadowColor: string;
   shadowOffset: { width: number; height: number };
   shadowOpacity: number;
   shadowRadius: number;
   elevation: number;
-};
+}
 
 export type ShadowKey = "card" | "raised" | "sheet" | "fab";
 
-export type ShadowSet = { [K in ShadowKey]: ShadowStyle };
+export type ShadowSet = Record<ShadowKey, ShadowStyle>;
 
 export const lightShadows: ShadowSet = {
   card: {
@@ -264,4 +264,9 @@ export const duration = {
   fast: 140,
   base: 220,
   slow: 360,
+} as const;
+
+export const opacity = {
+  disabled: 0.45,
+  pressed: 0.85,
 } as const;

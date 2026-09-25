@@ -1,10 +1,13 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
 import { Observable, tap } from "rxjs";
-import type { RequestWithApiClient } from "./service-auth.guard";
+import type { RequestMaybeWithApiClient } from "./service-auth.guard";
 import { ServiceAuditService } from "./service-audit.service";
+import { optionalField } from "../common/optional-field";
 
-interface CreatedResource {
-  id?: string;
+function readStringField(source: unknown, field: string): string | undefined {
+  if (typeof source !== "object" || source === null) return undefined;
+  const value: unknown = Reflect.get(source, field);
+  return typeof value === "string" ? value : undefined;
 }
 
 @Injectable()
@@ -12,27 +15,29 @@ export class ServiceAuditInterceptor implements NestInterceptor {
   constructor(private readonly audit: ServiceAuditService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<RequestWithApiClient>();
+    const req = context.switchToHttp().getRequest<RequestMaybeWithApiClient>();
     const apiClient = req.apiClient;
-    if (!apiClient) {
+    if (apiClient === undefined) {
       return next.handle();
     }
 
-    const body = (req.body ?? {}) as { issuerId?: string };
-    const query = req.query as { issuerId?: string };
-    const params = req.params as { issuerId?: string };
+    const requestBody: unknown = req.body;
+    const issuerId =
+      readStringField(requestBody, "issuerId") ??
+      readStringField(req.query, "issuerId") ??
+      readStringField(req.params, "issuerId");
     const base = {
       apiClientId: apiClient.id,
-      issuerId: body.issuerId ?? query.issuerId ?? params.issuerId,
+      ...optionalField("issuerId", issuerId),
       method: req.method,
       path: req.originalUrl,
     };
 
     return next.handle().pipe(
       tap({
-        next: (result) => {
-          const resourceId = (result as CreatedResource | undefined)?.id;
-          void this.audit.record({ ...base, outcome: "success", resourceId });
+        next: (result: unknown) => {
+          const resourceId = readStringField(result, "id");
+          void this.audit.record({ ...base, outcome: "success", ...optionalField("resourceId", resourceId) });
         },
         error: (err: unknown) => {
           const detail = err instanceof Error ? err.message : String(err);

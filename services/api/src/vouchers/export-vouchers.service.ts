@@ -9,7 +9,8 @@ import {
 import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { WsfexService } from "../arca/wsfex/wsfex.service";
-import type { ExportCaeRequest } from "../arca/wsfex/wsfex.types";
+import type { Prisma } from "@prisma/client";
+import type { ExportCaeRequest, ExportCaeResult } from "../arca/wsfex/wsfex.types";
 import { buildQrUrl } from "./qr.util";
 import { IssuerLockService } from "./issuer-lock.service";
 
@@ -17,6 +18,30 @@ const EXPORT_SERVICE = "wsfex";
 const NO_IVA_RATE = 0;
 const FOREIGN_RECIPIENT_DOC_TYPE = 80;
 const EXPORT_CONCEPT = 1;
+
+export type ExportedVoucher = Prisma.VoucherGetPayload<{ include: { items: true; salesPoint: true } }>;
+
+interface ExportEmission {
+  issuer: { id: string; cuit: string };
+  input: IssueExportVoucher;
+  request: ExportCaeRequest;
+  cae: ExportCaeResult;
+  totalAmount: number;
+}
+
+function optionalExportJson({
+  input,
+  cae,
+}: ExportEmission): Pick<Prisma.VoucherUncheckedCreateInput, "arcaObservations" | "associatedVouchers"> {
+  const { associatedVouchers } = input;
+  const hasAssociatedVouchers = associatedVouchers !== undefined && associatedVouchers.length > 0;
+  return {
+    ...(cae.observations.length > 0
+      ? { arcaObservations: cae.observations.map((observation) => ({ ...observation })) }
+      : {}),
+    ...(hasAssociatedVouchers ? { associatedVouchers } : {}),
+  };
+}
 
 @Injectable()
 export class ExportVouchersService {
@@ -29,7 +54,7 @@ export class ExportVouchersService {
     private readonly issuerLock: IssuerLockService,
   ) {}
 
-  async issue(userId: string, input: IssueExportVoucher) {
+  async issue(userId: string, input: IssueExportVoucher): Promise<ExportedVoucher> {
     const issuer = await this.prisma.issuer.findUnique({
       where: { id: input.issuerId },
     });
@@ -40,7 +65,7 @@ export class ExportVouchersService {
       throw new NotFoundException("Emisor inexistente.");
     }
 
-    return this.issuerLock.runExclusive(issuer.id, async () => {
+    return await this.issuerLock.runExclusive(issuer.id, async () => {
       const auth = await this.issuerAuth.buildAuth(issuer, EXPORT_SERVICE);
       const [lastNumber, lastRequestId] = await Promise.all([
         this.wsfex.getLastAuthorized(auth, input.salesPoint, input.voucherType),
@@ -78,21 +103,16 @@ export class ExportVouchersService {
         `Comprobante de exportación ${input.voucherType}-${input.salesPoint}-${request.number} emitido, CAE ${cae.cae}`,
       );
 
-      return this.persist(issuer.id, issuer.cuit, input, request, cae, totalAmount);
+      return await this.persist({ issuer, input, request, cae, totalAmount });
     });
   }
 
-  private async persist(
-    issuerId: string,
-    issuerCuit: string,
-    input: IssueExportVoucher,
-    request: ExportCaeRequest,
-    cae: { cae: string; caeVto: Date; observations: unknown[] },
-    totalAmount: number,
-  ) {
+  private async persist(emission: ExportEmission): Promise<ExportedVoucher> {
+    const { issuer, input, request, cae, totalAmount } = emission;
+    const issuerId = issuer.id;
     const qrData = buildQrUrl({
       date: request.date,
-      issuerCuit,
+      issuerCuit: issuer.cuit,
       salesPoint: input.salesPoint,
       voucherType: input.voucherType,
       number: request.number,
@@ -110,7 +130,7 @@ export class ExportVouchersService {
       update: {},
     });
 
-    return this.prisma.voucher.create({
+    return await this.prisma.voucher.create({
       data: {
         issuerId,
         salesPointId: salesPoint.id,
@@ -132,13 +152,8 @@ export class ExportVouchersService {
         status: cae.observations.length > 0 ? VoucherStatus.OBSERVED : VoucherStatus.APPROVED,
         cae: cae.cae,
         caeExpiration: cae.caeVto,
-        arcaObservations:
-          cae.observations.length > 0 ? (cae.observations as { code: string; message: string }[]) : undefined,
         qrData,
-        associatedVouchers:
-          input.associatedVouchers && input.associatedVouchers.length > 0
-            ? input.associatedVouchers
-            : undefined,
+        ...optionalExportJson(emission),
         exportDetail: {
           exportType: input.exportType,
           destinationCountryId: input.destinationCountryId,

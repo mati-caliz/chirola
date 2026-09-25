@@ -1,3 +1,4 @@
+import { ISO_DATE_LENGTH } from "../common/time";
 import { documentTypeName, ivaRates, type SalesBook, type SalesBookEntry } from "@chirola/shared";
 
 const COLUMN_SEPARATOR = ";";
@@ -14,7 +15,7 @@ function formatAmount(amount: number): string {
 }
 
 function formatDate(iso: string): string {
-  const [year, month, day] = iso.slice(0, 10).split("-");
+  const [year, month, day] = iso.slice(0, ISO_DATE_LENGTH).split("-");
   return `${day}/${month}/${year}`;
 }
 

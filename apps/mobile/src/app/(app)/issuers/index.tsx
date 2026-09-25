@@ -14,16 +14,60 @@ import {
   Title,
 } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
-import { listIssuers, type Issuer } from "@/lib/resources";
+import { listIssuers } from "@/lib/resources";
+import type { Issuer } from "@chirola/shared";
 import { formatDate } from "@/lib/format";
+import { hasText } from "@chirola/shared";
+import type { ReactNode } from "react";
 
-export default function IssuersScreen() {
-  const router = useRouter();
-  const { logout } = useAuth();
+const IssuersContent = ({
+  onOpenIssuer,
+}: Readonly<{ onOpenIssuer: (issuerId: string) => void }>): ReactNode => {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["issuers"],
     queryFn: listIssuers,
   });
+
+  if (isLoading) return <Loading />;
+  if (isError) {
+    return (
+      <Centered>
+        <BodyText>{error instanceof Error ? error.message : "Error al cargar."}</BodyText>
+        <Button
+          title="Reintentar"
+          variant="secondary"
+          onPress={() => {
+            void refetch();
+          }}
+        />
+      </Centered>
+    );
+  }
+  if (data && data.length > 0) {
+    return (
+      <>
+        {data.map((issuer) => (
+          <IssuerCard
+            key={issuer.id}
+            issuer={issuer}
+            onPress={() => {
+              onOpenIssuer(issuer.id);
+            }}
+          />
+        ))}
+      </>
+    );
+  }
+  return (
+    <Centered>
+      <Subtitle>Todavía no cargaste ningún emisor.</Subtitle>
+    </Centered>
+  );
+};
+
+export default function IssuersScreen(): ReactNode {
+  const router = useRouter();
+  const { logout } = useAuth();
 
   return (
     <>
@@ -31,7 +75,12 @@ export default function IssuersScreen() {
         options={{
           title: "Emisores",
           headerRight: () => (
-            <Pressable onPress={logout} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                void logout();
+              }}
+              hitSlop={8}
+            >
               <Text style={{ color: brandColor, fontWeight: "600" }}>Salir</Text>
             </Pressable>
           ),
@@ -43,34 +92,24 @@ export default function IssuersScreen() {
           <Subtitle>Los CUIT en cuyo nombre facturás.</Subtitle>
         </View>
 
-        {isLoading ? (
-          <Loading />
-        ) : isError ? (
-          <Centered>
-            <BodyText>{error instanceof Error ? error.message : "Error al cargar."}</BodyText>
-            <Button title="Reintentar" variant="secondary" onPress={() => refetch()} />
-          </Centered>
-        ) : data && data.length > 0 ? (
-          data.map((issuer) => (
-            <IssuerCard
-              key={issuer.id}
-              issuer={issuer}
-              onPress={() => router.push(`/(app)/issuers/${issuer.id}`)}
-            />
-          ))
-        ) : (
-          <Centered>
-            <Subtitle>Todavía no cargaste ningún emisor.</Subtitle>
-          </Centered>
-        )}
+        <IssuersContent
+          onOpenIssuer={(issuerId) => {
+            router.push(`/(app)/issuers/${issuerId}`);
+          }}
+        />
 
-        <Button title="+ Nuevo emisor" onPress={() => router.push("/(app)/issuers/new")} />
+        <Button
+          title="+ Nuevo emisor"
+          onPress={() => {
+            router.push("/(app)/issuers/new");
+          }}
+        />
       </Screen>
     </>
   );
 }
 
-function IssuerCard({ issuer, onPress }: { issuer: Issuer; onPress: () => void }) {
+function IssuerCard({ issuer, onPress }: Readonly<{ issuer: Issuer; onPress: () => void }>): ReactNode {
   const certificate = issuer.certificate;
   return (
     <Card onPress={onPress}>
@@ -82,7 +121,7 @@ function IssuerCard({ issuer, onPress }: { issuer: Issuer; onPress: () => void }
       {certificate ? (
         <Badge
           text={
-            certificate.validUntil
+            hasText(certificate.validUntil)
               ? `Cert. vence ${formatDate(certificate.validUntil)}`
               : "Certificado cargado"
           }

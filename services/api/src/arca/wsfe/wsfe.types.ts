@@ -16,13 +16,13 @@ export interface ArcaIvaRate {
   amount: number;
 }
 
-export type ArcaTribute = {
+export interface ArcaTribute {
   id: number;
   description: string;
   taxableBase: number;
   rate: number;
   amount: number;
-};
+}
 
 export interface VoucherAmounts {
   netAmount: number;
@@ -36,10 +36,10 @@ export interface VoucherAmounts {
   tributes: ArcaTribute[];
 }
 
-export type ArcaOptional = {
+export interface ArcaOptional {
   id: number;
   value: string;
-};
+}
 
 export interface CaeRequest {
   salesPoint: number;
@@ -67,10 +67,10 @@ export interface CaeRequest {
   optionals?: ArcaOptional[];
 }
 
-export type ArcaObservation = {
+export interface ArcaObservation {
   code: string;
   message: string;
-};
+}
 
 export interface CaeResult {
   cae: string;
@@ -78,10 +78,10 @@ export interface CaeResult {
   observations: ArcaObservation[];
 }
 
-export type ArcaParamEntry = {
+export interface ArcaParamEntry {
   id: number;
   description: string;
-};
+}
 
 export interface CurrencyInfo {
   id: string;

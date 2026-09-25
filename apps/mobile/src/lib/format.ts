@@ -11,13 +11,13 @@ export function formatCurrency(value: number, currency = "PES"): string {
 }
 
 export function formatDate(iso: string | Date): string {
-  const d = typeof iso === "string" ? new Date(iso) : iso;
-  if (Number.isNaN(d.getTime())) return "—";
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(d);
+  }).format(date);
 }
 
 export function toIsoDate(date: Date): string {
@@ -26,6 +26,9 @@ export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+const SALES_POINT_DIGITS = 4;
+const VOUCHER_NUMBER_DIGITS = 8;
+
 export function formatVoucherNumber(salesPoint: number, number: number): string {
-  return `${String(salesPoint).padStart(4, "0")}-${String(number).padStart(8, "0")}`;
+  return `${String(salesPoint).padStart(SALES_POINT_DIGITS, "0")}-${String(number).padStart(VOUCHER_NUMBER_DIGITS, "0")}`;
 }

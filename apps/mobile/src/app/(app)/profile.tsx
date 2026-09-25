@@ -6,8 +6,9 @@ import { Button, Card, Divider, Screen } from "@/components/ds";
 import { useActiveIssuer } from "@/lib/active-issuer";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/hooks/use-theme";
+import type { ReactNode } from "react";
 
-const InfoRow = ({ label, value }: { label: string; value: string }) => {
+const InfoRow = ({ label, value }: Readonly<{ label: string; value: string }>): ReactNode => {
   const theme = useTheme();
   return (
     <View
@@ -40,7 +41,7 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => {
   );
 };
 
-export default function ProfileScreen() {
+export default function ProfileScreen(): ReactNode {
   const theme = useTheme();
   const { user, logout } = useAuth();
   const { issuers } = useActiveIssuer();
@@ -93,7 +94,9 @@ export default function ProfileScreen() {
           variant="danger"
           full
           icon={<LogOut size={18} color={theme.colors.textInverse} strokeWidth={2} />}
-          onPress={logout}
+          onPress={() => {
+            void logout();
+          }}
         >
           Cerrar sesión
         </Button>

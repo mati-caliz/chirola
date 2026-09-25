@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Stack } from "expo-router";
 import { Text, View } from "react-native";
 import { Card, Screen, Segmented, Switch } from "@/components/ds";
@@ -17,18 +17,18 @@ const modeOptions: { value: ThemeMode; label: string }[] = [
   { value: "dark", label: "Oscuro" },
 ];
 
-export default function ConfigScreen() {
+export default function ConfigScreen(): ReactNode {
   const theme = useTheme();
   const { mode, setMode } = useThemeMode();
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   useEffect(() => {
-    isBiometricAvailable().then(setBiometricAvailable);
-    isBiometricLockEnabled().then(setBiometricEnabled);
+    void isBiometricAvailable().then(setBiometricAvailable);
+    void isBiometricLockEnabled().then(setBiometricEnabled);
   }, []);
 
-  const toggleBiometric = async (next: boolean) => {
+  const toggleBiometric = async (next: boolean): Promise<void> => {
     if (next) {
       const ok = await authenticateBiometric();
       if (!ok) return;
@@ -91,7 +91,13 @@ export default function ConfigScreen() {
                   Pedí tu huella o rostro cada vez que abrís la app.
                 </Text>
               </View>
-              <Switch checked={biometricEnabled} onChange={toggleBiometric} label="Bloqueo con biometría" />
+              <Switch
+                checked={biometricEnabled}
+                onChange={(next) => {
+                  void toggleBiometric(next);
+                }}
+                label="Bloqueo con biometría"
+              />
             </View>
           </Card>
         ) : null}

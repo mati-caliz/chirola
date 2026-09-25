@@ -1,29 +1,33 @@
-import { IssuerOnboardingStatus, type EmissionPlan } from "@chirola/shared";
-import { ShadowService } from "./shadow.service";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { ApiClientService } from "../service-auth/api-client.service";
-import type { VouchersService } from "../vouchers/vouchers.service";
-import type { ShadowCompareInput } from "@chirola/shared";
+import {
+  IssuerOnboardingStatus,
+  TaxTreatment,
+  VoucherConcept,
+  VoucherType,
+  type EmissionPlan,
+  type ShadowCompareInput,
+} from "@chirola/shared";
+import { ShadowService, type EmissionPlanner, type IssuerGrantChecker } from "./shadow.service";
+import { prismaDouble } from "../prisma/prisma.fixture";
 
 const API_CLIENT = { id: "client-1", name: "gastronova" };
 
 function buildHarness(plan: EmissionPlan) {
   const stored: { matched: boolean }[] = [];
-  const prisma = {
+  const prisma = prismaDouble({
     shadowComparison: {
-      create: jest.fn(async ({ data }: { data: { matched: boolean } }) => {
+      create: ({ data }: { data: { matched: boolean } }) => {
         stored.push(data);
-        return data;
-      }),
-      findMany: jest.fn(async () => stored),
+        return Promise.resolve(data);
+      },
+      findMany: () => Promise.resolve(stored),
     },
-  } as unknown as PrismaService;
-  const vouchers = {
-    computeEmissionPlanForApiClient: jest.fn(async () => plan),
-  } as unknown as VouchersService;
-  const apiClients = {
-    assertIssuerGranted: jest.fn(async () => undefined),
-  } as unknown as ApiClientService;
+  });
+  const vouchers: EmissionPlanner = {
+    computeEmissionPlanForApiClient: () => Promise.resolve(plan),
+  };
+  const apiClients: IssuerGrantChecker = {
+    assertIssuerGranted: () => Promise.resolve(),
+  };
   return {
     service: new ShadowService(prisma, vouchers, apiClients),
     stored,
@@ -48,11 +52,21 @@ function plan(overrides: Partial<EmissionPlan> = {}): EmissionPlan {
   };
 }
 
+const VOUCHER: ShadowCompareInput["voucher"] = {
+  issuerId: "issuer-1",
+  salesPoint: 1,
+  voucherType: VoucherType.FACTURA_A,
+  concept: VoucherConcept.PRODUCTS,
+  recipient: { docType: 80, docNumber: "20111111112" },
+  items: [
+    { description: "Item", quantity: 1, unitPrice: 1210, ivaRate: 21, taxTreatment: TaxTreatment.TAXED },
+  ],
+  currency: "PES",
+  exchangeRate: 1,
+};
+
 function compareInput(expected: ShadowCompareInput["expected"]): ShadowCompareInput {
-  return {
-    voucher: { issuerId: "issuer-1" } as ShadowCompareInput["voucher"],
-    expected,
-  };
+  return { voucher: VOUCHER, expected };
 }
 
 describe("ShadowService", () => {
@@ -64,7 +78,7 @@ describe("ShadowService", () => {
     );
     expect(result.matched).toBe(true);
     expect(result.differences).toEqual([]);
-    expect(stored[0].matched).toBe(true);
+    expect(stored[0]?.matched).toBe(true);
   });
 
   it("reporta las diferencias de número y montos", async () => {
@@ -74,7 +88,7 @@ describe("ShadowService", () => {
       compareInput({ number: 42, netAmount: 1000, ivaAmount: 200, totalAmount: 1210 }),
     );
     expect(result.matched).toBe(false);
-    const fields = result.differences.map((d) => d.field);
+    const fields = result.differences.map((difference) => difference.field);
     expect(fields).toEqual(["number", "ivaAmount"]);
   });
 

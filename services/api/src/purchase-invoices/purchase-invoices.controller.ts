@@ -7,13 +7,15 @@ import {
   type PurchaseInvoiceInput,
   type UpdatePurchaseInvoiceInput,
 } from "@chirola/shared";
+import type { PurchaseInvoice } from "@prisma/client";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { parseOptionalNumber } from "../common/query-params";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
 import { IssuersService } from "../issuers/issuers.service";
-import { PurchaseInvoicesService } from "./purchase-invoices.service";
-import { PurchaseImportService } from "./purchase-import.service";
+import { PurchaseInvoicesService, type PurchaseInvoiceListing } from "./purchase-invoices.service";
+import { ImportPreview, PurchaseImportService } from "./purchase-import.service";
 
 @Controller("purchase-invoices")
 @UseGuards(JwtAuthGuard)
@@ -29,9 +31,9 @@ export class PurchaseInvoicesController {
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
     body: ImportPurchaseInvoicesInput,
-  ) {
+  ): Promise<ImportPreview> {
     await this.issuers.getFromUser(body.issuerId, user.sub);
-    return this.purchaseImport.preview(body.issuerId, body.csv);
+    return await this.purchaseImport.preview(body.issuerId, body.csv);
   }
 
   @Post("import")
@@ -39,18 +41,18 @@ export class PurchaseInvoicesController {
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(importPurchaseInvoicesSchema))
     body: ImportPurchaseInvoicesInput,
-  ) {
+  ): Promise<ImportPreview> {
     await this.issuers.getFromUser(body.issuerId, user.sub);
-    return this.purchaseImport.import(body.issuerId, body.csv);
+    return await this.purchaseImport.import(body.issuerId, body.csv);
   }
 
   @Post()
   async create(
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(purchaseInvoiceSchema)) body: PurchaseInvoiceInput,
-  ) {
+  ): Promise<PurchaseInvoice> {
     await this.issuers.getFromUser(body.issuerId, user.sub);
-    return this.purchaseInvoices.create(body.issuerId, body);
+    return await this.purchaseInvoices.create(body.issuerId, body);
   }
 
   @Get()
@@ -59,13 +61,9 @@ export class PurchaseInvoicesController {
     @Query("issuerId") issuerId: string,
     @Query("year") year?: string,
     @Query("month") month?: string,
-  ) {
+  ): Promise<PurchaseInvoiceListing> {
     await this.issuers.getFromUser(issuerId, user.sub);
-    return this.purchaseInvoices.list(
-      issuerId,
-      year ? Number(year) : undefined,
-      month ? Number(month) : undefined,
-    );
+    return await this.purchaseInvoices.list(issuerId, parseOptionalNumber(year), parseOptionalNumber(month));
   }
 
   @Put(":id")
@@ -74,9 +72,9 @@ export class PurchaseInvoicesController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updatePurchaseInvoiceSchema))
     body: UpdatePurchaseInvoiceInput,
-  ) {
+  ): Promise<PurchaseInvoice> {
     await this.issuers.getFromUser(body.issuerId, user.sub);
-    return this.purchaseInvoices.update(body.issuerId, id, body);
+    return await this.purchaseInvoices.update(body.issuerId, id, body);
   }
 
   @Delete(":id")
@@ -84,8 +82,8 @@ export class PurchaseInvoicesController {
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,
     @Query("issuerId") issuerId: string,
-  ) {
+  ): Promise<{ ok: boolean }> {
     await this.issuers.getFromUser(issuerId, user.sub);
-    return this.purchaseInvoices.remove(issuerId, id);
+    return await this.purchaseInvoices.remove(issuerId, id);
   }
 }

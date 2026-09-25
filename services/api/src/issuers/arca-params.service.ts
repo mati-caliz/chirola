@@ -14,17 +14,17 @@ export class ArcaParamsService {
 
   async getSalesPoints(issuer: ArcaIssuer): Promise<SalesPointInfo[]> {
     const auth = await this.issuerAuth.buildAuth(issuer);
-    return this.wsfe.getSalesPoints(auth);
+    return await this.wsfe.getSalesPoints(auth);
   }
 
   async getCurrencies(issuer: ArcaIssuer): Promise<CurrencyInfo[]> {
     const auth = await this.issuerAuth.buildAuth(issuer);
-    return this.wsfe.getCurrencies(auth);
+    return await this.wsfe.getCurrencies(auth);
   }
 
   async getExchangeRate(issuer: ArcaIssuer, currencyId: string): Promise<ExchangeRateInfo> {
     const auth = await this.issuerAuth.buildAuth(issuer);
-    return this.wsfe.getExchangeRate(auth, currencyId);
+    return await this.wsfe.getExchangeRate(auth, currencyId);
   }
 
   async detectFiscalCondition(issuer: ArcaIssuer): Promise<{ fiscalCondition: FiscalConditionType | null }> {

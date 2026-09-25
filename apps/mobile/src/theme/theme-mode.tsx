@@ -17,12 +17,17 @@ function isThemeMode(value: string | null): value is ThemeMode {
   return value === "system" || value === "light" || value === "dark";
 }
 
-export function ThemeModeProvider({ children }: { children: ReactNode }) {
+function resolveColorScheme(mode: ThemeMode, systemScheme: string | null | undefined): ColorScheme {
+  if (mode !== "system") return mode;
+  return systemScheme === "dark" ? "dark" : "light";
+}
+
+export function ThemeModeProvider({ children }: Readonly<{ children: ReactNode }>): ReactNode {
   const systemScheme = useSystemColorScheme();
   const [mode, setModeState] = useState<ThemeMode>("system");
 
   useEffect(() => {
-    getPreference(preferenceKeys.colorSchemeOverride).then((value) => {
+    void getPreference(preferenceKeys.colorSchemeOverride).then((value) => {
       if (isThemeMode(value)) setModeState(value);
     });
   }, []);
@@ -36,7 +41,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const scheme: ColorScheme = mode === "system" ? (systemScheme === "dark" ? "dark" : "light") : mode;
+  const scheme = resolveColorScheme(mode, systemScheme);
 
   const value = useMemo<ThemeModeState>(() => ({ mode, scheme, setMode }), [mode, scheme, setMode]);
 

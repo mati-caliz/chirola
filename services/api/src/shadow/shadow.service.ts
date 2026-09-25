@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Inject, Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type { EmissionPlan, ShadowCompareInput } from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApiClientService } from "../service-auth/api-client.service";
@@ -8,6 +8,11 @@ import type { AuthenticatedApiClient } from "../service-auth/api-client.service"
 
 const MONEY_TOLERANCE = 0.01;
 const SUMMARY_WINDOW = 200;
+const BASIS_POINTS_PER_UNIT = 10_000;
+const BASIS_POINTS_PER_PERCENT = 100;
+
+export type EmissionPlanner = Pick<VouchersService, "computeEmissionPlanForApiClient">;
+export type IssuerGrantChecker = Pick<ApiClientService, "assertIssuerGranted">;
 
 export interface Difference {
   field: string;
@@ -15,15 +20,31 @@ export interface Difference {
   computed: number;
 }
 
+function differencesAsJson(differences: Difference[]): Prisma.InputJsonValue {
+  return differences.map(({ field, expected, computed }) => ({ field, expected, computed }));
+}
+
+function emissionPlanAsJson(plan: EmissionPlan): Prisma.InputJsonObject {
+  return { ...plan, verification: { ...plan.verification } };
+}
+
+function matchRatePercent(matched: number, total: number): number | null {
+  if (total === 0) return null;
+  return Math.round((matched / total) * BASIS_POINTS_PER_UNIT) / BASIS_POINTS_PER_PERCENT;
+}
+
 @Injectable()
 export class ShadowService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly vouchers: VouchersService,
-    private readonly apiClients: ApiClientService,
+    @Inject(VouchersService) private readonly vouchers: EmissionPlanner,
+    @Inject(ApiClientService) private readonly apiClients: IssuerGrantChecker,
   ) {}
 
-  async compare(apiClient: AuthenticatedApiClient, input: ShadowCompareInput) {
+  async compare(
+    apiClient: AuthenticatedApiClient,
+    input: ShadowCompareInput,
+  ): Promise<{ matched: boolean; differences: Difference[]; computed: EmissionPlan }> {
     const computed = await this.vouchers.computeEmissionPlanForApiClient(apiClient, input.voucher);
     const differences = this.diff(input.expected, computed);
     const matched = differences.length === 0;
@@ -35,16 +56,19 @@ export class ShadowService {
         salesPoint: computed.salesPoint,
         voucherType: computed.voucherType,
         matched,
-        differences: differences as unknown as Prisma.InputJsonValue,
-        expected: input.expected as unknown as Prisma.InputJsonValue,
-        computed: computed as unknown as Prisma.InputJsonValue,
+        differences: differencesAsJson(differences),
+        expected: input.expected,
+        computed: emissionPlanAsJson(computed),
       },
     });
 
     return { matched, differences, computed };
   }
 
-  async summary(apiClient: AuthenticatedApiClient, issuerId: string) {
+  async summary(
+    apiClient: AuthenticatedApiClient,
+    issuerId: string,
+  ): Promise<{ total: number; matched: number; mismatched: number; matchRate: number | null }> {
     await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
     const recent = await this.prisma.shadowComparison.findMany({
       where: { issuerId },
@@ -57,7 +81,7 @@ export class ShadowService {
       total,
       matched,
       mismatched: total - matched,
-      matchRate: total === 0 ? null : Math.round((matched / total) * 10000) / 100,
+      matchRate: matchRatePercent(matched, total),
     };
   }
 

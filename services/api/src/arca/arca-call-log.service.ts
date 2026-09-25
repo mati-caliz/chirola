@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { ArcaCallLog, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { redactArcaXml, truncateXml } from "./arca-call-redaction";
 
@@ -25,7 +26,7 @@ export interface ArcaCallLogEntry {
   httpStatus: number;
   durationMs: number;
   outcome: ArcaCallOutcomeName;
-  errorCodes?: string[];
+  errorCodes?: string[] | undefined;
   requestXml: string;
   responseXml: string;
 }
@@ -35,6 +36,30 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_RETENTION_DAYS = 30;
 const MILLISECONDS_PER_DAY = 86_400_000;
+
+const CALL_SUMMARY_SELECT = {
+  id: true,
+  service: true,
+  operation: true,
+  httpStatus: true,
+  durationMs: true,
+  outcome: true,
+  errorCodes: true,
+  createdAt: true,
+} satisfies Prisma.ArcaCallLogSelect;
+
+export type ArcaCallSummary = Prisma.ArcaCallLogGetPayload<{ select: typeof CALL_SUMMARY_SELECT }>;
+
+function joinErrorCodes(errorCodes: string[] | undefined): string | null {
+  return errorCodes !== undefined && errorCodes.length > 0 ? errorCodes.join(",") : null;
+}
+
+function callFilters(query: ArcaCallQuery): Prisma.ArcaCallLogWhereInput {
+  return {
+    ...(query.operation === undefined ? {} : { operation: query.operation }),
+    ...(query.outcome === undefined ? {} : { outcome: query.outcome }),
+  };
+}
 
 @Injectable()
 export class ArcaCallLogService {
@@ -55,7 +80,7 @@ export class ArcaCallLogService {
           httpStatus: entry.httpStatus,
           durationMs: entry.durationMs,
           outcome: entry.outcome,
-          errorCodes: entry.errorCodes?.length ? entry.errorCodes.join(",") : null,
+          errorCodes: joinErrorCodes(entry.errorCodes),
           requestXml: this.sanitize(entry.requestXml),
           responseXml: this.sanitize(entry.responseXml),
         },
@@ -69,29 +94,16 @@ export class ArcaCallLogService {
     }
   }
 
-  async listForIssuer(issuerId: string, query: ArcaCallQuery = {}) {
-    return this.prisma.arcaCallLog.findMany({
-      where: {
-        issuerId,
-        operation: query.operation,
-        outcome: query.outcome,
-      },
+  async listForIssuer(issuerId: string, query: ArcaCallQuery = {}): Promise<ArcaCallSummary[]> {
+    return await this.prisma.arcaCallLog.findMany({
+      where: { issuerId, ...callFilters(query) },
       orderBy: { createdAt: "desc" },
       take: Math.min(query.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
-      select: {
-        id: true,
-        service: true,
-        operation: true,
-        httpStatus: true,
-        durationMs: true,
-        outcome: true,
-        errorCodes: true,
-        createdAt: true,
-      },
+      select: CALL_SUMMARY_SELECT,
     });
   }
 
-  async getForIssuer(issuerId: string, callId: string) {
+  async getForIssuer(issuerId: string, callId: string): Promise<ArcaCallLog> {
     const call = await this.prisma.arcaCallLog.findFirst({
       where: { id: callId, issuerId },
     });

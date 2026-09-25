@@ -1,99 +1,110 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Client } from "@prisma/client";
+import { DocumentType } from "@chirola/shared";
 import { ClientsService } from "./clients.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
-type Row = Record<string, unknown>;
+type NewClient = Pick<Client, "issuerId" | "docType" | "docNumber"> & Partial<Client>;
 
-function fakePrisma(): PrismaService {
-  const store = new Map<string, Row>();
-  let seq = 0;
-  const key = (r: Row) => `${r.issuerId}|${r.docType}|${r.docNumber}`;
+const EXPECTED_CLIENT_COUNT = 2;
+
+function uniqueKey(row: Pick<Client, "issuerId" | "docType" | "docNumber">): string {
+  return `${row.issuerId}|${String(row.docType)}|${row.docNumber}`;
+}
+
+function fakePrisma() {
+  const store = new Map<string, Client>();
+  let sequence = 0;
   return {
     client: {
-      create: async ({ data }: { data: Row }) => {
-        for (const r of store.values()) {
-          if (key(r) === key(data)) {
-            throw new Prisma.PrismaClientKnownRequestError("dup", {
-              code: "P2002",
-              clientVersion: "test",
-            });
+      create: ({ data }: { data: NewClient }) => {
+        for (const existing of store.values()) {
+          if (uniqueKey(existing) === uniqueKey(data)) {
+            return Promise.reject(
+              new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "test" }),
+            );
           }
         }
-        const row: Row = {
-          id: `cli${++seq}`,
+        const row: Client = {
+          id: `cli${String(++sequence)}`,
           legalName: null,
           ivaCondition: null,
           email: null,
           ...data,
         };
-        store.set(row.id as string, row);
-        return row;
+        store.set(row.id, row);
+        return Promise.resolve(row);
       },
-      findMany: async ({ where }: { where: { issuerId: string } }) =>
-        [...store.values()].filter((r) => r.issuerId === where.issuerId),
-      findFirst: async ({ where }: { where: { id: string; issuerId: string } }) =>
-        [...store.values()].find((r) => r.id === where.id && r.issuerId === where.issuerId) ?? null,
-      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
-        const row: Row = { ...store.get(where.id) };
-        for (const [k, v] of Object.entries(data)) {
-          if (v !== undefined) row[k] = v;
-        }
+      findMany: ({ where }: { where: { issuerId: string } }) =>
+        Promise.resolve([...store.values()].filter((row) => row.issuerId === where.issuerId)),
+      findFirst: ({ where }: { where: { id: string; issuerId: string } }) =>
+        Promise.resolve(
+          [...store.values()].find((row) => row.id === where.id && row.issuerId === where.issuerId) ?? null,
+        ),
+      update: ({ where, data }: { where: { id: string }; data: Partial<Client> }) => {
+        const existing = store.get(where.id);
+        if (existing === undefined) return Promise.reject(new Error("Cliente inexistente en el doble."));
+        const row: Client = { ...existing, ...data };
         store.set(where.id, row);
-        return row;
+        return Promise.resolve(row);
       },
-      delete: async ({ where }: { where: { id: string } }) => {
+      delete: ({ where }: { where: { id: string } }) => {
         store.delete(where.id);
-        return {};
+        return Promise.resolve({});
       },
     },
-  } as unknown as PrismaService;
+  };
 }
 
 describe("ClientsService", () => {
   const ISSUER = "em1";
-  let svc: ClientsService;
+  let service: ClientsService;
 
-  beforeEach(() => {
-    svc = new ClientsService(fakePrisma());
+  beforeEach(async () => {
+    service = await instantiateWithDoubles(ClientsService, [{ token: PrismaService, value: fakePrisma() }]);
   });
 
   it("crea y lista clientes de un emisor", async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745", legalName: "Acme" });
-    await svc.create(ISSUER, { docType: 96, docNumber: "12345678", legalName: "Beta" });
-    const lista = await svc.list(ISSUER);
-    expect(lista).toHaveLength(2);
+    await service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745", legalName: "Acme" });
+    await service.create(ISSUER, { docType: DocumentType.DNI, docNumber: "12345678", legalName: "Beta" });
+    const clients = await service.list(ISSUER);
+    expect(clients).toHaveLength(EXPECTED_CLIENT_COUNT);
   });
 
   it("rechaza documento duplicado en el mismo emisor con 409", async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
-    await expect(svc.create(ISSUER, { docType: 80, docNumber: "30707153745" })).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745" });
+    await expect(
+      service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745" }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it("el mismo documento en otro emisor sí se permite", async () => {
-    await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
-    await expect(svc.create("em2", { docType: 80, docNumber: "30707153745" })).resolves.toMatchObject({
-      issuerId: "em2",
-    });
+    await service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745" });
+    await expect(
+      service.create("em2", { docType: DocumentType.CUIT, docNumber: "30707153745" }),
+    ).resolves.toMatchObject({ issuerId: "em2" });
   });
 
   it("no encuentra un cliente de otro emisor (aislamiento)", async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
-    await expect(svc.get("em2", c.id)).rejects.toBeInstanceOf(NotFoundException);
+    const client = await service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745" });
+    await expect(service.get("em2", client.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("actualiza sólo los campos provistos", async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745", legalName: "Acme" });
-    const upd = await svc.update(ISSUER, c.id, { email: "x@acme.com" });
-    expect(upd.email).toBe("x@acme.com");
-    expect(upd.legalName).toBe("Acme");
+    const client = await service.create(ISSUER, {
+      docType: DocumentType.CUIT,
+      docNumber: "30707153745",
+      legalName: "Acme",
+    });
+    const updated = await service.update(ISSUER, client.id, { email: "x@acme.com" });
+    expect(updated.email).toBe("x@acme.com");
+    expect(updated.legalName).toBe("Acme");
   });
 
   it("elimina un cliente propio", async () => {
-    const c = await svc.create(ISSUER, { docType: 80, docNumber: "30707153745" });
-    await expect(svc.delete(ISSUER, c.id)).resolves.toEqual({ ok: true });
-    await expect(svc.get(ISSUER, c.id)).rejects.toBeInstanceOf(NotFoundException);
+    const client = await service.create(ISSUER, { docType: DocumentType.CUIT, docNumber: "30707153745" });
+    await expect(service.delete(ISSUER, client.id)).resolves.toEqual({ ok: true });
+    await expect(service.get(ISSUER, client.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

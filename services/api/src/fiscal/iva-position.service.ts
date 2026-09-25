@@ -1,27 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { authorizedVoucherStatuses, isCreditNote } from "@chirola/shared";
+import {
+  authorizedVoucherStatuses,
+  isCreditNote,
+  type IvaPosition,
+  type IvaRateBreakdown,
+} from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { breakDownVoucherTaxes, round2, voucherSign } from "./voucher-tax-breakdown";
 
 const RATE_21 = 21;
 const RATE_105 = 10.5;
 const RATE_27 = 27;
-
-interface IvaRateBreakdown {
-  rate: number;
-  debit: number;
-  credit: number;
-  balance: number;
-}
-
-export interface IvaPosition {
-  year: number;
-  month: number;
-  breakdown: IvaRateBreakdown[];
-  totalDebit: number;
-  totalCredit: number;
-  balance: number;
-}
 
 @Injectable()
 export class IvaPositionService {
@@ -34,7 +23,9 @@ export class IvaPositionService {
     const debitByRate = await this.computeDebit(issuerId, from, to);
     const creditByRate = await this.computeCredit(issuerId, from, to);
 
-    const rates = [...new Set([...debitByRate.keys(), ...creditByRate.keys()])].sort((a, b) => b - a);
+    const rates = [...new Set([...debitByRate.keys(), ...creditByRate.keys()])].sort(
+      (left, right) => right - left,
+    );
 
     const breakdown: IvaRateBreakdown[] = rates.map((rate) => {
       const debit = round2(debitByRate.get(rate) ?? 0);

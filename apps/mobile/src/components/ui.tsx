@@ -1,8 +1,9 @@
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native";
 import { Button as DsButton, type ButtonVariant } from "@/components/ds/Button";
 import { useTheme } from "@/hooks/use-theme";
-import { palette } from "@/theme/tokens";
+import { hasText } from "@chirola/shared";
+import { opacity, palette } from "@/theme/tokens";
 
 export {
   Screen,
@@ -33,8 +34,14 @@ export const Button = ({
   loading?: boolean;
   disabled?: boolean;
   variant?: ButtonVariant;
-}) => (
-  <DsButton variant={variant} full loading={loading} disabled={disabled} onPress={onPress}>
+}): ReactNode => (
+  <DsButton
+    variant={variant}
+    full
+    {...(loading !== undefined && { loading })}
+    {...(disabled !== undefined && { disabled })}
+    onPress={onPress}
+  >
     {title}
   </DsButton>
 );
@@ -46,7 +53,7 @@ export const TextField = forwardRef<TextInput, TextInputProps & { label?: string
   const theme = useTheme();
   return (
     <View style={styles.field}>
-      {label ? (
+      {hasText(label) ? (
         <Text
           style={{
             marginBottom: theme.spacing.xs,
@@ -82,7 +89,13 @@ export const TextField = forwardRef<TextInput, TextInputProps & { label?: string
   );
 });
 
-export const Badge = ({ text, tone = "neutral" }: { text: string; tone?: "ok" | "warn" | "neutral" }) => {
+export const Badge = ({
+  text,
+  tone = "neutral",
+}: {
+  text: string;
+  tone?: "ok" | "warn" | "neutral";
+}): ReactNode => {
   const theme = useTheme();
   const { colors } = theme;
   const map = {
@@ -110,12 +123,12 @@ export const OptionGroup = <T extends string | number>({
   value: T;
   options: { label: string; value: T }[];
   onChange: (value: T) => void;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const { colors } = theme;
   return (
     <View style={styles.field}>
-      {label ? (
+      {hasText(label) ? (
         <Text
           style={{
             marginBottom: theme.spacing.xs,
@@ -133,14 +146,16 @@ export const OptionGroup = <T extends string | number>({
           return (
             <Pressable
               key={String(opt.value)}
-              onPress={() => onChange(opt.value)}
+              onPress={() => {
+                onChange(opt.value);
+              }}
               style={({ pressed }) => [
                 styles.option,
                 {
                   borderRadius: theme.radius.pill,
                   backgroundColor: selected ? colors.actionPrimary : colors.surfaceCard,
                   borderColor: selected ? colors.actionPrimary : colors.borderDefault,
-                  opacity: pressed ? 0.85 : 1,
+                  opacity: pressed ? opacity.pressed : 1,
                 },
               ]}
             >

@@ -11,7 +11,9 @@ describe("FixedWindowLimiter", () => {
     limiter.consume("email:a@b.com");
     limiter.consume("email:otro@b.com");
 
-    expect(() => limiter.consume("email:a@b.com")).toThrow(HttpException);
+    expect(() => {
+      limiter.consume("email:a@b.com");
+    }).toThrow(HttpException);
   });
 
   it("vuelve a permitir cuando vence la ventana", () => {
@@ -19,9 +21,13 @@ describe("FixedWindowLimiter", () => {
     const start = Date.now();
     jest.spyOn(Date, "now").mockReturnValue(start);
     limiter.consume("ip:1.2.3.4");
-    expect(() => limiter.consume("ip:1.2.3.4")).toThrow(HttpException);
+    expect(() => {
+      limiter.consume("ip:1.2.3.4");
+    }).toThrow(HttpException);
 
     jest.spyOn(Date, "now").mockReturnValue(start + 1_001);
-    expect(() => limiter.consume("ip:1.2.3.4")).not.toThrow();
+    expect(() => {
+      limiter.consume("ip:1.2.3.4");
+    }).not.toThrow();
   });
 });

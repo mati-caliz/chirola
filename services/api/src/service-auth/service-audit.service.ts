@@ -21,7 +21,7 @@ export class ServiceAuditService {
     try {
       await this.prisma.serviceAuditLog.create({ data: entry });
     } catch (err) {
-      this.logger.error("No se pudo registrar la auditoría de servicio", err as Error);
+      this.logger.error("No se pudo registrar la auditoría de servicio", err);
     }
   }
 }

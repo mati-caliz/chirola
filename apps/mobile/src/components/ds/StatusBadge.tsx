@@ -1,6 +1,12 @@
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme, type Theme } from "@/hooks/use-theme";
 import { type StatusKey } from "@/theme/tokens";
+import type { ReactNode } from "react";
+
+const badgeMetrics = {
+  sm: { dot: 5, paddingHorizontal: 8, paddingVertical: 2 },
+  md: { dot: 6, paddingHorizontal: 12, paddingVertical: 4 },
+} as const;
 
 const defaultLabels: Record<StatusKey, string> = {
   aprobado: "Aprobado",
@@ -9,7 +15,7 @@ const defaultLabels: Record<StatusKey, string> = {
   pendiente: "Pendiente",
 };
 
-function statusColors(theme: Theme, status: StatusKey) {
+function statusColors(theme: Theme, status: StatusKey): { bg: string; fg: string } {
   const { colors } = theme;
   switch (status) {
     case "aprobado":
@@ -18,7 +24,7 @@ function statusColors(theme: Theme, status: StatusKey) {
       return { bg: colors.statusObservadoBg, fg: colors.statusObservadoFg };
     case "rechazado":
       return { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg };
-    default:
+    case "pendiente":
       return { bg: colors.statusPendienteBg, fg: colors.statusPendienteFg };
   }
 }
@@ -31,11 +37,12 @@ export const StatusBadge = ({
   status?: StatusKey;
   label?: string;
   size?: "sm" | "md";
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const { bg, fg } = statusColors(theme, status);
   const small = size === "sm";
-  const dot = small ? 5 : 6;
+  const metrics = badgeMetrics[size];
+  const dot = metrics.dot;
   return (
     <View
       style={[
@@ -43,8 +50,8 @@ export const StatusBadge = ({
         {
           backgroundColor: bg,
           borderRadius: theme.radius.pill,
-          paddingHorizontal: small ? 8 : 12,
-          paddingVertical: small ? 2 : 4,
+          paddingHorizontal: metrics.paddingHorizontal,
+          paddingVertical: metrics.paddingVertical,
         },
       ]}
     >

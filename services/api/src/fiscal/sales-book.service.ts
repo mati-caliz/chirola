@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   authorizedVoucherStatuses,
+  hasText,
   voucherTypeName,
   type SalesBook,
   type SalesBookEntry,
@@ -43,14 +44,32 @@ function monthRange(year: number, month: number): { from: Date; to: Date } {
   };
 }
 
+type SalesBookRecipient = Pick<SalesBookEntry, "recipientDocType" | "recipientDocNumber" | "recipientName">;
+
+function firstPresent<Value>(...candidates: (Value | null | undefined)[]): Value | null {
+  for (const candidate of candidates) {
+    if (candidate !== null && candidate !== undefined) return candidate;
+  }
+  return null;
+}
+
+function resolveRecipient(voucher: SalesBookVoucherRow): SalesBookRecipient {
+  const qrRecipient = hasText(voucher.qrData) ? recipientFromQr(voucher.qrData) : null;
+  const { client } = voucher;
+  return {
+    recipientDocType: firstPresent(voucher.recipientDocType, client?.docType, qrRecipient?.docType),
+    recipientDocNumber: firstPresent(voucher.recipientDocNumber, client?.docNumber, qrRecipient?.docNumber),
+    recipientName: firstPresent(voucher.recipientName, client?.legalName),
+  };
+}
+
 function toEntry(voucher: SalesBookVoucherRow): SalesBookEntry {
   const sign = voucherSign(voucher.voucherType);
-  const signedPesos = (amount: number) => round2(sign * toPesos(voucher, amount));
+  const signedPesos = (amount: number): number => round2(sign * toPesos(voucher, amount));
   const taxes = breakDownVoucherTaxes(voucher);
   const ivaByRate = [...taxes.ivaByRate.entries()]
     .sort(([rateA], [rateB]) => rateB - rateA)
     .map(([rate, amount]) => ({ rate, amount: round2(sign * amount) }));
-  const qrRecipient = voucher.qrData ? recipientFromQr(voucher.qrData) : null;
 
   return {
     voucherId: voucher.id,
@@ -59,10 +78,7 @@ function toEntry(voucher: SalesBookVoucherRow): SalesBookEntry {
     voucherTypeName: voucherTypeName[voucher.voucherType] ?? String(voucher.voucherType),
     salesPoint: voucher.salesPoint.number,
     number: voucher.number,
-    recipientDocType: voucher.recipientDocType ?? voucher.client?.docType ?? qrRecipient?.docType ?? null,
-    recipientDocNumber:
-      voucher.recipientDocNumber ?? voucher.client?.docNumber ?? qrRecipient?.docNumber ?? null,
-    recipientName: voucher.recipientName ?? voucher.client?.legalName ?? null,
+    ...resolveRecipient(voucher),
     currency: voucher.currency,
     exchangeRate: Number(voucher.exchangeRate),
     netAmount: round2(sign * taxes.netAmount),
@@ -77,7 +93,7 @@ function toEntry(voucher: SalesBookVoucherRow): SalesBookEntry {
 }
 
 function sumEntries(entries: SalesBookEntry[]): SalesBookTotals {
-  const sum = (pick: (entry: SalesBookEntry) => number) =>
+  const sum = (pick: (entry: SalesBookEntry) => number): number =>
     round2(entries.reduce((total, entry) => total + pick(entry), 0));
   return {
     voucherCount: entries.length,

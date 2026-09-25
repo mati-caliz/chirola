@@ -24,9 +24,11 @@ export interface VoucherTaxBreakdown {
 const IVA_BEARING_LETTERS: readonly string[] = ["A", "B", "M"];
 const EXPORT_LETTER = "E";
 const LOCAL_EXCHANGE_RATE = 1;
+const CENTS_PER_UNIT = 100;
+const PERCENT_BASE = 100;
 
 export function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return Math.round((value + Number.EPSILON) * CENTS_PER_UNIT) / CENTS_PER_UNIT;
 }
 
 export function bearsIva(voucherType: number): boolean {
@@ -70,7 +72,7 @@ export function breakDownVoucherTaxes(voucher: TaxBreakdownVoucher): VoucherTaxB
       netAmount += gross;
       continue;
     }
-    const base = gross / (1 + rate / 100);
+    const base = gross / (1 + rate / PERCENT_BASE);
     netAmount += base;
     addTo(ivaByRate, rate, gross - base);
   }

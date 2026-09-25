@@ -25,7 +25,7 @@ describe("upcomingVencimientos", () => {
     const result = upcomingVencimientos(cuit, from, to, from);
 
     const dates = result.map((item) => item.dueDate);
-    expect(dates).toEqual([...dates].sort());
+    expect(dates).toEqual([...dates].sort((left, right) => left.localeCompare(right)));
   });
 
   it("computa el día según el último dígito del CUIT (terminación 2 → grupo día 19)", () => {

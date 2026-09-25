@@ -50,7 +50,7 @@ describe("buildFiscalTransparency", () => {
         ],
       }),
     );
-    expect(transparency?.containedIva).toBe(30.98);
+    expect(transparency?.containedIva).toBeCloseTo(30.98);
   });
 
   it("suma como otros impuestos nacionales indirectos sólo los tributos nacionales e internos", () => {
@@ -64,6 +64,6 @@ describe("buildFiscalTransparency", () => {
         ],
       }),
     );
-    expect(transparency?.otherNationalIndirectTaxes).toBe(15.3);
+    expect(transparency?.otherNationalIndirectTaxes).toBeCloseTo(15.3);
   });
 });

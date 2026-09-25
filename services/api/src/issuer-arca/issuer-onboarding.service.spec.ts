@@ -1,5 +1,5 @@
 import { IssuerOnboardingStatus } from "@chirola/shared";
-import { PrismaService } from "../prisma/prisma.service";
+import { prismaDouble } from "../prisma/prisma.fixture";
 import { ArcaDelegationError, ArcaRejectionError, ARCA_TOKEN_RELATION_CODE } from "../arca/wsfe/arca-errors";
 import { ArcaConfirmation, IssuerOnboardingService } from "./issuer-onboarding.service";
 
@@ -7,15 +7,15 @@ const ISSUER_ID = "issuer-1";
 
 function build(onboardingStatus: string) {
   const issuer = { onboardingStatus };
-  const prisma = {
+  const prisma = prismaDouble({
     issuer: {
-      findUniqueOrThrow: async () => issuer,
-      update: async ({ data }: { data: { onboardingStatus: string } }) => {
+      findUniqueOrThrow: () => Promise.resolve(issuer),
+      update: ({ data }: { data: { onboardingStatus: string } }) => {
         issuer.onboardingStatus = data.onboardingStatus;
-        return issuer;
+        return Promise.resolve(issuer);
       },
     },
-  } as unknown as PrismaService;
+  });
   return { service: new IssuerOnboardingService(prisma), issuer };
 }
 
@@ -23,7 +23,7 @@ describe("IssuerOnboardingService", () => {
   it("confirma la delegación después de una consulta de sólo lectura", async () => {
     const { service, issuer } = build(IssuerOnboardingStatus.PENDING_DELEGATION);
 
-    await service.track(ISSUER_ID, ArcaConfirmation.READ_ONLY, async () => 1);
+    await service.track(ISSUER_ID, ArcaConfirmation.READ_ONLY, () => Promise.resolve(1));
 
     expect(issuer.onboardingStatus).toBe(IssuerOnboardingStatus.DELEGATION_CONFIRMED);
   });
@@ -31,7 +31,7 @@ describe("IssuerOnboardingService", () => {
   it("marca al emisor como facturando después de un cae", async () => {
     const { service, issuer } = build(IssuerOnboardingStatus.DELEGATION_CONFIRMED);
 
-    await service.track(ISSUER_ID, ArcaConfirmation.ISSUE, async () => 1);
+    await service.track(ISSUER_ID, ArcaConfirmation.ISSUE, () => Promise.resolve(1));
 
     expect(issuer.onboardingStatus).toBe(IssuerOnboardingStatus.ISSUING_CONFIRMED);
   });
@@ -39,7 +39,7 @@ describe("IssuerOnboardingService", () => {
   it("no retrocede el estado de un emisor que ya facturó", async () => {
     const { service, issuer } = build(IssuerOnboardingStatus.ISSUING_CONFIRMED);
 
-    await service.track(ISSUER_ID, ArcaConfirmation.READ_ONLY, async () => 1);
+    await service.track(ISSUER_ID, ArcaConfirmation.READ_ONLY, () => Promise.resolve(1));
 
     expect(issuer.onboardingStatus).toBe(IssuerOnboardingStatus.ISSUING_CONFIRMED);
   });

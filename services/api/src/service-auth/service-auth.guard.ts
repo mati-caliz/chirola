@@ -1,9 +1,14 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import type { Request } from "express";
+import { hasText } from "@chirola/shared";
 import { ApiClientService, AuthenticatedApiClient } from "./api-client.service";
 
 export type RequestWithApiClient = Request & {
   apiClient: AuthenticatedApiClient;
+};
+
+export type RequestMaybeWithApiClient = Request & {
+  apiClient?: AuthenticatedApiClient;
 };
 
 @Injectable()
@@ -13,14 +18,14 @@ export class ServiceAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
     const rawKey = this.extractKey(req);
-    if (!rawKey) {
+    if (!hasText(rawKey)) {
       throw new UnauthorizedException("Falta la API key del servicio.");
     }
     const apiClient = await this.apiClients.authenticate(rawKey);
     if (!apiClient) {
       throw new UnauthorizedException("API key inválida.");
     }
-    (req as RequestWithApiClient).apiClient = apiClient;
+    Object.assign(req, { apiClient });
     return true;
   }
 
@@ -31,7 +36,7 @@ export class ServiceAuthGuard implements CanActivate {
     }
     const authorization = req.headers.authorization ?? "";
     const [scheme, token] = authorization.split(" ");
-    if (scheme === "Bearer" && token) {
+    if (scheme === "Bearer" && hasText(token)) {
       return token;
     }
     return null;

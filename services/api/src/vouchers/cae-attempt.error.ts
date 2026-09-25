@@ -1,6 +1,6 @@
 export class CaeAttemptError extends Error {
   constructor(
-    readonly cause: unknown,
+    override readonly cause: unknown,
     readonly salesPoint: number,
     readonly attemptedNumber: number | null,
   ) {

@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClientSchema, DocumentType } from "@chirola/shared";
+import { createClientSchema, DocumentType, hasText } from "@chirola/shared";
 import { Banner, Button, Input, Screen, Segmented, Subtitle } from "@/components/ds";
 import { createClient } from "@/lib/resources";
 
-export default function NewClientScreen() {
+export default function NewClientScreen(): ReactNode {
   const { issuerId } = useLocalSearchParams<{ issuerId: string }>();
   const router = useRouter();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
 
   const [docType, setDocType] = useState<number>(DocumentType.CUIT);
   const [docNumber, setDocNumber] = useState("");
@@ -19,13 +19,15 @@ export default function NewClientScreen() {
   const mutation = useMutation({
     mutationFn: (body: ReturnType<typeof createClientSchema.parse>) => createClient(issuerId, body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients", issuerId] });
+      void queryClient.invalidateQueries({ queryKey: ["clients", issuerId] });
       router.back();
     },
-    onError: (e) => setError(e instanceof Error ? e.message : "No se pudo crear el cliente."),
+    onError: (entry) => {
+      setError(entry instanceof Error ? entry.message : "No se pudo crear el cliente.");
+    },
   });
 
-  const onSubmit = () => {
+  const onSubmit = (): void => {
     setError(null);
     const parsed = createClientSchema.safeParse({
       docType,
@@ -47,7 +49,7 @@ export default function NewClientScreen() {
       <Stack.Screen options={{ title: "Nuevo cliente" }} />
       <Screen>
         <Subtitle>Los receptores que después vas a poder elegir al facturar.</Subtitle>
-        {error ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
+        {hasText(error) ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
         <Segmented<number>
           label="Tipo de documento"
           value={docType}
@@ -66,7 +68,7 @@ export default function NewClientScreen() {
           keyboardType="number-pad"
           mono
           placeholder={isCuitCuil ? "20123456789" : "12345678"}
-          hint={isCuitCuil ? "Sin guiones. Necesario para emitir Factura A." : undefined}
+          {...(isCuitCuil && { hint: "Sin guiones. Necesario para emitir Factura A." })}
         />
         <Input
           label="Razón social / Nombre"

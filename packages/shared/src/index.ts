@@ -5,6 +5,7 @@ import {
   RecipientIvaCondition,
 } from "./recipient-iva-condition";
 import { ivaRates } from "./iva-rate";
+import { hasText } from "./text";
 import { DocumentType } from "./document-type";
 import { TransmissionType } from "./optional-type";
 import {
@@ -36,6 +37,11 @@ export * from "./pending-voucher";
 export * from "./sales-book";
 export * from "./arca-health";
 export * from "./push-token";
+export * from "./money";
+export * from "./text";
+export * from "./fiscal";
+export * from "./currency";
+export * from "./voucher-response";
 
 export const FiscalCondition = {
   RESPONSABLE_INSCRIPTO: "RESPONSABLE_INSCRIPTO",
@@ -114,21 +120,25 @@ export const draftAmountsSchema = z.object({
 
 export type DraftAmountsInput = z.infer<typeof draftAmountsSchema>;
 
-export interface DraftAmounts {
-  netAmount: number;
-  ivaAmount: number;
-  exemptAmount: number;
-  untaxedAmount: number;
-  tributeAmount: number;
-  totalAmount: number;
-}
+export const draftAmountsResultSchema = z.object({
+  netAmount: z.number(),
+  ivaAmount: z.number(),
+  exemptAmount: z.number(),
+  untaxedAmount: z.number(),
+  tributeAmount: z.number(),
+  totalAmount: z.number(),
+});
+
+export type DraftAmounts = z.infer<typeof draftAmountsResultSchema>;
+
+const supportedIvaRates: readonly number[] = ivaRates;
 
 export const itemSchema = z
   .object({
     description: z.string().min(1),
     quantity: z.number().positive(),
     unitPrice: z.number().nonnegative(),
-    ivaRate: z.number().refine((v) => (ivaRates as readonly number[]).includes(v), {
+    ivaRate: z.number().refine((rate) => supportedIvaRates.includes(rate), {
       message: "Alícuota de IVA no soportada",
     }),
 
@@ -209,114 +219,132 @@ export const associatedVoucherSchema = z.object({
     .optional(),
 });
 
-export const issueVoucherSchema = z
-  .object({
-    issuerId: z.string().min(1),
-    salesPoint: z.number().int().positive(),
-    voucherType: z.number().int().positive(),
-    concept: voucherConceptSchema,
-    recipient: z.object({
-      docType: z.number().int(),
-      docNumber: z.string().min(1),
-      legalName: z.string().optional(),
+const issueVoucherObjectSchema = z.object({
+  issuerId: z.string().min(1),
+  salesPoint: z.number().int().positive(),
+  voucherType: z.number().int().positive(),
+  concept: voucherConceptSchema,
+  recipient: z.object({
+    docType: z.number().int(),
+    docNumber: z.string().min(1),
+    legalName: z.string().optional(),
 
-      ivaConditionId: z.number().int().optional(),
-    }),
-    items: z.array(itemSchema).min(1),
-    currency: z.string().default(LOCAL_CURRENCY),
-    exchangeRate: z.number().positive().default(LOCAL_EXCHANGE_RATE),
+    ivaConditionId: z.number().int().optional(),
+  }),
+  items: z.array(itemSchema).min(1),
+  currency: z.string().default(LOCAL_CURRENCY),
+  exchangeRate: z.number().positive().default(LOCAL_EXCHANGE_RATE),
 
-    associatedVouchers: z.array(associatedVoucherSchema).optional(),
+  associatedVouchers: z.array(associatedVoucherSchema).optional(),
 
-    servicePeriod: servicePeriodSchema.optional(),
+  servicePeriod: servicePeriodSchema.optional(),
 
-    paymentDueDate: isoDate.optional(),
+  paymentDueDate: isoDate.optional(),
 
-    transmissionType: z
-      .enum([TransmissionType.OPEN_CIRCULATION, TransmissionType.COLLECTIVE_DEPOSIT])
-      .optional(),
+  transmissionType: z
+    .enum([TransmissionType.OPEN_CIRCULATION, TransmissionType.COLLECTIVE_DEPOSIT])
+    .optional(),
 
-    tributes: z.array(tributeSchema).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (
-      isCreditDebitNote(data.voucherType) &&
-      !(data.associatedVouchers && data.associatedVouchers.length > 0)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["associatedVouchers"],
-        message: "Las notas de crédito/débito requieren al menos un comprobante asociado.",
-      });
+  tributes: z.array(tributeSchema).optional(),
+});
+
+type IssueVoucherFields = z.infer<typeof issueVoucherObjectSchema>;
+
+function addIssue(ctx: z.RefinementCtx, path: (string | number)[], message: string): void {
+  ctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
+}
+
+function hasAssociatedVouchers(data: IssueVoucherFields): boolean {
+  return data.associatedVouchers !== undefined && data.associatedVouchers.length > 0;
+}
+
+function validateAssociatedVouchers(data: IssueVoucherFields, ctx: z.RefinementCtx): void {
+  if (isCreditDebitNote(data.voucherType) && !hasAssociatedVouchers(data)) {
+    addIssue(
+      ctx,
+      ["associatedVouchers"],
+      "Las notas de crédito/débito requieren al menos un comprobante asociado.",
+    );
+  }
+}
+
+function validateRecipient(data: IssueVoucherFields, ctx: z.RefinementCtx): void {
+  if (requiresRecipientCuit(data.voucherType) && data.recipient.docType !== DocumentType.CUIT) {
+    addIssue(
+      ctx,
+      ["recipient", "docType"],
+      `${voucherTypeName[data.voucherType] ?? "El comprobante"} requiere identificar al receptor con CUIT.`,
+    );
+  }
+
+  const ivaConditionId = data.recipient.ivaConditionId ?? defaultRecipientIvaCondition(data.voucherType);
+  if (!isRecipientIvaConditionAllowed(data.voucherType, ivaConditionId)) {
+    const conditionName = recipientIvaConditionName[ivaConditionId] ?? "undefined";
+    const voucherName = voucherTypeName[data.voucherType] ?? "este comprobante";
+    addIssue(
+      ctx,
+      ["recipient", "ivaConditionId"],
+      `Un receptor ${conditionName} no puede recibir ${voucherName}.`,
+    );
+  }
+}
+
+function validateServicePeriod(data: IssueVoucherFields, ctx: z.RefinementCtx): void {
+  if (!requiresServicePeriod(data.concept)) {
+    if (data.servicePeriod) {
+      addIssue(ctx, ["servicePeriod"], "El período facturado sólo corresponde a comprobantes de servicios.");
     }
+    return;
+  }
+  if (!data.servicePeriod) {
+    addIssue(ctx, ["servicePeriod"], "Los comprobantes de servicios requieren el período facturado.");
+  } else if (data.servicePeriod.from > data.servicePeriod.to) {
+    addIssue(
+      ctx,
+      ["servicePeriod", "to"],
+      "La fecha de fin del período no puede ser anterior a la de inicio.",
+    );
+  }
+}
 
-    if (requiresRecipientCuit(data.voucherType) && data.recipient.docType !== DocumentType.CUIT) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["recipient", "docType"],
-        message: `${voucherTypeName[data.voucherType] ?? "El comprobante"} requiere identificar al receptor con CUIT.`,
-      });
-    }
+function missingPaymentDueDateMessage(voucherType: number): string {
+  return isCreditInvoice(voucherType)
+    ? "La Factura de Crédito Electrónica MiPyME requiere la fecha de vencimiento de pago."
+    : "Los comprobantes de servicios requieren la fecha de vencimiento de pago.";
+}
 
-    const ivaConditionId = data.recipient.ivaConditionId ?? defaultRecipientIvaCondition(data.voucherType);
-    if (!isRecipientIvaConditionAllowed(data.voucherType, ivaConditionId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["recipient", "ivaConditionId"],
-        message: `Un receptor ${recipientIvaConditionName[ivaConditionId]} no puede recibir ${voucherTypeName[data.voucherType] ?? "este comprobante"}.`,
-      });
-    }
+function validatePaymentDueDate(data: IssueVoucherFields, ctx: z.RefinementCtx): void {
+  const needsPaymentDueDate = requiresServicePeriod(data.concept) || isCreditInvoice(data.voucherType);
+  const hasPaymentDueDate = hasText(data.paymentDueDate);
 
-    if (requiresServicePeriod(data.concept)) {
-      if (!data.servicePeriod) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["servicePeriod"],
-          message: "Los comprobantes de servicios requieren el período facturado.",
-        });
-      } else if (data.servicePeriod.from > data.servicePeriod.to) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["servicePeriod", "to"],
-          message: "La fecha de fin del período no puede ser anterior a la de inicio.",
-        });
-      }
-    } else if (data.servicePeriod) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["servicePeriod"],
-        message: "El período facturado sólo corresponde a comprobantes de servicios.",
-      });
-    }
+  if (needsPaymentDueDate && !hasPaymentDueDate) {
+    addIssue(ctx, ["paymentDueDate"], missingPaymentDueDateMessage(data.voucherType));
+  }
 
-    const needsPaymentDueDate = requiresServicePeriod(data.concept) || isCreditInvoice(data.voucherType);
+  if (!needsPaymentDueDate && hasPaymentDueDate) {
+    addIssue(ctx, ["paymentDueDate"], "La fecha de vencimiento de pago no corresponde a este comprobante.");
+  }
+}
 
-    if (needsPaymentDueDate && !data.paymentDueDate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["paymentDueDate"],
-        message: isCreditInvoice(data.voucherType)
-          ? "La Factura de Crédito Electrónica MiPyME requiere la fecha de vencimiento de pago."
-          : "Los comprobantes de servicios requieren la fecha de vencimiento de pago.",
-      });
-    }
+function validateTransmissionType(data: IssueVoucherFields, ctx: z.RefinementCtx): void {
+  if (data.transmissionType && !isCreditInvoice(data.voucherType)) {
+    addIssue(
+      ctx,
+      ["transmissionType"],
+      "El tipo de transmisión sólo corresponde a las Facturas de Crédito Electrónica MiPyME.",
+    );
+  }
+}
 
-    if (!needsPaymentDueDate && data.paymentDueDate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["paymentDueDate"],
-        message: "La fecha de vencimiento de pago no corresponde a este comprobante.",
-      });
-    }
+export const issueVoucherDraftSchema = issueVoucherObjectSchema;
 
-    if (data.transmissionType && !isCreditInvoice(data.voucherType)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["transmissionType"],
-        message: "El tipo de transmisión sólo corresponde a las Facturas de Crédito Electrónica MiPyME.",
-      });
-    }
-  });
+export const issueVoucherSchema = issueVoucherObjectSchema.superRefine((data, ctx) => {
+  validateAssociatedVouchers(data, ctx);
+  validateRecipient(data, ctx);
+  validateServicePeriod(data, ctx);
+  validatePaymentDueDate(data, ctx);
+  validateTransmissionType(data, ctx);
+});
 
 export type Item = z.infer<typeof itemSchema>;
 export type AssociatedVoucher = z.infer<typeof associatedVoucherSchema>;

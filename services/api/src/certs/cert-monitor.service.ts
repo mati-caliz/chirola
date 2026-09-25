@@ -6,9 +6,9 @@ import { WebhookService } from "../webhooks/webhook.service";
 import { WebhookEvent } from "../webhooks/webhook-events";
 import { PushNotificationService } from "../notifications/push-notification.service";
 import { CERTIFICATE_EXPIRY_PUSH_DAYS, certificateExpiringMessage } from "../notifications/push-messages";
+import { MS_PER_DAY } from "../common/time";
 
 const DEFAULT_WARNING_DAYS = 30;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class CertMonitorService {

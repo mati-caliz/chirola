@@ -21,7 +21,7 @@ export class PushTokensController {
   register(
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(pushTokenSchema)) body: PushTokenInput,
-  ) {
+  ): Promise<void> {
     return this.pushTokens.register(user.sub, body);
   }
 
@@ -30,7 +30,7 @@ export class PushTokensController {
   remove(
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(removePushTokenSchema)) body: RemovePushTokenInput,
-  ) {
+  ): Promise<void> {
     return this.pushTokens.remove(user.sub, body.token);
   }
 }

@@ -12,7 +12,7 @@ export const Card = ({
   onPress?: () => void;
   pad?: number;
   style?: ViewStyle;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const base: ViewStyle = {
     backgroundColor: theme.colors.surfaceCard,

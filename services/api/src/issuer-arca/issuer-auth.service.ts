@@ -54,11 +54,11 @@ export class IssuerAuthService {
         representativeCuit: true,
       },
     });
-    return this.buildAuth(issuer, service);
+    return await this.buildAuth(issuer, service);
   }
 
   private resolveHolderCuit(issuer: ArcaIssuer, holderCuit: string | null): string {
-    if (holderCuit) {
+    if (holderCuit !== null && holderCuit !== "") {
       assertCertificateBelongsToIssuer(issuer, holderCuit);
       return holderCuit;
     }

@@ -2,8 +2,9 @@ import { Stack } from "expo-router";
 import { ActiveIssuerProvider } from "@/lib/active-issuer";
 import { BiometricGate } from "@/components/BiometricGate";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import type { ReactNode } from "react";
 
-export default function AppLayout() {
+export default function AppLayout(): ReactNode {
   usePushNotifications();
 
   return (

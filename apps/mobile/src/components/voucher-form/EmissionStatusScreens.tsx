@@ -3,8 +3,9 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Banner, Button } from "@/components/ds";
 import { useTheme } from "@/hooks/use-theme";
+import type { ReactNode } from "react";
 
-export const EmittingScreen = () => {
+export const EmittingScreen = (): ReactNode => {
   const theme = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>
@@ -40,7 +41,7 @@ interface FailedEmissionScreenProps {
   onExit: () => void;
 }
 
-export const FailedEmissionScreen = ({ message, onRetry, onExit }: FailedEmissionScreenProps) => {
+export const FailedEmissionScreen = ({ message, onRetry, onExit }: FailedEmissionScreenProps): ReactNode => {
   const theme = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>

@@ -4,7 +4,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
-import { ExportVouchersService } from "./export-vouchers.service";
+import { ExportVouchersService, type ExportedVoucher } from "./export-vouchers.service";
 
 @Controller("export-vouchers")
 @UseGuards(JwtAuthGuard)
@@ -16,7 +16,7 @@ export class ExportVouchersController {
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(issueExportVoucherSchema))
     body: IssueExportVoucher,
-  ) {
+  ): Promise<ExportedVoucher> {
     return this.exportVouchers.issue(user.sub, body);
   }
 }

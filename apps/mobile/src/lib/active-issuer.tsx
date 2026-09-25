@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listIssuers, type Issuer } from "@/lib/resources";
+import { listIssuers } from "@/lib/resources";
+import type { Issuer } from "@chirola/shared";
+import { hasText } from "@chirola/shared";
 import { getPreference, preferenceKeys, removePreference, setPreference } from "@/lib/storage";
 
 interface ActiveIssuerState {
@@ -15,7 +17,7 @@ interface ActiveIssuerState {
 
 const ActiveIssuerContext = createContext<ActiveIssuerState | null>(null);
 
-export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
+export function ActiveIssuerProvider({ children }: Readonly<{ children: ReactNode }>): ReactNode {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["issuers"],
     queryFn: listIssuers,
@@ -25,16 +27,19 @@ export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
   const [restored, setRestored] = useState(false);
 
   useEffect(() => {
-    getPreference(preferenceKeys.activeIssuerId)
+    void getPreference(preferenceKeys.activeIssuerId)
       .then(setActiveIssuerId)
-      .finally(() => setRestored(true));
+      .finally(() => {
+        setRestored(true);
+      });
   }, []);
 
   useEffect(() => {
     if (!restored || issuers.length === 0) return;
-    const stillExists = activeIssuerId && issuers.some((issuer) => issuer.id === activeIssuerId);
-    if (!stillExists) {
-      setActiveIssuerId(issuers[0].id);
+    const stillExists = hasText(activeIssuerId) && issuers.some((issuer) => issuer.id === activeIssuerId);
+    const firstIssuer = issuers[0];
+    if (!stillExists && firstIssuer !== undefined) {
+      setActiveIssuerId(firstIssuer.id);
     }
   }, [restored, issuers, activeIssuerId]);
 
@@ -49,6 +54,10 @@ export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
     }
   }, [restored, activeIssuerId, issuers.length]);
 
+  const refetchIssuers = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
   const activeIssuer = useMemo(
     () => issuers.find((issuer) => issuer.id === activeIssuerId) ?? null,
     [issuers, activeIssuerId],
@@ -62,9 +71,9 @@ export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
       isLoading: isLoading || !restored,
       isError,
       selectIssuer,
-      refetch,
+      refetch: refetchIssuers,
     }),
-    [issuers, activeIssuer, activeIssuerId, isLoading, restored, isError, selectIssuer, refetch],
+    [issuers, activeIssuer, activeIssuerId, isLoading, restored, isError, selectIssuer, refetchIssuers],
   );
 
   return <ActiveIssuerContext.Provider value={value}>{children}</ActiveIssuerContext.Provider>;
@@ -72,6 +81,6 @@ export function ActiveIssuerProvider({ children }: { children: ReactNode }) {
 
 export function useActiveIssuer(): ActiveIssuerState {
   const ctx = useContext(ActiveIssuerContext);
-  if (!ctx) throw new Error("useActiveIssuer debe usarse dentro de <ActiveIssuerProvider>.");
+  if (ctx === null) throw new Error("useActiveIssuer debe usarse dentro de <ActiveIssuerProvider>.");
   return ctx;
 }

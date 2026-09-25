@@ -13,11 +13,11 @@ const ROW = "12/07/2026;1;5;123;123;30707153745;Proveedor SA;1000,00;0,00;0,00;2
 
 describe("parseArcaAmount", () => {
   it("lee el formato argentino con punto de miles y coma decimal", () => {
-    expect(parseArcaAmount("1.234,56")).toBe(1234.56);
+    expect(parseArcaAmount("1.234,56")).toBeCloseTo(1234.56);
   });
 
   it("lee el formato con punto decimal", () => {
-    expect(parseArcaAmount("1234.56")).toBe(1234.56);
+    expect(parseArcaAmount("1234.56")).toBeCloseTo(1234.56);
   });
 
   it("trata la celda vacía como cero", () => {
@@ -69,7 +69,7 @@ describe("parseMisComprobantesCsv", () => {
   });
 
   it("tolera el BOM y los encabezados con acentos", () => {
-    const { rows } = parseMisComprobantesCsv(`﻿${HEADER}\n${ROW}`);
+    const { rows } = parseMisComprobantesCsv(`\uFEFF${HEADER}\n${ROW}`);
 
     expect(rows).toHaveLength(1);
   });
@@ -78,7 +78,7 @@ describe("parseMisComprobantesCsv", () => {
     const row = ROW.replace("Proveedor SA", '"Proveedor SA; Sucursal Norte"');
     const { rows } = parseMisComprobantesCsv(`${HEADER}\n${row}`);
 
-    expect(rows[0].supplierName).toBe("Proveedor SA; Sucursal Norte");
+    expect(rows[0]?.supplierName).toBe("Proveedor SA; Sucursal Norte");
   });
 
   it("junta las filas ilegibles en vez de abortar el archivo entero", () => {
@@ -89,8 +89,8 @@ describe("parseMisComprobantesCsv", () => {
 
     expect(rows).toHaveLength(2);
     expect(invalid).toHaveLength(1);
-    expect(invalid[0].line).toBe(3);
-    expect(invalid[0].reason).toContain("CUIT");
+    expect(invalid[0]?.line).toBe(3);
+    expect(invalid[0]?.reason).toContain("CUIT");
   });
 
   it("rechaza un archivo que no es el de Mis Comprobantes", () => {

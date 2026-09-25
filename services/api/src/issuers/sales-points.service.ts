@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { IssuersService } from "./issuers.service";
 import { ArcaParamsService } from "./arca-params.service";
@@ -11,12 +12,17 @@ export class SalesPointsService {
     private readonly params: ArcaParamsService,
   ) {}
 
-  async list(userId: string, issuerId: string) {
+  async list(
+    userId: string,
+    issuerId: string,
+  ): Promise<{ number: number; id: string; description: string | null }[]> {
     await this.issuers.getFromUser(issuerId, userId);
-    return this.listForIssuer(issuerId);
+    return await this.listForIssuer(issuerId);
   }
 
-  listForIssuer(issuerId: string) {
+  listForIssuer(
+    issuerId: string,
+  ): Prisma.PrismaPromise<{ number: number; id: string; description: string | null }[]> {
     return this.prisma.salesPoint.findMany({
       where: { issuerId },
       orderBy: { number: "asc" },
@@ -24,7 +30,10 @@ export class SalesPointsService {
     });
   }
 
-  async sync(userId: string, issuerId: string) {
+  async sync(
+    userId: string,
+    issuerId: string,
+  ): Promise<{ number: number; id: string; description: string | null }[]> {
     const issuer = await this.issuers.getFromUser(issuerId, userId);
     const remote = await this.params.getSalesPoints(issuer);
     for (const point of remote) {
@@ -34,12 +43,17 @@ export class SalesPointsService {
         update: {},
       });
     }
-    return this.list(userId, issuerId);
+    return await this.list(userId, issuerId);
   }
 
-  async updateDescription(userId: string, issuerId: string, number: number, description: string) {
+  async updateDescription(
+    userId: string,
+    issuerId: string,
+    number: number,
+    description: string,
+  ): Promise<{ number: number; id: string; description: string | null }> {
     await this.issuers.getFromUser(issuerId, userId);
-    return this.prisma.salesPoint.update({
+    return await this.prisma.salesPoint.update({
       where: { issuerId_number: { issuerId, number } },
       data: { description: description.length > 0 ? description : null },
       select: { id: true, number: true, description: true },

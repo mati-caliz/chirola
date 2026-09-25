@@ -1,253 +1,168 @@
+import {
+  arcaHealthSchema,
+  arcaParamSchema,
+  certificateMatchSchema,
+  clientSchema,
+  createdIssuerSchema,
+  currencySchema,
+  draftAmountsResultSchema,
+  emissionPlanSchema,
+  exchangeRateSchema,
+  fiscalAlertsSchema,
+  generatedCsrSchema,
+  hasText,
+  issuedVoucherSchema,
+  issuerSchema,
+  issueVoucherDraftSchema,
+  ivaPositionSchema,
+  pendingVoucherSummarySchema,
+  salesBookSchema,
+  salesPointSchema,
+  taxpayerInfoSchema,
+  vencimientoSchema,
+  voucherDetailSchema,
+  voucherSummarySchema,
+} from "@chirola/shared";
 import type {
   ArcaHealth,
   ArcaParam,
   ArcaParamTypeName,
+  CertificateMatch,
+  Client,
+  CreatedIssuer,
+  CreateClient,
+  CreateIssuer,
+  Currency,
   DraftAmounts,
   DraftAmountsInput,
   EmissionPlan,
+  ExchangeRate,
+  FiscalAlerts,
+  GeneratedCsr,
+  IssuedVoucher,
+  Issuer,
+  IssueVoucher,
+  IvaPosition,
   PendingVoucherSummary,
   PushTokenInput,
   SalesBook,
-  UpdateClient,
-  CreateClient,
-  CreateIssuer,
-  IssueVoucher,
+  SalesPoint,
   TaxpayerInfo,
+  UpdateClient,
+  Vencimiento,
+  VoucherDetail,
+  VoucherSummary,
 } from "@chirola/shared";
-import { apiFetch, apiFetchBase64 } from "./api";
+import { z } from "zod";
+import { apiFetch, apiFetchBase64, apiSend } from "./api";
 
-export interface Issuer {
-  id: string;
-  cuit: string;
-  legalName: string;
-  ivaCondition: string;
-  environment: string;
-  createdAt: string;
-  updatedAt: string;
-  certificate: { alias: string | null; validUntil: string | null } | null;
-}
+export const listVouchers = (issuerId: string): Promise<VoucherSummary[]> =>
+  apiFetch(`/issuers/${issuerId}/vouchers`, z.array(voucherSummarySchema));
 
-export interface Client {
-  id: string;
-  issuerId: string;
-  docType: number;
-  docNumber: string;
-  legalName: string | null;
-  ivaCondition: string | null;
-  email: string | null;
-}
+export const getIvaPosition = (issuerId: string, year: number, month: number): Promise<IvaPosition> =>
+  apiFetch(`/fiscal/iva-position?issuerId=${issuerId}&year=${year}&month=${month}`, ivaPositionSchema);
 
-export interface IssuedVoucher {
-  id: string;
-  voucherType: number;
-  salesPoint: number;
-  number: number;
-  cae: string;
-  caeExpiration: string;
-  netAmount: number;
-  ivaAmount: number;
-  totalAmount: number;
-  qrData: string;
-}
+export const getVencimientos = (issuerId: string): Promise<Vencimiento[]> =>
+  apiFetch(`/fiscal/vencimientos?issuerId=${issuerId}`, z.array(vencimientoSchema));
 
-export interface VoucherItem {
-  id: string;
-  description: string;
-  quantity: string;
-  unitPrice: string;
-  ivaRate: string;
-  subtotal: string;
-}
+export const getFiscalAlerts = (issuerId: string): Promise<FiscalAlerts> =>
+  apiFetch(`/fiscal/alerts?issuerId=${issuerId}`, fiscalAlertsSchema);
 
-export interface VoucherObservation {
-  code: string;
-  message: string;
-}
+export const listSalesPoints = (issuerId: string): Promise<SalesPoint[]> =>
+  apiFetch(`/issuers/${issuerId}/sales-points`, z.array(salesPointSchema));
 
-export interface VoucherDetail {
-  id: string;
-  issuerId: string;
-  voucherType: number;
-  number: number;
-  voucherDate: string;
-  concept: number;
-  netAmount: string;
-  ivaAmount: string;
-  totalAmount: string;
-  currency: string;
-  exchangeRate: string;
-  status: string;
-  cae: string | null;
-  caeExpiration: string | null;
-  qrData: string | null;
-  arcaObservations: VoucherObservation[] | null;
-  recipientDocType: number | null;
-  recipientDocNumber: string | null;
-  recipientName: string | null;
-  items: VoucherItem[];
-  salesPoint: { number: number };
-  issuer: { legalName: string; cuit: string };
-  client: Client | null;
-}
+export const syncSalesPoints = (issuerId: string): Promise<SalesPoint[]> =>
+  apiFetch(`/issuers/${issuerId}/sales-points/sync`, z.array(salesPointSchema), { method: "POST" });
 
-export interface VoucherSummary {
-  id: string;
-  voucherType: number;
-  number: number;
-  voucherDate: string;
-  status: string;
-  cae: string | null;
-  totalAmount: string;
-  currency: string;
-  recipientName: string | null;
-  salesPoint: { number: number };
-  client: { legalName: string | null; docNumber: string } | null;
-}
-
-export const listVouchers = (issuerId: string) => apiFetch<VoucherSummary[]>(`/issuers/${issuerId}/vouchers`);
-
-export interface IvaRateBreakdown {
-  rate: number;
-  debit: number;
-  credit: number;
-  balance: number;
-}
-
-export interface IvaPosition {
-  year: number;
-  month: number;
-  breakdown: IvaRateBreakdown[];
-  totalDebit: number;
-  totalCredit: number;
-  balance: number;
-}
-
-export type VencimientoStatus = "OVERDUE" | "DUE_SOON" | "UPCOMING";
-
-export interface Vencimiento {
-  type: string;
-  label: string;
-  dueDate: string;
-  status: VencimientoStatus;
-}
-
-export const getIvaPosition = (issuerId: string, year: number, month: number) =>
-  apiFetch<IvaPosition>(`/fiscal/iva-position?issuerId=${issuerId}&year=${year}&month=${month}`);
-
-export const getVencimientos = (issuerId: string) =>
-  apiFetch<Vencimiento[]>(`/fiscal/vencimientos?issuerId=${issuerId}`);
-
-export interface FiscalAlerts {
-  vencimientos: Vencimiento[];
-  certificate: { validUntil: string; daysToExpiry: number } | null;
-}
-
-export const getFiscalAlerts = (issuerId: string) =>
-  apiFetch<FiscalAlerts>(`/fiscal/alerts?issuerId=${issuerId}`);
-
-export interface SalesPoint {
-  id: string;
-  number: number;
-  description: string | null;
-}
-
-export const listSalesPoints = (issuerId: string) =>
-  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points`);
-
-export const syncSalesPoints = (issuerId: string) =>
-  apiFetch<SalesPoint[]>(`/issuers/${issuerId}/sales-points/sync`, { method: "POST" });
-
-export const updateSalesPoint = (issuerId: string, number: number, description: string) =>
-  apiFetch<SalesPoint>(`/issuers/${issuerId}/sales-points/${number}`, {
+export const updateSalesPoint = (
+  issuerId: string,
+  number: number,
+  description: string,
+): Promise<SalesPoint> =>
+  apiFetch(`/issuers/${issuerId}/sales-points/${number}`, salesPointSchema, {
     method: "PATCH",
     body: { description },
   });
 
-export const listIssuers = () => apiFetch<Issuer[]>("/issuers");
+export const listIssuers = (): Promise<Issuer[]> => apiFetch("/issuers", z.array(issuerSchema));
 
-export const createIssuer = (body: CreateIssuer) => apiFetch<Issuer>("/issuers", { method: "POST", body });
+export const createIssuer = (body: CreateIssuer): Promise<CreatedIssuer> =>
+  apiFetch("/issuers", createdIssuerSchema, { method: "POST", body });
 
-export const generateCsr = (issuerId: string, alias?: string) =>
-  apiFetch<{ csrPem: string }>(`/issuers/${issuerId}/csr`, {
+export const generateCsr = (issuerId: string, alias?: string): Promise<GeneratedCsr> =>
+  apiFetch(`/issuers/${issuerId}/csr`, generatedCsrSchema, {
     method: "POST",
-    body: alias ? { alias } : {},
+    body: hasText(alias) ? { alias } : {},
   });
 
-export const matchCertificate = (issuerId: string, certPem: string) =>
-  apiFetch<{ ok: true }>(`/issuers/${issuerId}/certificate`, {
+export const matchCertificate = (issuerId: string, certPem: string): Promise<CertificateMatch> =>
+  apiFetch(`/issuers/${issuerId}/certificate`, certificateMatchSchema, {
     method: "PUT",
     body: { certPem },
   });
 
-export const listClients = (issuerId: string) => apiFetch<Client[]>(`/issuers/${issuerId}/clients`);
+export const listClients = (issuerId: string): Promise<Client[]> =>
+  apiFetch(`/issuers/${issuerId}/clients`, z.array(clientSchema));
 
-export const createClient = (issuerId: string, body: CreateClient) =>
-  apiFetch<Client>(`/issuers/${issuerId}/clients`, { method: "POST", body });
+export const createClient = (issuerId: string, body: CreateClient): Promise<Client> =>
+  apiFetch(`/issuers/${issuerId}/clients`, clientSchema, { method: "POST", body });
 
-export const updateClient = (issuerId: string, id: string, body: UpdateClient) =>
-  apiFetch<Client>(`/issuers/${issuerId}/clients/${id}`, {
+export const updateClient = (issuerId: string, id: string, body: UpdateClient): Promise<Client> =>
+  apiFetch(`/issuers/${issuerId}/clients/${id}`, clientSchema, {
     method: "PATCH",
     body,
   });
 
-export interface Currency {
-  id: string;
-  description: string;
-}
+export const listCurrencies = (issuerId: string): Promise<Currency[]> =>
+  apiFetch(`/issuers/${issuerId}/currencies`, z.array(currencySchema));
 
-export interface ExchangeRate {
-  currencyId: string;
-  rate: number;
-  date: string;
-}
+export const getExchangeRate = (issuerId: string, currencyId: string): Promise<ExchangeRate> =>
+  apiFetch(`/issuers/${issuerId}/exchange-rate/${currencyId}`, exchangeRateSchema);
 
-export const listCurrencies = (issuerId: string) => apiFetch<Currency[]>(`/issuers/${issuerId}/currencies`);
+export const listArcaParams = (issuerId: string, paramType: ArcaParamTypeName): Promise<ArcaParam[]> =>
+  apiFetch(`/issuers/${issuerId}/params/${paramType}`, z.array(arcaParamSchema));
 
-export const getExchangeRate = (issuerId: string, currencyId: string) =>
-  apiFetch<ExchangeRate>(`/issuers/${issuerId}/exchange-rate/${currencyId}`);
+export const lookupTaxpayer = (issuerId: string, cuit: string): Promise<TaxpayerInfo> =>
+  apiFetch(`/issuers/${issuerId}/taxpayers/${cuit}`, taxpayerInfoSchema);
 
-export const listArcaParams = (issuerId: string, paramType: ArcaParamTypeName) =>
-  apiFetch<ArcaParam[]>(`/issuers/${issuerId}/params/${paramType}`);
+export const issueVoucher = (body: IssueVoucher): Promise<IssuedVoucher> =>
+  apiFetch("/vouchers", issuedVoucherSchema, { method: "POST", body });
 
-export const lookupTaxpayer = (issuerId: string, cuit: string) =>
-  apiFetch<TaxpayerInfo>(`/issuers/${issuerId}/taxpayers/${cuit}`);
+export const getVoucher = (id: string): Promise<VoucherDetail> =>
+  apiFetch(`/vouchers/${id}`, voucherDetailSchema);
 
-export const issueVoucher = (body: IssueVoucher) =>
-  apiFetch<IssuedVoucher>("/vouchers", { method: "POST", body });
+export const dryRunVoucher = (body: IssueVoucher): Promise<EmissionPlan> =>
+  apiFetch("/vouchers/dry-run", emissionPlanSchema, { method: "POST", body });
 
-export const getVoucher = (id: string) => apiFetch<VoucherDetail>(`/vouchers/${id}`);
+export const getCreditNoteDraft = (voucherId: string): Promise<IssueVoucher> =>
+  apiFetch(`/vouchers/${voucherId}/credit-note-draft`, issueVoucherDraftSchema);
 
-export const dryRunVoucher = (body: IssueVoucher) =>
-  apiFetch<EmissionPlan>("/vouchers/dry-run", { method: "POST", body });
+export const listPendingVouchers = (issuerId: string): Promise<PendingVoucherSummary[]> =>
+  apiFetch(`/issuers/${issuerId}/pending-vouchers`, z.array(pendingVoucherSummarySchema));
 
-export const getCreditNoteDraft = (voucherId: string) =>
-  apiFetch<IssueVoucher>(`/vouchers/${voucherId}/credit-note-draft`);
+export const retryPendingVoucher = (issuerId: string, id: string): Promise<void> =>
+  apiSend(`/issuers/${issuerId}/pending-vouchers/${id}/retry`, { method: "POST" });
 
-export const listPendingVouchers = (issuerId: string) =>
-  apiFetch<PendingVoucherSummary[]>(`/issuers/${issuerId}/pending-vouchers`);
+export const discardPendingVoucher = (issuerId: string, id: string): Promise<void> =>
+  apiSend(`/issuers/${issuerId}/pending-vouchers/${id}`, { method: "DELETE" });
 
-export const retryPendingVoucher = (issuerId: string, id: string) =>
-  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}/retry`, { method: "POST" });
-
-export const discardPendingVoucher = (issuerId: string, id: string) =>
-  apiFetch<void>(`/issuers/${issuerId}/pending-vouchers/${id}`, { method: "DELETE" });
-
-const periodQuery = (issuerId: string, year: number, month: number) =>
+const periodQuery = (issuerId: string, year: number, month: number): string =>
   `issuerId=${issuerId}&year=${year}&month=${month}`;
 
-export const getSalesBook = (issuerId: string, year: number, month: number) =>
-  apiFetch<SalesBook>(`/fiscal/sales-book?${periodQuery(issuerId, year, month)}`);
+export const getSalesBook = (issuerId: string, year: number, month: number): Promise<SalesBook> =>
+  apiFetch(`/fiscal/sales-book?${periodQuery(issuerId, year, month)}`, salesBookSchema);
 
-export const downloadSalesBookCsv = (issuerId: string, year: number, month: number) =>
+export const downloadSalesBookCsv = (issuerId: string, year: number, month: number): Promise<string> =>
   apiFetchBase64(`/fiscal/sales-book/csv?${periodQuery(issuerId, year, month)}`);
 
-export const getArcaHealth = (issuerId: string) => apiFetch<ArcaHealth>(`/issuers/${issuerId}/arca-health`);
+export const getArcaHealth = (issuerId: string): Promise<ArcaHealth> =>
+  apiFetch(`/issuers/${issuerId}/arca-health`, arcaHealthSchema);
 
-export const registerPushToken = (body: PushTokenInput) =>
-  apiFetch<void>("/push-tokens", { method: "POST", body });
+export const registerPushToken = (body: PushTokenInput): Promise<void> =>
+  apiSend("/push-tokens", { method: "POST", body });
 
-export const removePushToken = (token: string) =>
-  apiFetch<void>("/push-tokens", { method: "DELETE", body: { token } });
+export const removePushToken = (token: string): Promise<void> =>
+  apiSend("/push-tokens", { method: "DELETE", body: { token } });
 
-export const calculateDraftAmounts = (body: DraftAmountsInput) =>
-  apiFetch<DraftAmounts>("/vouchers/amounts", { method: "POST", body });
+export const calculateDraftAmounts = (body: DraftAmountsInput): Promise<DraftAmounts> =>
+  apiFetch("/vouchers/amounts", draftAmountsResultSchema, { method: "POST", body });

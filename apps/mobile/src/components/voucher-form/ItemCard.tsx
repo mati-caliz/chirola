@@ -3,6 +3,7 @@ import { ivaRates, TaxTreatment, type TaxTreatmentType } from "@chirola/shared";
 import { Button, Card, Input, Segmented } from "@/components/ds";
 import { useTheme } from "@/hooks/use-theme";
 import { DEFAULT_IVA_RATE, NO_IVA_RATE, taxTreatmentOptions, type ItemForm } from "./form-model";
+import type { ReactNode } from "react";
 
 interface ItemCardProps {
   item: ItemForm;
@@ -22,14 +23,15 @@ export const ItemCard = ({
   canRemove,
   onChange,
   onRemove,
-}: ItemCardProps) => {
+}: ItemCardProps): ReactNode => {
   const theme = useTheme();
   const taxed = discriminatesIva && item.taxTreatment === TaxTreatment.TAXED;
-  const chooseTaxTreatment = (taxTreatment: TaxTreatmentType) =>
+  const chooseTaxTreatment = (taxTreatment: TaxTreatmentType): void => {
     onChange({
       taxTreatment,
       ivaRate: taxTreatment === TaxTreatment.TAXED ? DEFAULT_IVA_RATE : NO_IVA_RATE,
     });
+  };
 
   return (
     <Card>
@@ -61,7 +63,9 @@ export const ItemCard = ({
       <Input
         label="Descripción"
         value={item.description}
-        onChangeText={(description) => onChange({ description })}
+        onChangeText={(description) => {
+          onChange({ description });
+        }}
       />
       <View style={{ height: 10 }} />
       <View style={{ flexDirection: "row", gap: 10 }}>
@@ -69,7 +73,9 @@ export const ItemCard = ({
           <Input
             label="Cantidad"
             value={item.quantity}
-            onChangeText={(quantity) => onChange({ quantity })}
+            onChangeText={(quantity) => {
+              onChange({ quantity });
+            }}
             keyboardType="decimal-pad"
             mono
           />
@@ -78,7 +84,9 @@ export const ItemCard = ({
           <Input
             label="Precio unitario"
             value={item.unitPrice}
-            onChangeText={(unitPrice) => onChange({ unitPrice })}
+            onChangeText={(unitPrice) => {
+              onChange({ unitPrice });
+            }}
             keyboardType="decimal-pad"
             mono
             prefix="$"
@@ -102,7 +110,9 @@ export const ItemCard = ({
           <Segmented
             value={item.ivaRate}
             options={ivaRateOptions}
-            onChange={(ivaRate) => onChange({ ivaRate })}
+            onChange={(ivaRate) => {
+              onChange({ ivaRate });
+            }}
             label="IVA"
           />
           <Text

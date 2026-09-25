@@ -77,3 +77,37 @@ export const representativeSchema = z.object({
 });
 
 export type Representative = z.infer<typeof representativeSchema>;
+
+export const createdIssuerSchema = z.object({
+  id: z.string(),
+  cuit: z.string(),
+  legalName: z.string(),
+  ivaCondition: z.string(),
+  environment: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type CreatedIssuer = z.infer<typeof createdIssuerSchema>;
+
+export const issuerSchema = createdIssuerSchema.extend({
+  certificate: z.object({ alias: z.string().nullable(), validUntil: z.string().nullable() }).nullable(),
+});
+
+export type Issuer = z.infer<typeof issuerSchema>;
+
+export const salesPointSchema = z.object({
+  id: z.string(),
+  number: z.number(),
+  description: z.string().nullable(),
+});
+
+export type SalesPoint = z.infer<typeof salesPointSchema>;
+
+export const generatedCsrSchema = z.object({ csrPem: z.string() });
+
+export type GeneratedCsr = z.infer<typeof generatedCsrSchema>;
+
+export const certificateMatchSchema = z.object({ ok: z.literal(true) });
+
+export type CertificateMatch = z.infer<typeof certificateMatchSchema>;

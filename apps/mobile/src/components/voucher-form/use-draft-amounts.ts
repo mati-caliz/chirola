@@ -1,11 +1,11 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { DraftAmountsInput } from "@chirola/shared";
+import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import type { DraftAmounts, DraftAmountsInput } from "@chirola/shared";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { calculateDraftAmounts } from "@/lib/resources";
 
 const RECALCULATION_DELAY_MS = 400;
 
-export function useDraftAmounts(input: DraftAmountsInput | null) {
+export function useDraftAmounts(input: DraftAmountsInput | null): UseQueryResult<NoInfer<DraftAmounts>> {
   const debounced = useDebouncedValue(input, RECALCULATION_DELAY_MS);
   return useQuery({
     queryKey: ["draft-amounts", debounced],

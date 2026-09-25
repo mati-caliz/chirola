@@ -3,13 +3,14 @@ import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ds";
 import { useTheme } from "@/hooks/use-theme";
+import type { ReactNode } from "react";
 
 interface QueuedEmissionScreenProps {
   onSeeVouchers: () => void;
   onExit: () => void;
 }
 
-export const QueuedEmissionScreen = ({ onSeeVouchers, onExit }: QueuedEmissionScreenProps) => {
+export const QueuedEmissionScreen = ({ onSeeVouchers, onExit }: QueuedEmissionScreenProps): ReactNode => {
   const theme = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>

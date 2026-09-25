@@ -3,117 +3,138 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { AuthService } from "./auth.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 import { hashRefreshToken } from "./refresh-token.util";
 
-type Row = Record<string, unknown>;
+interface UserRow {
+  id: string;
+  email: string;
+  password: string;
+}
+
+interface TokenRow {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+}
+
+interface TokenUpdate {
+  revokedAt?: Date | null;
+  expiresAt?: Date;
+}
+
+const ONE_SECOND_MS = 1000;
+const MINIMUM_REFRESH_TOKEN_LENGTH = 20;
 
 function fakePrisma() {
-  const users = new Map<string, Row>();
-  const tokens = new Map<string, Row>();
-  let seq = 0;
-  const prisma = {
-    _users: users,
-    _tokens: tokens,
+  const users = new Map<string, UserRow>();
+  const tokens = new Map<string, TokenRow>();
+  let sequence = 0;
+  return {
+    tokens,
     user: {
-      findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
-        [...users.values()].find((u) => u.id === where.id || u.email === where.email) ?? null,
-      create: async ({ data }: { data: Row }) => {
-        const u = { id: `u${++seq}`, ...data };
-        users.set(u.id, u);
-        return u;
+      findUnique: ({ where }: { where: { id?: string; email?: string } }) =>
+        Promise.resolve(
+          [...users.values()].find((row) => row.id === where.id || row.email === where.email) ?? null,
+        ),
+      create: ({ data }: { data: Omit<UserRow, "id"> }) => {
+        const user = { id: `u${String(++sequence)}`, ...data };
+        users.set(user.id, user);
+        return Promise.resolve(user);
       },
     },
     refreshToken: {
-      create: async ({ data }: { data: Row }) => {
-        const t = { id: `t${++seq}`, revokedAt: null, ...data };
-        tokens.set(t.id, t);
-        return t;
+      create: ({ data }: { data: Omit<TokenRow, "id" | "revokedAt"> }) => {
+        const item: TokenRow = { id: `t${String(++sequence)}`, revokedAt: null, ...data };
+        tokens.set(item.id, item);
+        return Promise.resolve(item);
       },
-      findUnique: async ({
-        where,
-        include,
-      }: {
-        where: { tokenHash: string };
-        include?: { user?: boolean };
-      }) => {
-        const t = [...tokens.values()].find((x) => x.tokenHash === where.tokenHash) ?? null;
-        if (t && include?.user) return { ...t, user: users.get(t.userId as string) };
-        return t;
+      findUnique: ({ where, include }: { where: { tokenHash: string }; include?: { user?: boolean } }) => {
+        const item = [...tokens.values()].find((row) => row.tokenHash === where.tokenHash) ?? null;
+        if (item !== null && include?.user === true) {
+          return Promise.resolve({ ...item, user: users.get(item.userId) });
+        }
+        return Promise.resolve(item);
       },
-      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
-        const t = { ...tokens.get(where.id), ...data };
-        tokens.set(where.id, t);
-        return t;
+      update: ({ where, data }: { where: { id: string }; data: TokenUpdate }) => {
+        const existing = tokens.get(where.id);
+        if (existing !== undefined) Object.assign(existing, data);
+        return Promise.resolve(existing);
       },
-      updateMany: async ({ where, data }: { where: { tokenHash: string }; data: Row }) => {
+      updateMany: ({ where, data }: { where: { tokenHash: string }; data: TokenUpdate }) => {
         let count = 0;
-        for (const t of tokens.values()) {
-          if (t.tokenHash === where.tokenHash && t.revokedAt == null) {
-            Object.assign(t, data);
+        for (const row of tokens.values()) {
+          if (row.tokenHash === where.tokenHash && row.revokedAt === null) {
+            Object.assign(row, data);
             count++;
           }
         }
-        return { count };
+        return Promise.resolve({ count });
       },
     },
   };
-  return prisma as unknown as PrismaService & { _tokens: Map<string, Row> };
 }
 
-function service(prisma: PrismaService) {
-  const jwt = { sign: () => "signed.jwt.token" } as unknown as JwtService;
-  const config = {
-    get: (_k: string, def?: string) => def,
-  } as unknown as ConfigService;
-  return new AuthService(prisma, jwt, config);
+type FakePrisma = ReturnType<typeof fakePrisma>;
+
+function service(prisma: FakePrisma): Promise<AuthService> {
+  const jwt = { sign: () => "signed.jwt.token" };
+  const config = { get: (_key: string, defaultValue?: string) => defaultValue };
+  return instantiateWithDoubles(AuthService, [
+    { token: PrismaService, value: prisma },
+    { token: JwtService, value: jwt },
+    { token: ConfigService, value: config },
+  ]);
 }
 
 describe("AuthService — refresh tokens", () => {
   it("register/login emiten access + refresh token", async () => {
     const prisma = fakePrisma();
-    const svc = service(prisma);
-    const res = await svc.register({ email: "a@b.com", password: "secret123" });
-    expect(res.token).toBe("signed.jwt.token");
-    expect(res.refreshToken).toEqual(expect.any(String));
-    expect(res.refreshToken.length).toBeGreaterThan(20);
+    const authService = await service(prisma);
+    const response = await authService.register({ email: "a@b.com", password: "secret123" });
+    expect(response.token).toBe("signed.jwt.token");
+    expect(response.refreshToken).toEqual(expect.any(String));
+    expect(response.refreshToken.length).toBeGreaterThan(MINIMUM_REFRESH_TOKEN_LENGTH);
   });
 
   it("refresh rota el token: emite uno nuevo y revoca el usado", async () => {
     const prisma = fakePrisma();
-    const svc = service(prisma);
-    const { refreshToken } = await svc.register({ email: "a@b.com", password: "secret123" });
+    const authService = await service(prisma);
+    const { refreshToken } = await authService.register({ email: "a@b.com", password: "secret123" });
 
-    const rotated = await svc.refresh(refreshToken);
+    const rotated = await authService.refresh(refreshToken);
     expect(rotated.refreshToken).not.toBe(refreshToken);
 
-    await expect(svc.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
-    await expect(svc.refresh(rotated.refreshToken)).resolves.toHaveProperty("refreshToken");
+    await expect(authService.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(authService.refresh(rotated.refreshToken)).resolves.toHaveProperty("refreshToken");
   });
 
   it("logout revoca el refresh token (idempotente)", async () => {
     const prisma = fakePrisma();
-    const svc = service(prisma);
-    const { refreshToken } = await svc.register({ email: "a@b.com", password: "secret123" });
+    const authService = await service(prisma);
+    const { refreshToken } = await authService.register({ email: "a@b.com", password: "secret123" });
 
-    await expect(svc.logout(refreshToken)).resolves.toEqual({ ok: true });
-    await expect(svc.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
-    await expect(svc.logout(refreshToken)).resolves.toEqual({ ok: true });
+    await expect(authService.logout(refreshToken)).resolves.toEqual({ ok: true });
+    await expect(authService.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(authService.logout(refreshToken)).resolves.toEqual({ ok: true });
   });
 
   it("rechaza un refresh token vencido", async () => {
     const prisma = fakePrisma();
-    const svc = service(prisma);
-    const { refreshToken } = await svc.register({ email: "a@b.com", password: "secret123" });
-    for (const t of prisma._tokens.values()) {
-      if (t.tokenHash === hashRefreshToken(refreshToken)) {
-        t.expiresAt = new Date(Date.now() - 1000);
+    const authService = await service(prisma);
+    const { refreshToken } = await authService.register({ email: "a@b.com", password: "secret123" });
+    for (const row of prisma.tokens.values()) {
+      if (row.tokenHash === hashRefreshToken(refreshToken)) {
+        row.expiresAt = new Date(Date.now() - ONE_SECOND_MS);
       }
     }
-    await expect(svc.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(authService.refresh(refreshToken)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it("rechaza un refresh token inexistente", async () => {
-    const svc = service(fakePrisma());
-    await expect(svc.refresh("no-existe")).rejects.toBeInstanceOf(UnauthorizedException);
+    const authService = await service(fakePrisma());
+    await expect(authService.refresh("no-existe")).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

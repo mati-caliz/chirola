@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Link } from "expo-router";
 import { registerSchema } from "@chirola/shared";
@@ -6,7 +6,7 @@ import { brandColor, Button, ErrorText, Screen, Subtitle, TextField, Title } fro
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/hooks/use-theme";
 
-export default function RegisterScreen() {
+export default function RegisterScreen(): ReactNode {
   const theme = useTheme();
   const { register } = useAuth();
   const [email, setEmail] = useState("");
@@ -14,7 +14,7 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function onSubmit() {
+  async function onSubmit(): Promise<void> {
     setError(null);
     const parsed = registerSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -24,8 +24,8 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       await register(parsed.data.email, parsed.data.password);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear la cuenta.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "No se pudo crear la cuenta.");
     } finally {
       setSubmitting(false);
     }
@@ -63,7 +63,13 @@ export default function RegisterScreen() {
         placeholder="Mínimo 8 caracteres"
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Crear cuenta" onPress={onSubmit} loading={submitting} />
+      <Button
+        title="Crear cuenta"
+        onPress={() => {
+          void onSubmit();
+        }}
+        loading={submitting}
+      />
       <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
         <Subtitle>¿Ya tenés cuenta?</Subtitle>
         <Link href="/(auth)/login" replace>

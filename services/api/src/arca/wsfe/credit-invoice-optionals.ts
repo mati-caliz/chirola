@@ -27,7 +27,7 @@ export function buildCreditInvoiceOptionals(
     return [{ id: ArcaOptionalType.CANCELLATION, value: CANCELLATION_NO }];
   }
 
-  if (!issuer.cbu) {
+  if (issuer.cbu === null || issuer.cbu === "") {
     throw new BadRequestException(
       "Para emitir una Factura de Crédito Electrónica MiPyME hay que cargar el CBU del emisor.",
     );
@@ -41,7 +41,7 @@ export function buildCreditInvoiceOptionals(
     },
   ];
 
-  if (issuer.paymentAlias) {
+  if (issuer.paymentAlias !== null && issuer.paymentAlias !== "") {
     optionals.push({
       id: ArcaOptionalType.PAYMENT_ALIAS,
       value: issuer.paymentAlias,

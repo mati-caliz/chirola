@@ -2,8 +2,9 @@ import { type ReactNode } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/use-theme";
+import { isRenderable } from "@/lib/react-node";
 
-export const Screen = ({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) => {
+export const Screen = ({ children, scroll = true }: { children: ReactNode; scroll?: boolean }): ReactNode => {
   const theme = useTheme();
   const content = { padding: theme.spacing.screenPad, gap: theme.spacing.stackGap };
   const body = scroll ? (
@@ -24,7 +25,7 @@ export const Screen = ({ children, scroll = true }: { children: ReactNode; scrol
   );
 };
 
-export const Title = ({ children }: { children: ReactNode }) => {
+export const Title = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -40,7 +41,7 @@ export const Title = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const Subtitle = ({ children }: { children: ReactNode }) => {
+export const Subtitle = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -56,7 +57,7 @@ export const Subtitle = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const Overline = ({ children }: { children: ReactNode }) => {
+export const Overline = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -73,7 +74,7 @@ export const Overline = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const Label = ({ children }: { children: ReactNode }) => {
+export const Label = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -89,7 +90,7 @@ export const Label = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const BodyText = ({ children }: { children: ReactNode }) => {
+export const BodyText = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -105,9 +106,9 @@ export const BodyText = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const ErrorText = ({ children }: { children: ReactNode }) => {
+export const ErrorText = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
-  if (!children) return null;
+  if (!isRenderable(children)) return null;
   return (
     <Text
       style={{ color: theme.colors.errFg, fontFamily: theme.font.regular, fontSize: theme.fontSize.caption }}
@@ -117,14 +118,14 @@ export const ErrorText = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const Centered = ({ children }: { children: ReactNode }) => {
+export const Centered = ({ children }: { children: ReactNode }): ReactNode => {
   const theme = useTheme();
   return (
     <View style={[styles.centered, { padding: theme.spacing.xxl, gap: theme.spacing.lg }]}>{children}</View>
   );
 };
 
-export const Loading = () => {
+export const Loading = (): ReactNode => {
   const theme = useTheme();
   return (
     <View style={[styles.flex, styles.center, { backgroundColor: theme.colors.bgApp }]}>

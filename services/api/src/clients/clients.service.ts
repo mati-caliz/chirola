@@ -1,37 +1,40 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { UpdateClient, CreateClient } from "@chirola/shared";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Client } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { optionalField } from "../common/optional-field";
+
+const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 
 @Injectable()
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(issuerId: string, input: CreateClient) {
+  async create(issuerId: string, input: CreateClient): Promise<Client> {
     try {
       return await this.prisma.client.create({
         data: {
           issuerId,
           docType: input.docType,
           docNumber: input.docNumber,
-          legalName: input.legalName,
-          ivaCondition: input.ivaCondition,
-          email: input.email,
+          ...optionalField("legalName", input.legalName),
+          ...optionalField("ivaCondition", input.ivaCondition),
+          ...optionalField("email", input.email),
         },
       });
-    } catch (e) {
-      throw this.mapError(e);
+    } catch (error) {
+      throw this.mapError(error);
     }
   }
 
-  list(issuerId: string) {
+  list(issuerId: string): Promise<Client[]> {
     return this.prisma.client.findMany({
       where: { issuerId },
       orderBy: { legalName: "asc" },
     });
   }
 
-  async get(issuerId: string, id: string) {
+  async get(issuerId: string, id: string): Promise<Client> {
     const client = await this.prisma.client.findFirst({
       where: { id, issuerId },
     });
@@ -39,34 +42,34 @@ export class ClientsService {
     return client;
   }
 
-  async update(issuerId: string, id: string, input: UpdateClient) {
+  async update(issuerId: string, id: string, input: UpdateClient): Promise<Client> {
     await this.get(issuerId, id);
     try {
       return await this.prisma.client.update({
         where: { id },
         data: {
-          docType: input.docType,
-          docNumber: input.docNumber,
-          legalName: input.legalName,
-          ivaCondition: input.ivaCondition,
-          email: input.email,
+          ...optionalField("docType", input.docType),
+          ...optionalField("docNumber", input.docNumber),
+          ...optionalField("legalName", input.legalName),
+          ...optionalField("ivaCondition", input.ivaCondition),
+          ...optionalField("email", input.email),
         },
       });
-    } catch (e) {
-      throw this.mapError(e);
+    } catch (error) {
+      throw this.mapError(error);
     }
   }
 
-  async delete(issuerId: string, id: string) {
+  async delete(issuerId: string, id: string): Promise<{ ok: boolean }> {
     await this.get(issuerId, id);
     await this.prisma.client.delete({ where: { id } });
     return { ok: true };
   }
 
-  private mapError(e: unknown): unknown {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+  private mapError(error: unknown): unknown {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNIQUE_CONSTRAINT_VIOLATION) {
       return new ConflictException("Ya existe un cliente con ese documento para este emisor.");
     }
-    return e;
+    return error;
   }
 }

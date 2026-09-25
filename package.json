@@ -28,6 +28,10 @@
     "db:down": "docker compose down",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "format": "pnpm -r format",
+    "typecheck": "pnpm --filter @chirola/shared build && pnpm -r typecheck",
+    "quality:check": "bash ../dotfiles/quality/sync.sh . --check",
+    "verify": "pnpm quality:check && pnpm --filter @chirola/shared build && pnpm -r --workspace-concurrency=1 verify"
   }
 }

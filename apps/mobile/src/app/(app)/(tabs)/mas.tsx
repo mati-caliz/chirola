@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Building2,
   FileBadge,
@@ -12,12 +12,13 @@ import {
 import { ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BottomSheet, Button, Card, Divider, ListItem, StatusBadge } from "@/components/ds";
+import { Card, Divider, ListItem, StatusBadge } from "@/components/ds";
 import { useActiveIssuer } from "@/lib/active-issuer";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/hooks/use-theme";
+import { IssuerPickerSheet } from "@/screens/shared/IssuerPickerSheet";
 
-const SectionLabel = ({ children }: { children: string }) => {
+const SectionLabel = ({ children }: Readonly<{ children: string }>): ReactNode => {
   const theme = useTheme();
   return (
     <Text
@@ -35,11 +36,11 @@ const SectionLabel = ({ children }: { children: string }) => {
   );
 };
 
-export default function MasScreen() {
+export default function MasScreen(): ReactNode {
   const theme = useTheme();
   const router = useRouter();
   const { logout } = useAuth();
-  const { issuers, activeIssuer, activeIssuerId, selectIssuer } = useActiveIssuer();
+  const { issuers, activeIssuer } = useActiveIssuer();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
@@ -65,7 +66,13 @@ export default function MasScreen() {
               trailing={
                 issuers.length > 1 ? <StatusBadge status="pendiente" label="Cambiar" size="sm" /> : undefined
               }
-              onPress={() => (issuers.length > 0 ? setPickerOpen(true) : router.push("/(app)/issuers/new"))}
+              onPress={() => {
+                if (issuers.length > 0) {
+                  setPickerOpen(true);
+                } else {
+                  router.push("/(app)/issuers/new");
+                }
+              }}
             />
             {activeIssuer ? (
               <>
@@ -74,28 +81,36 @@ export default function MasScreen() {
                   title="Certificado ARCA"
                   leading={<ShieldCheck color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
                   chevron
-                  onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/certificate`)}
+                  onPress={() => {
+                    router.push(`/(app)/issuers/${activeIssuer.id}/certificate`);
+                  }}
                 />
                 <Divider inset={16} />
                 <ListItem
                   title="Clientes"
                   leading={<Users color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
                   chevron
-                  onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/clients`)}
+                  onPress={() => {
+                    router.push(`/(app)/issuers/${activeIssuer.id}/clients`);
+                  }}
                 />
                 <Divider inset={16} />
                 <ListItem
                   title="Puntos de venta"
                   leading={<Store color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
                   chevron
-                  onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/sales-points`)}
+                  onPress={() => {
+                    router.push(`/(app)/issuers/${activeIssuer.id}/sales-points`);
+                  }}
                 />
                 <Divider inset={16} />
                 <ListItem
                   title="Datos del emisor"
                   leading={<FileBadge color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
                   chevron
-                  onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}`)}
+                  onPress={() => {
+                    router.push(`/(app)/issuers/${activeIssuer.id}`);
+                  }}
                 />
               </>
             ) : null}
@@ -109,56 +124,37 @@ export default function MasScreen() {
               title="Perfil"
               leading={<UserCircle color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
               chevron
-              onPress={() => router.push("/(app)/profile")}
+              onPress={() => {
+                router.push("/(app)/profile");
+              }}
             />
             <Divider inset={16} />
             <ListItem
               title="Configuración"
               leading={<Settings color={theme.colors.textSecondary} size={20} strokeWidth={2} />}
               chevron
-              onPress={() => router.push("/(app)/config")}
+              onPress={() => {
+                router.push("/(app)/config");
+              }}
             />
             <Divider inset={16} />
             <ListItem
               title="Cerrar sesión"
               leading={<LogOut color={theme.colors.errFg} size={20} strokeWidth={2} />}
-              onPress={logout}
+              onPress={() => {
+                void logout();
+              }}
             />
           </Card>
         </View>
       </ScrollView>
 
-      <BottomSheet open={pickerOpen} title="Tus emisores" onClose={() => setPickerOpen(false)}>
-        {issuers.map((issuer, index) => (
-          <View key={issuer.id}>
-            {index > 0 ? <Divider /> : null}
-            <ListItem
-              title={issuer.legalName}
-              subtitle={`CUIT ${issuer.cuit}`}
-              trailing={
-                issuer.id === activeIssuerId ? (
-                  <StatusBadge status="aprobado" label="Activo" size="sm" />
-                ) : undefined
-              }
-              onPress={() => {
-                selectIssuer(issuer.id);
-                setPickerOpen(false);
-              }}
-            />
-          </View>
-        ))}
-        <View style={{ height: 12 }} />
-        <Button
-          variant="secondary"
-          full
-          onPress={() => {
-            setPickerOpen(false);
-            router.push("/(app)/issuers/new");
-          }}
-        >
-          Agregar otro emisor
-        </Button>
-      </BottomSheet>
+      <IssuerPickerSheet
+        open={pickerOpen}
+        onClose={() => {
+          setPickerOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -99,7 +99,7 @@ export const newTribute = (): TributeForm => ({
   rate: "",
 });
 
-export const currentMonthPeriod = () => {
+export const currentMonthPeriod = (): { from: string; to: string } => {
   const now = new Date();
   return {
     from: toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
@@ -107,7 +107,7 @@ export const currentMonthPeriod = () => {
   };
 };
 
-export const todayIso = () => toIsoDate(new Date());
+export const todayIso = (): string => toIsoDate(new Date());
 
 const toNumber = (value: string): number => (value.trim() === "" ? 0 : Number(value));
 

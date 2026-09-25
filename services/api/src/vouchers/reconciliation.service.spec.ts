@@ -1,7 +1,6 @@
 import { fakeIssuerAuth } from "../issuer-arca/issuer-arca.fixture";
-import { ReconciliationService } from "./reconciliation.service";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { WsfeService } from "../arca/wsfe/wsfe.service";
+import { ReconciliationService, type LastAuthorizedLookup } from "./reconciliation.service";
+import type { NumberingGroup, NumberingTables } from "./voucher-tables";
 
 const issuer = {
   id: "issuer-1",
@@ -10,28 +9,25 @@ const issuer = {
   representativeCuit: null,
 };
 
-interface Group {
-  salesPointId: string;
-  voucherType: number;
-  _max: { number: number | null };
-}
-
-function build(options: { groups?: Group[]; lastInArca?: Record<number, number> }) {
-  const prisma = {
+function build(options: {
+  groups?: NumberingGroup[];
+  lastInArca?: Record<number, number>;
+}): ReconciliationService {
+  const tables: NumberingTables = {
     voucher: {
-      groupBy: async () => options.groups ?? [],
+      groupBy: () => Promise.resolve(options.groups ?? []),
     },
     salesPoint: {
-      findMany: async () => [{ id: "sp-1", number: 1 }],
+      findMany: () => Promise.resolve([{ id: "sp-1", number: 1 }]),
     },
-  } as unknown as PrismaService;
+  };
 
-  const wsfe = {
-    getLastAuthorized: async (_auth: unknown, _salesPoint: number, voucherType: number) =>
-      options.lastInArca?.[voucherType] ?? 0,
-  } as unknown as WsfeService;
+  const wsfe: LastAuthorizedLookup = {
+    getLastAuthorized: (_auth, _salesPoint, voucherType) =>
+      Promise.resolve(options.lastInArca?.[voucherType] ?? 0),
+  };
 
-  return new ReconciliationService(prisma, fakeIssuerAuth(), wsfe);
+  return new ReconciliationService(tables, fakeIssuerAuth(), wsfe);
 }
 
 describe("ReconciliationService", () => {
@@ -49,9 +45,9 @@ describe("ReconciliationService", () => {
 
     const [status] = await service.checkNumbering(issuer);
 
-    expect(status.missingInDatabase).toBe(0);
-    expect(status.lastInArca).toBe(42);
-    expect(status.lastInDatabase).toBe(42);
+    expect(status?.missingInDatabase).toBe(0);
+    expect(status?.lastInArca).toBe(42);
+    expect(status?.lastInDatabase).toBe(42);
   });
 
   it("detecta comprobantes que ARCA autorizó y la base no tiene", async () => {
@@ -62,7 +58,7 @@ describe("ReconciliationService", () => {
 
     const [status] = await service.checkNumbering(issuer);
 
-    expect(status.missingInDatabase).toBe(3);
+    expect(status?.missingInDatabase).toBe(3);
   });
 
   it("no reporta faltantes negativos si la base va adelante", async () => {
@@ -73,7 +69,7 @@ describe("ReconciliationService", () => {
 
     const [status] = await service.checkNumbering(issuer);
 
-    expect(status.missingInDatabase).toBe(0);
+    expect(status?.missingInDatabase).toBe(0);
   });
 
   it("revisa cada combinación de punto de venta y tipo", async () => {
@@ -88,8 +84,8 @@ describe("ReconciliationService", () => {
     const statuses = await service.checkNumbering(issuer);
 
     expect(statuses).toHaveLength(2);
-    expect(statuses[0].missingInDatabase).toBe(2);
-    expect(statuses[1].missingInDatabase).toBe(0);
+    expect(statuses[0]?.missingInDatabase).toBe(2);
+    expect(statuses[1]?.missingInDatabase).toBe(0);
   });
 
   it("ignora grupos cuyo punto de venta ya no existe", async () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Link } from "expo-router";
 import { loginSchema } from "@chirola/shared";
@@ -6,7 +6,7 @@ import { brandColor, Button, ErrorText, Screen, Subtitle, TextField } from "@/co
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/hooks/use-theme";
 
-const Wordmark = ({ tagline }: { tagline: string }) => {
+const Wordmark = ({ tagline }: { tagline: string }): ReactNode => {
   const theme = useTheme();
   return (
     <View style={{ alignItems: "center", gap: 6, marginTop: 48, marginBottom: 8 }}>
@@ -24,14 +24,14 @@ const Wordmark = ({ tagline }: { tagline: string }) => {
   );
 };
 
-export default function LoginScreen() {
+export default function LoginScreen(): ReactNode {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function onSubmit() {
+  async function onSubmit(): Promise<void> {
     setError(null);
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -41,8 +41,8 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await login(parsed.data.email, parsed.data.password);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo iniciar sesión.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "No se pudo iniciar sesión.");
     } finally {
       setSubmitting(false);
     }
@@ -68,7 +68,13 @@ export default function LoginScreen() {
         placeholder="••••••••"
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Iniciar sesión" onPress={onSubmit} loading={submitting} />
+      <Button
+        title="Iniciar sesión"
+        onPress={() => {
+          void onSubmit();
+        }}
+        loading={submitting}
+      />
       <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
         <Subtitle>¿No tenés cuenta?</Subtitle>
         <Link href="/(auth)/register" replace>

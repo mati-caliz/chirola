@@ -1,8 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { ArcaIssuer } from "../arca/arca-environment";
 import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
-import { PrismaService } from "../prisma/prisma.service";
 import { WsfeService } from "../arca/wsfe/wsfe.service";
+import type { IssuerAuthenticator, WsfeGateway } from "./voucher-ports";
+import { VOUCHER_TABLES, type NumberingTables } from "./voucher-tables";
+
+export type LastAuthorizedLookup = Pick<WsfeGateway, "getLastAuthorized">;
 
 export interface NumberingStatus {
   salesPoint: number;
@@ -17,13 +20,13 @@ export class ReconciliationService {
   private readonly logger = new Logger(ReconciliationService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly issuerAuth: IssuerAuthService,
-    private readonly wsfe: WsfeService,
+    @Inject(VOUCHER_TABLES) private readonly tables: NumberingTables,
+    @Inject(IssuerAuthService) private readonly issuerAuth: IssuerAuthenticator,
+    @Inject(WsfeService) private readonly wsfe: LastAuthorizedLookup,
   ) {}
 
   async checkNumbering(issuer: ArcaIssuer): Promise<NumberingStatus[]> {
-    const grouped = await this.prisma.voucher.groupBy({
+    const grouped = await this.tables.voucher.groupBy({
       by: ["salesPointId", "voucherType"],
       where: { issuerId: issuer.id },
       _max: { number: true },
@@ -32,7 +35,7 @@ export class ReconciliationService {
       return [];
     }
 
-    const salesPoints = await this.prisma.salesPoint.findMany({
+    const salesPoints = await this.tables.salesPoint.findMany({
       where: { issuerId: issuer.id },
     });
     const numberById = new Map(salesPoints.map((point) => [point.id, point.number]));

@@ -15,7 +15,7 @@ import { useThemeMode, type ColorScheme } from "@/theme/theme-mode";
 
 export type { ColorScheme };
 
-export type Theme = {
+export interface Theme {
   scheme: ColorScheme;
   colors: ThemeColors;
   spacing: typeof spacing;
@@ -24,7 +24,7 @@ export type Theme = {
   lineHeight: typeof lineHeight;
   font: typeof fontFamily;
   shadow: ShadowSet;
-};
+}
 
 const lightTheme: Theme = {
   scheme: "light",

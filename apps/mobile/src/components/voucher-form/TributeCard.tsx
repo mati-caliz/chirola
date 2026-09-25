@@ -3,6 +3,7 @@ import { tributeTypeName } from "@chirola/shared";
 import { Button, Card, Input } from "@/components/ds";
 import { useTheme } from "@/hooks/use-theme";
 import type { TributeForm } from "./form-model";
+import type { ReactNode } from "react";
 
 interface TributeCardProps {
   tribute: TributeForm;
@@ -10,7 +11,7 @@ interface TributeCardProps {
   onRemove: () => void;
 }
 
-export const TributeCard = ({ tribute, onChange, onRemove }: TributeCardProps) => {
+export const TributeCard = ({ tribute, onChange, onRemove }: TributeCardProps): ReactNode => {
   const theme = useTheme();
   return (
     <Card>
@@ -40,7 +41,9 @@ export const TributeCard = ({ tribute, onChange, onRemove }: TributeCardProps) =
       <Input
         label="Descripción"
         value={tribute.description}
-        onChangeText={(description) => onChange({ description })}
+        onChangeText={(description) => {
+          onChange({ description });
+        }}
       />
       <View style={{ height: 10 }} />
       <View style={{ flexDirection: "row", gap: 10 }}>
@@ -48,7 +51,9 @@ export const TributeCard = ({ tribute, onChange, onRemove }: TributeCardProps) =
           <Input
             label="Base imponible"
             value={tribute.taxableBase}
-            onChangeText={(taxableBase) => onChange({ taxableBase })}
+            onChangeText={(taxableBase) => {
+              onChange({ taxableBase });
+            }}
             keyboardType="decimal-pad"
             mono
             prefix="$"
@@ -58,7 +63,9 @@ export const TributeCard = ({ tribute, onChange, onRemove }: TributeCardProps) =
           <Input
             label="Alícuota"
             value={tribute.rate}
-            onChangeText={(rate) => onChange({ rate })}
+            onChangeText={(rate) => {
+              onChange({ rate });
+            }}
             keyboardType="decimal-pad"
             mono
           />

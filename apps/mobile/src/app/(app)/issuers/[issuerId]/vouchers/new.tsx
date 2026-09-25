@@ -5,8 +5,10 @@ import { Banner, Loading } from "@/components/ds";
 import { VoucherForm } from "@/components/voucher-form/VoucherForm";
 import { getCreditNoteDraft } from "@/lib/resources";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import type { ReactNode } from "react";
 
-export default function NewVoucherScreen() {
+export default function NewVoucherScreen(): ReactNode {
   const theme = useTheme();
   const { issuerId, creditNoteFor } = useLocalSearchParams<{
     issuerId: string;
@@ -18,7 +20,7 @@ export default function NewVoucherScreen() {
     enabled: Boolean(creditNoteFor),
   });
 
-  if (!creditNoteFor) {
+  if (!hasText(creditNoteFor)) {
     return <VoucherForm issuerId={issuerId} draft={null} />;
   }
   if (draft.isLoading) {

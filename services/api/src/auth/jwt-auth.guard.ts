@@ -11,12 +11,12 @@ export class JwtAuthGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const header = req.headers.authorization ?? "";
     const [scheme, token] = header.split(" ");
-    if (scheme !== "Bearer" || !token) {
+    if (scheme !== "Bearer" || token === undefined || token === "") {
       throw new UnauthorizedException("Falta el token de autenticación.");
     }
     try {
       const payload = this.jwt.verify<JwtPayload>(token);
-      (req as Request & { user: JwtPayload }).user = payload;
+      Object.assign(req, { user: payload });
       return true;
     } catch {
       throw new UnauthorizedException("Token inválido o expirado.");

@@ -12,12 +12,18 @@ export class SalesPointsController {
   constructor(private readonly salesPoints: SalesPointsService) {}
 
   @Get()
-  list(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string) {
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Param("issuerId") issuerId: string,
+  ): Promise<{ number: number; id: string; description: string | null }[]> {
     return this.salesPoints.list(user.sub, issuerId);
   }
 
   @Post("sync")
-  sync(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string) {
+  sync(
+    @CurrentUser() user: JwtPayload,
+    @Param("issuerId") issuerId: string,
+  ): Promise<{ number: number; id: string; description: string | null }[]> {
     return this.salesPoints.sync(user.sub, issuerId);
   }
 
@@ -27,7 +33,7 @@ export class SalesPointsController {
     @Param("issuerId") issuerId: string,
     @Param("number") number: string,
     @Body(new ZodValidationPipe(updateSalesPointSchema)) body: UpdateSalesPoint,
-  ) {
+  ): Promise<{ number: number; id: string; description: string | null }> {
     return this.salesPoints.updateDescription(user.sub, issuerId, Number(number), body.description);
   }
 }

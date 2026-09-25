@@ -1,7 +1,8 @@
 import { ConflictException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { IssuersService } from "./issuers.service";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
 const input = {
   cuit: "20111111112",
@@ -10,22 +11,26 @@ const input = {
   environment: "homologacion" as const,
 };
 
-function prismaWithTransaction(tx: Record<string, unknown>): PrismaService {
+function prismaWithTransaction(transactionClient: object): object {
   return {
-    $transaction: jest.fn(async (callback: (client: Record<string, unknown>) => unknown) => callback(tx)),
-  } as unknown as PrismaService;
+    $transaction: jest.fn((callback: (client: object) => Promise<unknown>) => callback(transactionClient)),
+  };
 }
 
-function prismaWithDelegates(delegates: Record<string, unknown>): PrismaService {
-  return delegates as unknown as PrismaService;
+function serviceWith(prisma: object): Promise<IssuersService> {
+  return instantiateWithDoubles(IssuersService, [{ token: PrismaService, value: prisma }]);
+}
+
+function resolvedWith<Value>(value: Value): jest.Mock<Promise<Value>> {
+  return jest.fn(() => Promise.resolve(value));
 }
 
 describe("IssuersService.createForApiClient", () => {
   it("crea el emisor con un usuario de servicio y lo habilita para el api client", async () => {
-    const userUpsert = jest.fn(async () => ({ id: "user-service-1" }));
-    const issuerCreate = jest.fn(async () => ({ id: "issuer-1" }));
-    const grantCreate = jest.fn(async () => ({ id: "grant-1" }));
-    const service = new IssuersService(
+    const userUpsert = resolvedWith({ id: "user-service-1" });
+    const issuerCreate = resolvedWith({ id: "issuer-1" });
+    const grantCreate = resolvedWith({ id: "grant-1" });
+    const service = await serviceWith(
       prismaWithTransaction({
         user: { upsert: userUpsert },
         issuer: { create: issuerCreate },
@@ -54,9 +59,9 @@ describe("IssuersService.createForApiClient", () => {
       code: "P2002",
       clientVersion: "test",
     });
-    const service = new IssuersService(
+    const service = await serviceWith(
       prismaWithTransaction({
-        user: { upsert: jest.fn(async () => ({ id: "user-service-1" })) },
+        user: { upsert: resolvedWith({ id: "user-service-1" }) },
         issuer: {
           create: jest.fn(() => {
             throw duplicate;
@@ -72,10 +77,10 @@ describe("IssuersService.createForApiClient", () => {
 
 describe("IssuersService.createForApiClient con domicilio comercial", () => {
   it("guarda el domicilio comercial cuando viene en el alta", async () => {
-    const issuerCreate = jest.fn(async () => ({ id: "issuer-1" }));
-    const service = new IssuersService(
+    const issuerCreate = resolvedWith({ id: "issuer-1" });
+    const service = await serviceWith(
       prismaWithTransaction({
-        user: { upsert: jest.fn(async () => ({ id: "user-service-1" })) },
+        user: { upsert: resolvedWith({ id: "user-service-1" }) },
         issuer: { create: issuerCreate },
         apiClientIssuer: { create: jest.fn() },
       }),
@@ -87,15 +92,15 @@ describe("IssuersService.createForApiClient con domicilio comercial", () => {
     });
 
     expect(issuerCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ commercialAddress: "Av. Corrientes 1234, CABA" }),
+      data: { userId: "user-service-1", ...input, commercialAddress: "Av. Corrientes 1234, CABA" },
     });
   });
 });
 
 describe("IssuersService.updateCommercialAddress", () => {
   it("actualiza sólo el domicilio comercial del emisor", async () => {
-    const issuerUpdate = jest.fn(async () => ({ id: "issuer-1" }));
-    const service = new IssuersService(prismaWithDelegates({ issuer: { update: issuerUpdate } }));
+    const issuerUpdate = resolvedWith({ id: "issuer-1" });
+    const service = await serviceWith({ issuer: { update: issuerUpdate } });
 
     await service.updateCommercialAddress("issuer-1", { commercialAddress: null });
 
@@ -118,21 +123,18 @@ describe("IssuersService.getWithCertificate", () => {
   };
   const validUntil = new Date("2027-09-24T00:00:00.000Z");
 
-  function serviceReturning(certificate: Record<string, unknown> | null) {
-    return new IssuersService(
-      prismaWithDelegates({
-        issuer: { findUnique: jest.fn(async () => ({ ...storedIssuer, certificate })) },
-      }),
-    );
+  function serviceReturning(certificate: object | null): Promise<IssuersService> {
+    return serviceWith({ issuer: { findUnique: resolvedWith({ ...storedIssuer, certificate }) } });
   }
 
   it("expone el vencimiento del certificado activo y el domicilio comercial", async () => {
-    const issuer = await serviceReturning({
+    const service = await serviceReturning({
       alias: "acme",
       validUntil,
       certPem: "PEM",
       holderCuit: "20111111112",
-    }).getWithCertificate("issuer-1");
+    });
+    const issuer = await service.getWithCertificate("issuer-1");
 
     expect(issuer).toEqual(
       expect.objectContaining({
@@ -143,24 +145,25 @@ describe("IssuersService.getWithCertificate", () => {
         ivaCondition: "RESPONSABLE_INSCRIPTO",
         environment: "produccion",
         certificateValidUntil: validUntil,
-        certificate: expect.objectContaining({ validUntil, status: "ready" }),
+        certificate: { alias: "acme", validUntil, holderCuit: "20111111112", status: "ready" },
       }),
     );
   });
 
   it("devuelve el vencimiento en null si el certificado todavía no se cargó", async () => {
-    const issuer = await serviceReturning({
+    const service = await serviceReturning({
       alias: "acme",
       validUntil: null,
       certPem: null,
       holderCuit: null,
-    }).getWithCertificate("issuer-1");
+    });
+    const issuer = await service.getWithCertificate("issuer-1");
 
     expect(issuer.certificateValidUntil).toBeNull();
   });
 
   it("devuelve el vencimiento en null si el emisor no tiene certificado", async () => {
-    const issuer = await serviceReturning(null).getWithCertificate("issuer-1");
+    const issuer = await (await serviceReturning(null)).getWithCertificate("issuer-1");
 
     expect(issuer.certificateValidUntil).toBeNull();
     expect(issuer.certificate).toBeNull();

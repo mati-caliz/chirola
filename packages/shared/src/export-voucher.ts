@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { roundToCents } from "./money";
+import { hasText } from "./text";
 import { VoucherType } from "./voucher-type";
 
 export const ExportType = {
@@ -103,7 +105,7 @@ export const issueExportVoucherSchema = z
       });
     }
 
-    if (data.exportType === ExportType.GOODS && !data.incoterm) {
+    if (data.exportType === ExportType.GOODS && !hasText(data.incoterm)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["incoterm"],
@@ -118,12 +120,12 @@ export type ShippingPermit = z.infer<typeof shippingPermitSchema>;
 
 export function exportItemTotal(item: { quantity: number; unitPrice: number; discount: number }): number {
   const gross = item.quantity * item.unitPrice - item.discount;
-  return Math.round((gross + Number.EPSILON) * 100) / 100;
+  return roundToCents(gross);
 }
 
 export function exportVoucherTotal(
   items: readonly { quantity: number; unitPrice: number; discount: number }[],
 ): number {
   const sum = items.reduce((acc, item) => acc + exportItemTotal(item), 0);
-  return Math.round((sum + Number.EPSILON) * 100) / 100;
+  return roundToCents(sum);
 }

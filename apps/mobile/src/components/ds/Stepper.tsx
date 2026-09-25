@@ -1,7 +1,8 @@
 import { Text, View } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import type { ReactNode } from "react";
 
-export const Stepper = ({ steps, current = 0 }: { steps: string[]; current?: number }) => {
+export const Stepper = ({ steps, current = 0 }: { steps: string[]; current?: number }): ReactNode => {
   const theme = useTheme();
   return (
     <View>

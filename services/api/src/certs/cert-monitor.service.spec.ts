@@ -2,81 +2,100 @@ import { ConfigService } from "@nestjs/config";
 import { CertMonitorService } from "./cert-monitor.service";
 import { WebhookService } from "../webhooks/webhook.service";
 import { WebhookEvent } from "../webhooks/webhook-events";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { PushNotificationService } from "../notifications/push-notification.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { PushNotificationService } from "../notifications/push-notification.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
+import { MS_PER_DAY } from "../common/time";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const WARNING_DAYS = 30;
+const DAYS_TO_EXPIRY_OFF_THRESHOLD = 10;
+const DAYS_TO_EXPIRY_ON_THRESHOLD = 7;
 
-function config(warningDays: number): ConfigService {
-  return {
-    get: (key: string, def?: number) => (key === "CERT_EXPIRY_WARNING_DAYS" ? warningDays : def),
-  } as unknown as ConfigService;
+interface ExpiringCertificate {
+  issuerId: string;
+  validUntil: Date;
 }
 
-function fakePush(): PushNotificationService {
-  return { notifyIssuerOwner: jest.fn(async () => undefined) } as unknown as PushNotificationService;
+interface MonitorDoubles {
+  certificates: ExpiringCertificate[];
+  dispatch: jest.Mock;
+  notifyIssuerOwner: jest.Mock;
 }
 
-function prismaWithCertificateExpiringIn(days: number): PrismaService {
-  const validUntil = new Date(Date.now() + days * MS_PER_DAY);
+function config(warningDays: number) {
   return {
-    certificate: {
-      findMany: jest.fn(async () => [{ issuerId: "issuer-1", validUntil }]),
-    },
-  } as unknown as PrismaService;
+    get: (key: string, defaultValue?: number) =>
+      key === "CERT_EXPIRY_WARNING_DAYS" ? warningDays : defaultValue,
+  };
+}
+
+function certificateExpiringIn(days: number): ExpiringCertificate {
+  return { issuerId: "issuer-1", validUntil: new Date(Date.now() + days * MS_PER_DAY) };
+}
+
+function resolvedMock(): jest.Mock {
+  return jest.fn(() => Promise.resolve());
+}
+
+function createMonitor({
+  certificates,
+  dispatch,
+  notifyIssuerOwner,
+}: MonitorDoubles): Promise<CertMonitorService> {
+  const prisma = { certificate: { findMany: jest.fn(() => Promise.resolve(certificates)) } };
+  return instantiateWithDoubles(CertMonitorService, [
+    { token: PrismaService, value: prisma },
+    { token: WebhookService, value: { dispatch } },
+    { token: PushNotificationService, value: { notifyIssuerOwner } },
+    { token: ConfigService, value: config(WARNING_DAYS) },
+  ]);
 }
 
 describe("CertMonitorService", () => {
   it("dispara certificate.expiring para certificados próximos a vencer", async () => {
-    const validUntil = new Date(Date.now() + 10 * MS_PER_DAY);
-    const prisma = {
-      certificate: {
-        findMany: jest.fn(async () => [{ issuerId: "issuer-1", validUntil }]),
-      },
-    } as unknown as PrismaService;
-    const webhooks = { dispatch: jest.fn(async () => undefined) } as unknown as WebhookService;
-    const service = new CertMonitorService(prisma, webhooks, fakePush(), config(30));
+    const dispatch = resolvedMock();
+    const service = await createMonitor({
+      certificates: [certificateExpiringIn(DAYS_TO_EXPIRY_OFF_THRESHOLD)],
+      dispatch,
+      notifyIssuerOwner: resolvedMock(),
+    });
 
     await service.checkExpiringCertificates();
 
-    expect(webhooks.dispatch).toHaveBeenCalledWith(
+    expect(dispatch).toHaveBeenCalledWith(
       "issuer-1",
       WebhookEvent.CERTIFICATE_EXPIRING,
-      expect.objectContaining({ issuerId: "issuer-1", daysToExpiry: expect.any(Number) }),
+      expect.objectContaining({ issuerId: "issuer-1", daysToExpiry: DAYS_TO_EXPIRY_OFF_THRESHOLD }),
     );
   });
 
   it("no dispara si no hay certificados por vencer", async () => {
-    const prisma = {
-      certificate: { findMany: jest.fn(async () => []) },
-    } as unknown as PrismaService;
-    const webhooks = { dispatch: jest.fn() } as unknown as WebhookService;
-    const service = new CertMonitorService(prisma, webhooks, fakePush(), config(30));
+    const dispatch = jest.fn();
+    const service = await createMonitor({ certificates: [], dispatch, notifyIssuerOwner: resolvedMock() });
 
     await service.checkExpiringCertificates();
 
-    expect(webhooks.dispatch).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("avisa por push sólo en los días de umbral, no todos los días", async () => {
-    const webhooks = { dispatch: jest.fn(async () => undefined) } as unknown as WebhookService;
-    const pushOnThreshold = fakePush();
-    const pushOffThreshold = fakePush();
+    const pushOnThreshold = resolvedMock();
+    const pushOffThreshold = resolvedMock();
 
-    await new CertMonitorService(
-      prismaWithCertificateExpiringIn(7),
-      webhooks,
-      pushOnThreshold,
-      config(30),
-    ).checkExpiringCertificates();
-    await new CertMonitorService(
-      prismaWithCertificateExpiringIn(10),
-      webhooks,
-      pushOffThreshold,
-      config(30),
-    ).checkExpiringCertificates();
+    const monitorOnThreshold = await createMonitor({
+      certificates: [certificateExpiringIn(DAYS_TO_EXPIRY_ON_THRESHOLD)],
+      dispatch: resolvedMock(),
+      notifyIssuerOwner: pushOnThreshold,
+    });
+    const monitorOffThreshold = await createMonitor({
+      certificates: [certificateExpiringIn(DAYS_TO_EXPIRY_OFF_THRESHOLD)],
+      dispatch: resolvedMock(),
+      notifyIssuerOwner: pushOffThreshold,
+    });
+    await monitorOnThreshold.checkExpiringCertificates();
+    await monitorOffThreshold.checkExpiringCertificates();
 
-    expect(pushOnThreshold.notifyIssuerOwner).toHaveBeenCalledTimes(1);
-    expect(pushOffThreshold.notifyIssuerOwner).not.toHaveBeenCalled();
+    expect(pushOnThreshold).toHaveBeenCalledTimes(1);
+    expect(pushOffThreshold).not.toHaveBeenCalled();
   });
 });

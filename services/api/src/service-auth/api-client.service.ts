@@ -22,7 +22,7 @@ export class ApiClientService {
     const client = await this.prisma.apiClient.findUnique({
       where: { id: parsed.clientId },
     });
-    if (!client || !client.active) {
+    if (!client?.active) {
       return null;
     }
     if (!this.apiKeys.verifySecret(parsed.secret, client.keyHash)) {

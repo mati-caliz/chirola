@@ -3,8 +3,14 @@ import { BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RecipientIvaCondition, type TaxpayerInfo } from "@chirola/shared";
 import { TaxpayersService } from "./taxpayers.service";
-import type { PrismaService } from "../prisma/prisma.service";
-import type { PadronService } from "../arca/padron/padron.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { PadronService } from "../arca/padron/padron.service";
+import { IssuerAuthService } from "../issuer-arca/issuer-auth.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
+import { MS_PER_DAY } from "../common/time";
+
+const DAYS_PER_YEAR = 365;
+const ONE_YEAR_MS = DAYS_PER_YEAR * MS_PER_DAY;
 
 const issuer = {
   id: "issuer-1",
@@ -30,43 +36,44 @@ interface CacheRow {
   fetchedAt: Date;
 }
 
-function build(options: { cached?: CacheRow } = {}) {
+async function build(options: { cached?: CacheRow } = {}) {
   const upserts: CacheRow[] = [];
   const prisma = {
     taxpayerCache: {
-      findUnique: async () => options.cached ?? null,
-      upsert: async ({ create }: { create: CacheRow }) => {
+      findUnique: () => Promise.resolve(options.cached ?? null),
+      upsert: ({ create }: { create: CacheRow }) => {
         upserts.push(create);
-        return create;
+        return Promise.resolve(create);
       },
     },
-  } as unknown as PrismaService;
+  };
 
   const lookups: string[] = [];
   const padron = {
-    getTaxpayer: async (_auth: unknown, cuit: string) => {
+    getTaxpayer: (_auth: unknown, cuit: string) => {
       lookups.push(cuit);
-      return taxpayer;
+      return Promise.resolve(taxpayer);
     },
-  } as unknown as PadronService;
+  };
 
   const requestedServices: string[] = [];
 
   const config = {
-    get: (_key: string, def: number) => def,
-  } as unknown as ConfigService;
-
-  return {
-    service: new TaxpayersService(prisma, fakeIssuerAuth(requestedServices), padron, config),
-    lookups,
-    upserts,
-    requestedServices,
+    get: (_key: string, defaultValue: number) => defaultValue,
   };
+
+  const service = await instantiateWithDoubles(TaxpayersService, [
+    { token: PrismaService, value: prisma },
+    { token: IssuerAuthService, value: fakeIssuerAuth(requestedServices) },
+    { token: PadronService, value: padron },
+    { token: ConfigService, value: config },
+  ]);
+  return { service, lookups, upserts, requestedServices };
 }
 
 describe("TaxpayersService", () => {
   it("normaliza el CUIT antes de consultar", async () => {
-    const { service, lookups } = build();
+    const { service, lookups } = await build();
 
     await service.lookup(issuer, "30-70715374-5");
 
@@ -74,13 +81,13 @@ describe("TaxpayersService", () => {
   });
 
   it("rechaza un CUIT que no tenga 11 dígitos", async () => {
-    const { service } = build();
+    const { service } = await build();
 
     await expect(service.lookup(issuer, "3070715")).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("pide el ticket del servicio de constancia, no el de wsfe", async () => {
-    const { service, requestedServices } = build();
+    const { service, requestedServices } = await build();
 
     await service.lookup(issuer, "30707153745");
 
@@ -88,16 +95,16 @@ describe("TaxpayersService", () => {
   });
 
   it("guarda en caché lo que devuelve el padrón", async () => {
-    const { service, upserts } = build();
+    const { service, upserts } = await build();
 
     await service.lookup(issuer, "30707153745");
 
     expect(upserts).toHaveLength(1);
-    expect(upserts[0].legalName).toBe("ACME SA");
+    expect(upserts[0]?.legalName).toBe("ACME SA");
   });
 
   it("usa la caché vigente sin llamar a ARCA", async () => {
-    const { service, lookups } = build({
+    const { service, lookups } = await build({
       cached: {
         cuit: "30707153745",
         legalName: "ACME SA (cacheado)",
@@ -115,8 +122,8 @@ describe("TaxpayersService", () => {
   });
 
   it("reconsulta cuando la caché está vencida", async () => {
-    const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const { service, lookups } = build({
+    const longAgo = new Date(Date.now() - ONE_YEAR_MS);
+    const { service, lookups } = await build({
       cached: {
         cuit: "30707153745",
         legalName: "ACME SA (viejo)",
@@ -134,7 +141,7 @@ describe("TaxpayersService", () => {
   });
 
   it("descarta un domicilio cacheado con forma inesperada", async () => {
-    const { service } = build({
+    const { service } = await build({
       cached: {
         cuit: "30707153745",
         legalName: "ACME SA",

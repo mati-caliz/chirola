@@ -3,7 +3,7 @@ import { containedIvaAmount } from "../arca/wsfe/iva-calculator";
 import type { FiscalTransparencyPdf } from "./pdf.util";
 
 export interface TypedTributeAmount {
-  id?: number;
+  id?: number | undefined;
   amount: number;
 }
 

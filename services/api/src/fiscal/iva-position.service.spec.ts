@@ -1,5 +1,6 @@
 import { IvaPositionService } from "./iva-position.service";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
 interface VoucherRow {
   voucherType: number;
@@ -14,15 +15,19 @@ interface PurchaseRow {
   iva27: number;
 }
 
-function fakePrisma(vouchers: VoucherRow[], purchases: PurchaseRow[]): PrismaService {
+function fakePrisma(vouchers: VoucherRow[], purchases: PurchaseRow[]) {
   return {
     voucher: {
-      findMany: async () => vouchers,
+      findMany: () => Promise.resolve(vouchers),
     },
     purchaseInvoice: {
-      findMany: async () => purchases,
+      findMany: () => Promise.resolve(purchases),
     },
-  } as unknown as PrismaService;
+  };
+}
+
+function serviceWith(prisma: ReturnType<typeof fakePrisma>): Promise<IvaPositionService> {
+  return instantiateWithDoubles(IvaPositionService, [{ token: PrismaService, value: prisma }]);
 }
 
 describe("IvaPositionService", () => {
@@ -31,7 +36,7 @@ describe("IvaPositionService", () => {
       [{ voucherType: 1, items: [{ ivaRate: 21, subtotal: 1210 }] }],
       [{ invoiceType: 1, iva21: 110, iva105: 0, iva27: 0 }],
     );
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.breakdown).toEqual([{ rate: 21, debit: 210, credit: 110, balance: 100 }]);
     expect(position.totalDebit).toBe(210);
@@ -47,14 +52,14 @@ describe("IvaPositionService", () => {
       ],
       [],
     );
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.totalDebit).toBe(105);
   });
 
   it("ignora comprobantes C (monotributo, sin IVA)", async () => {
     const prisma = fakePrisma([{ voucherType: 11, items: [{ ivaRate: 21, subtotal: 1210 }] }], []);
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.totalDebit).toBe(0);
     expect(position.breakdown).toEqual([]);
@@ -71,7 +76,7 @@ describe("IvaPositionService — notas de crédito de compra", () => {
       ],
     );
 
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.totalCredit).toBe(105);
   });
@@ -85,7 +90,7 @@ describe("IvaPositionService — notas de crédito de compra", () => {
       ],
     );
 
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.totalCredit).toBe(315);
   });
@@ -98,7 +103,7 @@ describe("IvaPositionService — moneda extranjera", () => {
       [],
     );
 
-    const position = await new IvaPositionService(prisma).getMonthlyPosition("issuer-1", 2026, 7);
+    const position = await (await serviceWith(prisma)).getMonthlyPosition("issuer-1", 2026, 7);
 
     expect(position.totalDebit).toBe(21000);
   });

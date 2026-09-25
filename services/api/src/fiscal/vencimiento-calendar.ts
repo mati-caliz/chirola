@@ -1,11 +1,15 @@
-export const FiscalObligation = {
-  IVA_DDJJ: "IVA_DDJJ",
-  CARGAS_SOCIALES: "CARGAS_SOCIALES",
-  LIBRO_IVA_DIGITAL: "LIBRO_IVA_DIGITAL",
-  MONOTRIBUTO: "MONOTRIBUTO",
-} as const;
+import {
+  FiscalObligation,
+  VencimientoStatus,
+  type FiscalObligationType,
+  type Vencimiento,
+  type VencimientoStatusType,
+} from "@chirola/shared";
+import { ISO_DATE_LENGTH, MS_PER_DAY } from "../common/time";
 
-export type FiscalObligationType = (typeof FiscalObligation)[keyof typeof FiscalObligation];
+export { FiscalObligation, VencimientoStatus };
+
+const MONTHS_PER_YEAR = 12;
 
 const OBLIGATION_LABEL: Record<FiscalObligationType, string> = {
   IVA_DDJJ: "DDJJ IVA",
@@ -14,25 +18,9 @@ const OBLIGATION_LABEL: Record<FiscalObligationType, string> = {
   MONOTRIBUTO: "Monotributo",
 };
 
-export const VencimientoStatus = {
-  OVERDUE: "OVERDUE",
-  DUE_SOON: "DUE_SOON",
-  UPCOMING: "UPCOMING",
-} as const;
-
-export type VencimientoStatusType = (typeof VencimientoStatus)[keyof typeof VencimientoStatus];
-
-export interface Vencimiento {
-  type: FiscalObligationType;
-  label: string;
-  dueDate: string;
-  status: VencimientoStatusType;
-}
-
 const FIRST_DIGIT_GROUP_DAY = 18;
 const CARGAS_SOCIALES_OFFSET = 4;
 const DUE_SOON_DAYS = 5;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function lastDigitOf(cuit: string): number {
   const digits = cuit.replace(/\D/g, "");
@@ -50,7 +38,7 @@ function safeDate(year: number, month: number, day: number): Date {
 }
 
 function toIsoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
 function startOfDay(date: Date): number {
@@ -82,11 +70,12 @@ export function upcomingVencimientos(
   const result: Vencimiento[] = [];
   const obligations = Object.values(FiscalObligation);
 
-  let year = from.getUTCFullYear();
-  let month = from.getUTCMonth() + 1;
-  const endMarker = to.getUTCFullYear() * 12 + to.getUTCMonth();
+  const startMonthIndex = from.getUTCFullYear() * MONTHS_PER_YEAR + from.getUTCMonth();
+  const endMonthIndex = to.getUTCFullYear() * MONTHS_PER_YEAR + to.getUTCMonth();
 
-  while (year * 12 + (month - 1) <= endMarker) {
+  for (let monthIndex = startMonthIndex; monthIndex <= endMonthIndex; monthIndex++) {
+    const year = Math.floor(monthIndex / MONTHS_PER_YEAR);
+    const month = (monthIndex % MONTHS_PER_YEAR) + 1;
     for (const obligation of obligations) {
       const dueDate = safeDate(year, month, dueDayFor(obligation, lastDigit));
       if (dueDate.getTime() >= startOfDay(from) && dueDate.getTime() <= startOfDay(to)) {
@@ -98,13 +87,8 @@ export function upcomingVencimientos(
         });
       }
     }
-    month += 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
-    }
   }
 
-  result.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  result.sort((left, right) => left.dueDate.localeCompare(right.dueDate));
   return result;
 }

@@ -5,12 +5,13 @@ import { Amount, Banner, Button, Card, StatusBadge } from "@/components/ds";
 import { discardPendingVoucher, listPendingVouchers, retryPendingVoucher } from "@/lib/resources";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useTheme } from "@/hooks/use-theme";
+import type { ReactNode } from "react";
 
 const PENDING_REFRESH_MS = 30_000;
 
-export const pendingVouchersQueryKey = (issuerId: string) => ["pending-vouchers", issuerId];
+export const pendingVouchersQueryKey = (issuerId: string): string[] => ["pending-vouchers", issuerId];
 
-export const PendingVouchersSection = ({ issuerId }: { issuerId: string }) => {
+export const PendingVouchersSection = ({ issuerId }: { issuerId: string }): ReactNode => {
   const theme = useTheme();
   const { data } = useQuery({
     queryKey: pendingVouchersQueryKey(issuerId),
@@ -42,11 +43,17 @@ export const PendingVouchersSection = ({ issuerId }: { issuerId: string }) => {
   );
 };
 
-const PendingVoucherCard = ({ issuerId, pending }: { issuerId: string; pending: PendingVoucherSummary }) => {
+const PendingVoucherCard = ({
+  issuerId,
+  pending,
+}: {
+  issuerId: string;
+  pending: PendingVoucherSummary;
+}): ReactNode => {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const failed = pending.status === PendingVoucherStatus.FAILED;
-  const refresh = () => {
+  const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: pendingVouchersQueryKey(issuerId) });
     void queryClient.invalidateQueries({ queryKey: ["vouchers", issuerId] });
   };
@@ -115,12 +122,26 @@ const PendingVoucherCard = ({ issuerId, pending }: { issuerId: string; pending: 
       {failed ? (
         <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
           <View style={{ flex: 1 }}>
-            <Button variant="secondary" full loading={retry.isPending} onPress={() => retry.mutate()}>
+            <Button
+              variant="secondary"
+              full
+              loading={retry.isPending}
+              onPress={() => {
+                retry.mutate();
+              }}
+            >
               Reintentar
             </Button>
           </View>
           <View style={{ flex: 1 }}>
-            <Button variant="ghost" full loading={discard.isPending} onPress={() => discard.mutate()}>
+            <Button
+              variant="ghost"
+              full
+              loading={discard.isPending}
+              onPress={() => {
+                discard.mutate();
+              }}
+            >
               Descartar
             </Button>
           </View>

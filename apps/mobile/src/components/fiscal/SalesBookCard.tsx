@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FileSpreadsheet } from "lucide-react-native";
 import { ActivityIndicator, Text, View } from "react-native";
 import { File, Paths } from "expo-file-system";
@@ -8,6 +8,8 @@ import { Amount, Banner, Button, Card, Divider } from "@/components/ds";
 import { downloadSalesBookCsv, getSalesBook } from "@/lib/resources";
 import { formatCurrency } from "@/lib/format";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import type { SalesBookTotals } from "@chirola/shared";
 
 const CSV_MIME_TYPE = "text/csv";
 const CSV_UTI = "public.comma-separated-values-text";
@@ -19,7 +21,7 @@ interface SalesBookCardProps {
   monthLabel: string;
 }
 
-export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCardProps) => {
+export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCardProps): ReactNode => {
   const theme = useTheme();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCa
     queryFn: () => getSalesBook(issuerId, year, month),
   });
 
-  const exportCsv = async () => {
+  const exportCsv = async (): Promise<void> => {
     setExportError(null);
     setExporting(true);
     try {
@@ -46,8 +48,8 @@ export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCa
           dialogTitle: `Libro IVA Ventas · ${monthLabel}`,
         });
       }
-    } catch (e) {
-      setExportError(e instanceof Error ? e.message : "No se pudo exportar el libro.");
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "No se pudo exportar el libro.");
     } finally {
       setExporting(false);
     }
@@ -68,45 +70,8 @@ export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCa
       >
         Ventas · {monthLabel}
       </Text>
-      {book.isLoading ? (
-        <ActivityIndicator style={{ marginVertical: 16 }} color={theme.colors.actionPrimary} />
-      ) : totals ? (
-        <>
-          <View style={{ alignItems: "center", paddingVertical: 12 }}>
-            <Amount value={formatCurrency(totals.totalAmount)} size="xl" />
-            <Text
-              style={{
-                marginTop: 4,
-                fontFamily: theme.font.regular,
-                fontSize: theme.fontSize.caption,
-                color: theme.colors.textSecondary,
-              }}
-            >
-              {totals.voucherCount === 1 ? "1 comprobante" : `${totals.voucherCount} comprobantes`}
-            </Text>
-          </View>
-          <Divider />
-          <View style={{ height: 8 }} />
-          <SalesRow label="Neto gravado" value={formatCurrency(totals.netAmount)} />
-          <SalesRow
-            label="Exento y no gravado"
-            value={formatCurrency(totals.exemptAmount + totals.untaxedAmount)}
-          />
-          <SalesRow label="IVA débito" value={formatCurrency(totals.ivaAmount)} />
-        </>
-      ) : (
-        <Text
-          style={{
-            marginVertical: 12,
-            fontFamily: theme.font.regular,
-            fontSize: theme.fontSize.callout,
-            color: theme.colors.textSecondary,
-          }}
-        >
-          No pudimos traer las ventas del mes.
-        </Text>
-      )}
-      {exportError ? (
+      <SalesBookBody isLoading={book.isLoading} totals={totals} />
+      {hasText(exportError) ? (
         <View style={{ marginTop: 8 }}>
           <Banner kind="error" title="No se pudo exportar" body={exportError} />
         </View>
@@ -116,9 +81,11 @@ export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCa
           variant="secondary"
           full
           loading={exporting}
-          disabled={!totals || totals.voucherCount === 0}
+          disabled={totals === undefined || totals.voucherCount === 0}
           icon={<FileSpreadsheet size={18} color={theme.colors.actionSecondaryText} strokeWidth={2} />}
-          onPress={exportCsv}
+          onPress={() => {
+            void exportCsv();
+          }}
         >
           Exportar Libro IVA Ventas
         </Button>
@@ -127,7 +94,61 @@ export const SalesBookCard = ({ issuerId, year, month, monthLabel }: SalesBookCa
   );
 };
 
-const SalesRow = ({ label, value }: { label: string; value: string }) => {
+const SalesBookBody = ({
+  isLoading,
+  totals,
+}: Readonly<{ isLoading: boolean; totals: SalesBookTotals | undefined }>): ReactNode => {
+  const theme = useTheme();
+  if (isLoading) {
+    return <ActivityIndicator style={{ marginVertical: 16 }} color={theme.colors.actionPrimary} />;
+  }
+  if (totals === undefined) {
+    return (
+      <Text
+        style={{
+          marginVertical: 12,
+          fontFamily: theme.font.regular,
+          fontSize: theme.fontSize.callout,
+          color: theme.colors.textSecondary,
+        }}
+      >
+        No pudimos traer las ventas del mes.
+      </Text>
+    );
+  }
+  return <SalesTotalsSummary totals={totals} />;
+};
+
+const SalesTotalsSummary = ({ totals }: Readonly<{ totals: SalesBookTotals }>): ReactNode => {
+  const theme = useTheme();
+  return (
+    <>
+      <View style={{ alignItems: "center", paddingVertical: 12 }}>
+        <Amount value={formatCurrency(totals.totalAmount)} size="xl" />
+        <Text
+          style={{
+            marginTop: 4,
+            fontFamily: theme.font.regular,
+            fontSize: theme.fontSize.caption,
+            color: theme.colors.textSecondary,
+          }}
+        >
+          {totals.voucherCount === 1 ? "1 comprobante" : `${totals.voucherCount} comprobantes`}
+        </Text>
+      </View>
+      <Divider />
+      <View style={{ height: 8 }} />
+      <SalesRow label="Neto gravado" value={formatCurrency(totals.netAmount)} />
+      <SalesRow
+        label="Exento y no gravado"
+        value={formatCurrency(totals.exemptAmount + totals.untaxedAmount)}
+      />
+      <SalesRow label="IVA débito" value={formatCurrency(totals.ivaAmount)} />
+    </>
+  );
+};
+
+const SalesRow = ({ label, value }: Readonly<{ label: string; value: string }>): ReactNode => {
   const theme = useTheme();
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>

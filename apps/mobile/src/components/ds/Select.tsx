@@ -1,6 +1,8 @@
 import { ChevronDown } from "lucide-react-native";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import type { ReactNode } from "react";
 
 export const Select = ({
   label,
@@ -18,12 +20,12 @@ export const Select = ({
   error?: string;
   onPress?: () => void;
   style?: ViewStyle;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
-  const borderColor = error ? theme.colors.errFg : theme.colors.borderDefault;
+  const borderColor = hasText(error) ? theme.colors.errFg : theme.colors.borderDefault;
   return (
     <View style={style}>
-      {label ? (
+      {hasText(label) ? (
         <Text
           style={{
             marginBottom: 6,
@@ -55,20 +57,20 @@ export const Select = ({
             flex: 1,
             fontSize: theme.fontSize.body,
             fontFamily: theme.font.regular,
-            color: value ? theme.colors.textPrimary : theme.colors.textTertiary,
+            color: hasText(value) ? theme.colors.textPrimary : theme.colors.textTertiary,
           }}
         >
-          {value || placeholder}
+          {hasText(value) ? value : placeholder}
         </Text>
         <ChevronDown size={20} color={theme.colors.textTertiary} strokeWidth={2} />
       </Pressable>
-      {error || hint ? (
+      {hasText(error) || hasText(hint) ? (
         <Text
           style={{
             marginTop: 6,
             fontFamily: theme.font.regular,
             fontSize: theme.fontSize.caption,
-            color: error ? theme.colors.errFg : theme.colors.textSecondary,
+            color: hasText(error) ? theme.colors.errFg : theme.colors.textSecondary,
           }}
         >
           {error ?? hint}

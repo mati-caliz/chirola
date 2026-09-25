@@ -5,6 +5,7 @@ const SECRET_BYTES = 32;
 const KEY_LENGTH = 64;
 const SALT_BYTES = 16;
 const HASH_PREFIX = "scrypt";
+const HASH_SEGMENT_COUNT = 3;
 const KEY_SEPARATOR = ".";
 
 export interface ParsedApiKey {
@@ -41,11 +42,15 @@ export class ApiKeyService {
 
   verifySecret(secret: string, stored: string): boolean {
     const parts = stored.split("$");
-    if (parts.length !== 3 || parts[0] !== HASH_PREFIX) {
+    const [prefix, encodedSalt, encodedHash] = parts;
+    if (parts.length !== HASH_SEGMENT_COUNT || prefix !== HASH_PREFIX) {
       return false;
     }
-    const salt = Buffer.from(parts[1], "base64");
-    const expected = Buffer.from(parts[2], "base64");
+    if (encodedSalt === undefined || encodedHash === undefined) {
+      return false;
+    }
+    const salt = Buffer.from(encodedSalt, "base64");
+    const expected = Buffer.from(encodedHash, "base64");
     const actual = scryptSync(secret, salt, expected.length);
     return expected.length === actual.length && timingSafeEqual(expected, actual);
   }

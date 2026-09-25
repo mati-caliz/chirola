@@ -2,26 +2,36 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
 import * as forge from "node-forge";
+import type { Certificate, Issuer } from "@prisma/client";
 import { CertsService } from "./certs.service";
 import { FieldEncryptionService } from "../crypto/field-encryption.service";
 import { IssuerOnboardingStatus } from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
+import { MS_PER_DAY } from "../common/time";
 
-type Row = Record<string, unknown>;
+type IssuerRow = Partial<Issuer> & { id: string };
+type CertificateRow = Partial<Certificate>;
+
+interface SubjectWithFields {
+  getField(selector: string | { name: string }): unknown;
+}
 
 const DEFAULT_CUIT = "20111111112";
+const ENCRYPTION_KEY_BYTES = 32;
+const TEST_KEY_BITS = 2048;
+const DAYS_PER_YEAR = 365;
+const TEST_CERT_VALIDITY_MS = DAYS_PER_YEAR * MS_PER_DAY;
+const DEFAULT_ISSUERS: IssuerRow[] = [
+  { id: "em1", cuit: DEFAULT_CUIT },
+  { id: "otro", cuit: DEFAULT_CUIT },
+];
 
-function fakePrisma(issuerRows: Row[] = []): PrismaService {
-  const store = new Map<string, Row>();
-  const issuers = new Map<string, Row>(
-    (issuerRows.length > 0
-      ? issuerRows
-      : [
-          { id: "em1", cuit: DEFAULT_CUIT },
-          { id: "otro", cuit: DEFAULT_CUIT },
-        ]
-    ).map((row) => [
-      String(row.id),
+function fakePrisma(issuerRows: IssuerRow[] = []) {
+  const store = new Map<string, CertificateRow>();
+  const issuers = new Map<string, IssuerRow>(
+    (issuerRows.length > 0 ? issuerRows : DEFAULT_ISSUERS).map((row) => [
+      row.id,
       {
         representativeCuit: null,
         onboardingStatus: IssuerOnboardingStatus.PENDING_CERTIFICATE,
@@ -29,61 +39,69 @@ function fakePrisma(issuerRows: Row[] = []): PrismaService {
       },
     ]),
   );
-  const findIssuer = async ({ where }: { where: { id: string } }) => issuers.get(where.id) ?? null;
+  const findIssuer = ({ where }: { where: { id: string } }) => Promise.resolve(issuers.get(where.id) ?? null);
   return {
     issuer: {
       findUnique: findIssuer,
       findUniqueOrThrow: findIssuer,
-      update: async ({ where, data }: { where: { id: string }; data: Row }) => {
-        const row = { ...issuers.get(where.id), ...data };
+      update: ({ where, data }: { where: { id: string }; data: Partial<Issuer> }) => {
+        const row = { id: where.id, ...issuers.get(where.id), ...data };
         issuers.set(where.id, row);
-        return row;
+        return Promise.resolve(row);
       },
     },
     certificate: {
-      upsert: async ({
+      upsert: ({
         where,
         create,
         update,
       }: {
         where: { issuerId: string };
-        create: Row;
-        update: Row;
+        create: CertificateRow;
+        update: CertificateRow;
       }) => {
-        const prev = store.get(where.issuerId);
-        const row = prev ? { ...prev, ...update } : { id: "c1", ...create };
+        const previous = store.get(where.issuerId);
+        const row = previous === undefined ? { id: "c1", ...create } : { ...previous, ...update };
         store.set(where.issuerId, row);
-        return row;
+        return Promise.resolve(row);
       },
-      findUnique: async ({ where }: { where: { issuerId: string } }) => store.get(where.issuerId) ?? null,
-      update: async ({ where, data }: { where: { issuerId: string }; data: Row }) => {
+      findUnique: ({ where }: { where: { issuerId: string } }) =>
+        Promise.resolve(store.get(where.issuerId) ?? null),
+      update: ({ where, data }: { where: { issuerId: string }; data: CertificateRow }) => {
         const row = { ...store.get(where.issuerId), ...data };
         store.set(where.issuerId, row);
-        return row;
+        return Promise.resolve(row);
       },
     },
-  } as unknown as PrismaService;
+  };
 }
 
-function encryptionService(): FieldEncryptionService {
-  const key = randomBytes(32).toString("base64");
+function encryptionService(): Promise<FieldEncryptionService> {
+  const key = randomBytes(ENCRYPTION_KEY_BYTES).toString("base64");
   const config = {
-    get: (k: string, def?: string) => (k === "CERT_ENCRYPTION_KEY" ? key : def),
-  } as unknown as ConfigService;
-  return new FieldEncryptionService(config);
+    get: (name: string, defaultValue?: string) => (name === "CERT_ENCRYPTION_KEY" ? key : defaultValue),
+  };
+  return instantiateWithDoubles(FieldEncryptionService, [{ token: ConfigService, value: config }]);
+}
+
+function subjectFieldValue(subject: SubjectWithFields, selector: string | { name: string }): unknown {
+  const field = subject.getField(selector);
+  if (typeof field !== "object" || field === null || !("value" in field)) return undefined;
+  return field.value;
 }
 
 function certFromCsr(csrPem: string): string {
   const csr = forge.pki.certificationRequestFromPem(csrPem);
-  const ca = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+  if (csr.publicKey === null) throw new Error("El CSR no trae clave pública.");
+  const certificateAuthorityKeys = forge.pki.rsa.generateKeyPair({ bits: TEST_KEY_BITS });
   const cert = forge.pki.createCertificate();
-  cert.publicKey = csr.publicKey!;
+  cert.publicKey = csr.publicKey;
   cert.serialNumber = "01";
   cert.validity.notBefore = new Date();
-  cert.validity.notAfter = new Date(Date.now() + 365 * 864e5);
+  cert.validity.notAfter = new Date(Date.now() + TEST_CERT_VALIDITY_MS);
   cert.setSubject(csr.subject.attributes);
   cert.setIssuer([{ shortName: "CN", value: "AR Test CA" }]);
-  cert.sign(ca.privateKey, forge.md.sha256.create());
+  cert.sign(certificateAuthorityKeys.privateKey, forge.md.sha256.create());
   return forge.pki.certificateToPem(cert);
 }
 
@@ -91,64 +109,74 @@ describe("CertsService — CSR / onboarding", () => {
   const ISSUER = "em1";
   const CUIT = DEFAULT_CUIT;
 
-  function build(issuerRows: Row[] = []) {
+  async function build(issuerRows: IssuerRow[] = []) {
     const prisma = fakePrisma(issuerRows);
-    return { service: new CertsService(prisma, encryptionService()), prisma };
+    const service = await instantiateWithDoubles(CertsService, [
+      { token: PrismaService, value: prisma },
+      { token: FieldEncryptionService, value: await encryptionService() },
+    ]);
+    return { service, prisma };
   }
 
-  function svc(issuerRows: Row[] = []) {
-    return build(issuerRows).service;
+  async function createService(issuerRows: IssuerRow[] = []): Promise<CertsService> {
+    return (await build(issuerRows)).service;
   }
 
   it("genera un CSR válido con el subject que exige ARCA", async () => {
-    const service = svc();
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA", "chirola-acme");
+    const service = await createService();
+    const { csrPem } = await service.generateCsr(
+      ISSUER,
+      { cuit: CUIT, legalName: "Acme SA" },
+      { alias: "chirola-acme" },
+    );
 
     expect(csrPem).toContain("BEGIN CERTIFICATE REQUEST");
     const csr = forge.pki.certificationRequestFromPem(csrPem);
     expect(csr.verify()).toBe(true);
-    const cn = csr.subject.getField("CN")?.value;
-    const o = csr.subject.getField("O")?.value;
-    const serial = csr.subject.getField({ name: "serialNumber" })?.value;
-    expect(cn).toBe("chirola-acme");
-    expect(o).toBe("Acme SA");
-    expect(serial).toBe(`CUIT ${CUIT}`);
+    const commonName = subjectFieldValue(csr.subject, "CN");
+    const organization = subjectFieldValue(csr.subject, "O");
+    const serialNumber = subjectFieldValue(csr.subject, { name: "serialNumber" });
+    expect(commonName).toBe("chirola-acme");
+    expect(organization).toBe("Acme SA");
+    expect(serialNumber).toBe(`CUIT ${CUIT}`);
   });
 
   it("usa la razón social como CN cuando no se pasa alias", async () => {
-    const { csrPem } = await svc().generateCsr(ISSUER, CUIT, "Acme SA");
+    const { csrPem } = await (
+      await createService()
+    ).generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     const csr = forge.pki.certificationRequestFromPem(csrPem);
-    expect(csr.subject.getField("CN")?.value).toBe("Acme SA");
+    expect(subjectFieldValue(csr.subject, "CN")).toBe("Acme SA");
   });
 
   it("empareja el .crt cuando corresponde a la clave generada", async () => {
-    const service = svc();
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService();
+    const { csrPem } = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     const certPem = certFromCsr(csrPem);
     await expect(service.matchCertificate(ISSUER, certPem)).resolves.toBeUndefined();
-    const creds = await service.getCredentials(ISSUER);
-    expect(creds.certPem).toBe(certPem);
-    expect(creds.privateKeyPem).toContain("BEGIN RSA PRIVATE KEY");
+    const credentials = await service.getCredentials(ISSUER);
+    expect(credentials.certPem).toBe(certPem);
+    expect(credentials.privateKeyPem).toContain("BEGIN RSA PRIVATE KEY");
   });
 
   it("rechaza un .crt que no corresponde a la clave generada", async () => {
-    const service = svc();
-    await service.generateCsr(ISSUER, CUIT, "Acme SA");
-    const otro = await svc().generateCsr("otro", CUIT, "Otra SA");
+    const service = await createService();
+    await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
+    const otro = await (await createService()).generateCsr("otro", { cuit: CUIT, legalName: "Otra SA" });
     const certAjeno = certFromCsr(otro.csrPem);
     await expect(service.matchCertificate(ISSUER, certAjeno)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("rechaza un .crt con PEM inválido", async () => {
-    const service = svc();
-    await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService();
+    await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     await expect(service.matchCertificate(ISSUER, "no-es-pem")).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("devuelve el mismo CSR si se vuelve a pedir, para no invalidar el de ARCA", async () => {
-    const service = svc();
-    const primero = await service.generateCsr(ISSUER, CUIT, "Acme SA");
-    const segundo = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService();
+    const primero = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
+    const segundo = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     expect(segundo.csrPem).toBe(primero.csrPem);
 
     const cert = certFromCsr(primero.csrPem);
@@ -156,9 +184,13 @@ describe("CertsService — CSR / onboarding", () => {
   });
 
   it("genera uno nuevo sólo si se lo pide explícitamente", async () => {
-    const service = svc();
-    const primero = await service.generateCsr(ISSUER, CUIT, "Acme SA");
-    const segundo = await service.generateCsr(ISSUER, CUIT, "Acme SA", undefined, true);
+    const service = await createService();
+    const primero = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
+    const segundo = await service.generateCsr(
+      ISSUER,
+      { cuit: CUIT, legalName: "Acme SA" },
+      { regenerate: true },
+    );
     expect(segundo.csrPem).not.toBe(primero.csrPem);
 
     const certViejo = certFromCsr(primero.csrPem);
@@ -166,16 +198,16 @@ describe("CertsService — CSR / onboarding", () => {
   });
 
   it("vuelve a generar cuando el emisor ya tiene un certificado emparejado", async () => {
-    const service = svc();
-    const primero = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService();
+    const primero = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     await service.matchCertificate(ISSUER, certFromCsr(primero.csrPem));
-    const renovacion = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const renovacion = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     expect(renovacion.csrPem).not.toBe(primero.csrPem);
   });
 
   it("rechaza un .crt cuyo titular no es el emisor", async () => {
-    const service = svc([{ id: ISSUER, cuit: "27999999993" }]);
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService([{ id: ISSUER, cuit: "27999999993" }]);
+    const { csrPem } = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
 
     await expect(service.matchCertificate(ISSUER, certFromCsr(csrPem))).rejects.toBeInstanceOf(
       BadRequestException,
@@ -183,15 +215,15 @@ describe("CertsService — CSR / onboarding", () => {
   });
 
   it("acepta el .crt del representante declarado", async () => {
-    const service = svc([{ id: ISSUER, cuit: "27999999993", representativeCuit: CUIT }]);
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService([{ id: ISSUER, cuit: "27999999993", representativeCuit: CUIT }]);
+    const { csrPem } = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
 
     await expect(service.matchCertificate(ISSUER, certFromCsr(csrPem))).resolves.toBeUndefined();
   });
 
   it("guarda el cuit del titular y deja al emisor esperando la autorización", async () => {
-    const service = svc();
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const service = await createService();
+    const { csrPem } = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     await service.matchCertificate(ISSUER, certFromCsr(csrPem));
 
     const credentials = await service.getCredentials(ISSUER);
@@ -199,8 +231,8 @@ describe("CertsService — CSR / onboarding", () => {
   });
 
   it("deduce el cuit del titular de un certificado guardado sin él", async () => {
-    const { service, prisma } = build();
-    const { csrPem } = await service.generateCsr(ISSUER, CUIT, "Acme SA");
+    const { service, prisma } = await build();
+    const { csrPem } = await service.generateCsr(ISSUER, { cuit: CUIT, legalName: "Acme SA" });
     await service.matchCertificate(ISSUER, certFromCsr(csrPem));
     await prisma.certificate.update({
       where: { issuerId: ISSUER },
@@ -211,6 +243,8 @@ describe("CertsService — CSR / onboarding", () => {
   });
 
   it("falla al emparejar si no se generó el CSR antes", async () => {
-    await expect(svc().matchCertificate("sin-csr", "x")).rejects.toBeInstanceOf(NotFoundException);
+    await expect((await createService()).matchCertificate("sin-csr", "x")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

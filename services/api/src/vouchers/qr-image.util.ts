@@ -1,7 +1,17 @@
 import * as QRCode from "qrcode";
+import { z } from "zod";
+import { hasText } from "@chirola/shared";
 
-export async function renderQrPng(qrUrl: string, width = 320): Promise<Buffer> {
-  return QRCode.toBuffer(qrUrl, {
+const DEFAULT_QR_WIDTH = 320;
+const QR_PAYLOAD_SEPARATOR = "?p=";
+
+const qrRecipientPayloadSchema = z.object({
+  tipoDocRec: z.unknown(),
+  nroDocRec: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+export async function renderQrPng(qrUrl: string, width = DEFAULT_QR_WIDTH): Promise<Buffer> {
+  return await QRCode.toBuffer(qrUrl, {
     type: "png",
     width,
     margin: 1,
@@ -16,13 +26,16 @@ export interface QrRecipient {
 
 export function recipientFromQr(qrUrl: string): QrRecipient | null {
   try {
-    const base64 = qrUrl.split("?p=")[1];
-    if (!base64) return null;
-    const payload = JSON.parse(Buffer.from(base64, "base64").toString("utf8"));
-    if (payload.tipoDocRec == null || payload.nroDocRec == null) return null;
+    const base64 = qrUrl.split(QR_PAYLOAD_SEPARATOR)[1];
+    if (!hasText(base64)) return null;
+    const decoded: unknown = JSON.parse(Buffer.from(base64, "base64").toString("utf8"));
+    const payload = qrRecipientPayloadSchema.safeParse(decoded);
+    if (!payload.success) return null;
+    const { tipoDocRec, nroDocRec } = payload.data;
+    if (tipoDocRec === null || tipoDocRec === undefined) return null;
     return {
-      docType: Number(payload.tipoDocRec),
-      docNumber: String(payload.nroDocRec),
+      docType: Number(tipoDocRec),
+      docNumber: String(nroDocRec),
     };
   } catch {
     return null;

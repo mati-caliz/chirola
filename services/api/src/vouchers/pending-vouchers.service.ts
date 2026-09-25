@@ -37,7 +37,7 @@ export class PendingVouchersService {
 
   async listForUser(userId: string, issuerId: string): Promise<PendingVoucherSummary[]> {
     await this.issuers.getFromUser(issuerId, userId);
-    return this.list(issuerId);
+    return await this.list(issuerId);
   }
 
   async retryForUser(userId: string, issuerId: string, id: string): Promise<void> {
@@ -55,7 +55,7 @@ export class PendingVouchersService {
     issuerId: string,
   ): Promise<PendingVoucherSummary[]> {
     await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    return this.list(issuerId);
+    return await this.list(issuerId);
   }
 
   async retryForApiClient(apiClient: AuthenticatedApiClient, issuerId: string, id: string): Promise<void> {

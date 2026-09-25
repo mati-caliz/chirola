@@ -72,7 +72,7 @@ describe("buildSalesBook", () => {
       }),
     ]);
 
-    expect(book.entries[1].ivaAmount).toBe(-105);
+    expect(book.entries[1]?.ivaAmount).toBe(-105);
     expect(book.totals).toMatchObject({ voucherCount: 2, ivaAmount: 105, totalAmount: 605 });
   });
 
@@ -97,6 +97,6 @@ describe("renderSalesBookCsv", () => {
 
     expect(lines[1]).toContain('15/07/2026;Factura A;0002;00000001;CUIT;20111111112;"Cliente; S.A."');
     expect(lines[1]).toContain("1000,00");
-    expect(lines[2].startsWith("Totales;1 comprobantes")).toBe(true);
+    expect(lines[2]?.startsWith("Totales;1 comprobantes")).toBe(true);
   });
 });

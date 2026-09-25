@@ -5,7 +5,7 @@ import { Button } from "@/components/ds";
 import { authenticateBiometric, isBiometricLockEnabled } from "@/lib/biometrics";
 import { useTheme } from "@/hooks/use-theme";
 
-export function BiometricGate({ children }: { children: ReactNode }) {
+export function BiometricGate({ children }: Readonly<{ children: ReactNode }>): ReactNode {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const appState = useRef(AppState.currentState);
@@ -16,7 +16,7 @@ export function BiometricGate({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    isBiometricLockEnabled().then((on) => {
+    void isBiometricLockEnabled().then((on) => {
       setEnabled(on);
       if (on) {
         void runAuth();
@@ -35,20 +35,26 @@ export function BiometricGate({ children }: { children: ReactNode }) {
       }
       appState.current = next;
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+    };
   }, [enabled, runAuth]);
+
+  const retryAuth = useCallback(() => {
+    void runAuth();
+  }, [runAuth]);
 
   const covered = enabled === null || (enabled && !unlocked);
 
   return (
     <View style={{ flex: 1 }}>
       {children}
-      {covered ? <LockOverlay showRetry={enabled === true} onRetry={runAuth} /> : null}
+      {covered ? <LockOverlay showRetry={enabled === true} onRetry={retryAuth} /> : null}
     </View>
   );
 }
 
-const LockOverlay = ({ showRetry, onRetry }: { showRetry: boolean; onRetry: () => void }) => {
+const LockOverlay = ({ showRetry, onRetry }: { showRetry: boolean; onRetry: () => void }): ReactNode => {
   const theme = useTheme();
   return (
     <View

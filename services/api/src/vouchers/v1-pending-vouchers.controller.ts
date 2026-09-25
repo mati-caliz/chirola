@@ -16,6 +16,7 @@ import { ServiceAuditInterceptor } from "../service-auth/service-audit.intercept
 import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
 import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { PendingVouchersService } from "./pending-vouchers.service";
+import { PendingVoucherSummary } from "@chirola/shared";
 
 @Controller("v1/pending-vouchers")
 @UseGuards(ServiceAuthGuard, RateLimitGuard)
@@ -24,7 +25,10 @@ export class V1PendingVouchersController {
   constructor(private readonly pendingVouchers: PendingVouchersService) {}
 
   @Get()
-  list(@CurrentApiClient() apiClient: AuthenticatedApiClient, @Query("issuerId") issuerId: string) {
+  list(
+    @CurrentApiClient() apiClient: AuthenticatedApiClient,
+    @Query("issuerId") issuerId: string,
+  ): Promise<PendingVoucherSummary[]> {
     return this.pendingVouchers.listForApiClient(apiClient, issuerId);
   }
 
@@ -34,7 +38,7 @@ export class V1PendingVouchersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Query("issuerId") issuerId: string,
     @Param("id") id: string,
-  ) {
+  ): Promise<void> {
     return this.pendingVouchers.retryForApiClient(apiClient, issuerId, id);
   }
 
@@ -44,7 +48,7 @@ export class V1PendingVouchersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Query("issuerId") issuerId: string,
     @Param("id") id: string,
-  ) {
+  ): Promise<void> {
     return this.pendingVouchers.discardForApiClient(apiClient, issuerId, id);
   }
 }

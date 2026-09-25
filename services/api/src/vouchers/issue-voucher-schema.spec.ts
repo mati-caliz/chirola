@@ -28,7 +28,7 @@ describe("issueVoucherSchema — tratamiento fiscal de los ítems", () => {
   it("asume gravado cuando no se especifica", () => {
     const result = issueVoucherSchema.parse(input());
 
-    expect(result.items[0].taxTreatment).toBe(TaxTreatment.TAXED);
+    expect(result.items[0]?.taxTreatment).toBe(TaxTreatment.TAXED);
   });
 
   it("acepta un ítem exento sin alícuota", () => {

@@ -9,10 +9,7 @@ import type { ExportCaeRequest } from "./wsfex.types";
 const recordedCalls = new RecordedArcaCalls();
 
 function service(): WsfexService {
-  const config = {
-    get: (_key: string, def?: string) => def,
-  } as unknown as ConfigService;
-  return new WsfexService(config, recordedCalls);
+  return new WsfexService(new ConfigService(), recordedCalls);
 }
 
 function baseRequest(overrides: Partial<ExportCaeRequest> = {}): ExportCaeRequest {

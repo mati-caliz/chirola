@@ -1,9 +1,14 @@
 import { ForbiddenException } from "@nestjs/common";
 import { ApiClientService } from "./api-client.service";
 import { ApiKeyService } from "./api-key.service";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
-function buildHarness(
+function resolvedWith(value: unknown): jest.Mock {
+  return jest.fn(() => Promise.resolve(value));
+}
+
+async function buildHarness(
   overrides: {
     findClient?: jest.Mock;
     findGrant?: jest.Mock;
@@ -11,14 +16,18 @@ function buildHarness(
 ) {
   const prisma = {
     apiClient: {
-      findUnique: overrides.findClient ?? jest.fn(async () => null),
+      findUnique: overrides.findClient ?? resolvedWith(null),
     },
     apiClientIssuer: {
-      findUnique: overrides.findGrant ?? jest.fn(async () => null),
+      findUnique: overrides.findGrant ?? resolvedWith(null),
     },
-  } as unknown as PrismaService;
+  };
   const apiKeys = new ApiKeyService();
-  return { service: new ApiClientService(prisma, apiKeys), apiKeys };
+  const service = await instantiateWithDoubles(ApiClientService, [
+    { token: PrismaService, value: prisma },
+    { token: ApiKeyService, value: apiKeys },
+  ]);
+  return { service, apiKeys };
 }
 
 describe("ApiClientService", () => {
@@ -31,8 +40,8 @@ describe("ApiClientService", () => {
       keyHash: apiKeys.hashSecret(secret),
       active: true,
     };
-    const { service } = buildHarness({
-      findClient: jest.fn(async () => client),
+    const { service } = await buildHarness({
+      findClient: resolvedWith(client),
     });
 
     const result = await service.authenticate(apiKeys.compose("client-1", secret));
@@ -42,44 +51,44 @@ describe("ApiClientService", () => {
   it("rechaza cliente inactivo", async () => {
     const apiKeys = new ApiKeyService();
     const secret = apiKeys.generateSecret();
-    const { service } = buildHarness({
-      findClient: jest.fn(async () => ({
+    const { service } = await buildHarness({
+      findClient: resolvedWith({
         id: "client-1",
         name: "x",
         keyHash: apiKeys.hashSecret(secret),
         active: false,
-      })),
+      }),
     });
     expect(await service.authenticate(apiKeys.compose("client-1", secret))).toBeNull();
   });
 
   it("rechaza secreto incorrecto", async () => {
     const apiKeys = new ApiKeyService();
-    const { service } = buildHarness({
-      findClient: jest.fn(async () => ({
+    const { service } = await buildHarness({
+      findClient: resolvedWith({
         id: "client-1",
         name: "x",
         keyHash: apiKeys.hashSecret(apiKeys.generateSecret()),
         active: true,
-      })),
+      }),
     });
     expect(await service.authenticate(apiKeys.compose("client-1", "wrong"))).toBeNull();
   });
 
   it("rechaza key mal formada", async () => {
-    const { service } = buildHarness();
+    const { service } = await buildHarness();
     expect(await service.authenticate("no-separator")).toBeNull();
   });
 
   it("assertIssuerGranted pasa si existe grant", async () => {
-    const { service } = buildHarness({
-      findGrant: jest.fn(async () => ({ id: "grant-1" })),
+    const { service } = await buildHarness({
+      findGrant: resolvedWith({ id: "grant-1" }),
     });
     await expect(service.assertIssuerGranted("client-1", "issuer-1")).resolves.toBeUndefined();
   });
 
   it("assertIssuerGranted lanza Forbidden si no hay grant", async () => {
-    const { service } = buildHarness();
+    const { service } = await buildHarness();
     await expect(service.assertIssuerGranted("client-1", "issuer-1")).rejects.toBeInstanceOf(
       ForbiddenException,
     );

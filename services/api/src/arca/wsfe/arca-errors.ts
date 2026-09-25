@@ -10,7 +10,7 @@ export class ArcaRejectionError extends BadRequestException {
   readonly codes: string[];
 
   constructor(codes: string[], messages: string[], summary: string = DEFAULT_REJECTION_SUMMARY) {
-    super(`${summary}: ${messages.length ? messages.join(" | ") : "motivo desconocido"}`);
+    super(`${summary}: ${messages.length > 0 ? messages.join(" | ") : "motivo desconocido"}`);
     this.codes = codes;
   }
 

@@ -5,6 +5,7 @@ node_modules/
 # Builds
 dist/
 build/
+coverage/
 web-build/
 *.tsbuildinfo
 

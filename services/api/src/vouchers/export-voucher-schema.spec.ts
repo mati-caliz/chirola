@@ -93,6 +93,6 @@ describe("comprobantes de exportación (C.3)", () => {
   it("la bonificación por defecto es cero", () => {
     const parsed = issueExportVoucherSchema.parse(input());
 
-    expect(parsed.items[0].discount).toBe(0);
+    expect(parsed.items[0]?.discount).toBe(0);
   });
 });

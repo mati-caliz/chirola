@@ -1,7 +1,15 @@
 import { Controller, Get, Query, Res, UseGuards } from "@nestjs/common";
 import type { Response } from "express";
-import { fiscalPeriodQuerySchema, type FiscalPeriodQuery } from "@chirola/shared";
+import {
+  fiscalPeriodQuerySchema,
+  SalesBook,
+  type FiscalAlerts,
+  type FiscalPeriodQuery,
+  type IvaPosition,
+  type Vencimiento,
+} from "@chirola/shared";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { parseOptionalDate } from "../common/query-params";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
@@ -27,9 +35,9 @@ export class FiscalController {
     @Query("issuerId") issuerId: string,
     @Query("year") year: string,
     @Query("month") month: string,
-  ) {
+  ): Promise<IvaPosition> {
     await this.issuers.getFromUser(issuerId, user.sub);
-    return this.ivaPosition.getMonthlyPosition(issuerId, Number(year), Number(month));
+    return await this.ivaPosition.getMonthlyPosition(issuerId, Number(year), Number(month));
   }
 
   @Get("vencimientos")
@@ -38,28 +46,27 @@ export class FiscalController {
     @Query("issuerId") issuerId: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
-  ) {
+  ): Promise<Vencimiento[]> {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
-    return this.alerts.getVencimientos(
-      issuer.cuit,
-      from ? new Date(from) : undefined,
-      to ? new Date(to) : undefined,
-    );
+    return this.alerts.getVencimientos(issuer.cuit, parseOptionalDate(from), parseOptionalDate(to));
   }
 
   @Get("alerts")
-  async fiscalAlerts(@CurrentUser() user: JwtPayload, @Query("issuerId") issuerId: string) {
+  async fiscalAlerts(
+    @CurrentUser() user: JwtPayload,
+    @Query("issuerId") issuerId: string,
+  ): Promise<FiscalAlerts> {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
-    return this.alerts.getAlerts(issuer);
+    return await this.alerts.getAlerts(issuer);
   }
 
   @Get("sales-book")
   async salesBookMonthly(
     @CurrentUser() user: JwtPayload,
     @Query(new ZodValidationPipe(fiscalPeriodQuerySchema)) query: FiscalPeriodQuery,
-  ) {
+  ): Promise<SalesBook> {
     await this.issuers.getFromUser(query.issuerId, user.sub);
-    return this.salesBook.getMonthly(query.issuerId, query.year, query.month);
+    return await this.salesBook.getMonthly(query.issuerId, query.year, query.month);
   }
 
   @Get("sales-book/csv")
@@ -67,7 +74,7 @@ export class FiscalController {
     @CurrentUser() user: JwtPayload,
     @Query(new ZodValidationPipe(fiscalPeriodQuerySchema)) query: FiscalPeriodQuery,
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     await this.issuers.getFromUser(query.issuerId, user.sub);
     const book = await this.salesBook.getMonthly(query.issuerId, query.year, query.month);
     res.setHeader("Content-Type", "text/csv; charset=utf-8");

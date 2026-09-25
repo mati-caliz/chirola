@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentTypeName } from "./document-type";
-import { ivaRates, ivaRateAfipId } from "./iva-rate";
+import { afipIdByIvaRate, ivaRates } from "./iva-rate";
 import { recipientIvaConditionName } from "./recipient-iva-condition";
 import { tributeTypeName } from "./tribute-type";
 import { voucherTypeName } from "./voucher-type";
@@ -25,10 +25,12 @@ export const arcaParamTypeSchema = z.enum([
   ArcaParamType.RECIPIENT_IVA_CONDITIONS,
 ]);
 
-export type ArcaParam = {
-  id: number;
-  description: string;
-};
+export const arcaParamSchema = z.object({
+  id: z.number(),
+  description: z.string(),
+});
+
+export type ArcaParam = z.infer<typeof arcaParamSchema>;
 
 function fromNameMap(names: Record<number, string>): ArcaParam[] {
   return Object.entries(names).map(([id, description]) => ({
@@ -41,7 +43,7 @@ export const localArcaParams: Record<ArcaParamTypeName, ArcaParam[]> = {
   VOUCHER_TYPES: fromNameMap(voucherTypeName),
   DOCUMENT_TYPES: fromNameMap(documentTypeName),
   IVA_RATES: ivaRates.map((rate) => ({
-    id: ivaRateAfipId[rate],
+    id: afipIdByIvaRate[rate],
     description: `${rate}%`,
   })),
   TRIBUTE_TYPES: fromNameMap(tributeTypeName),

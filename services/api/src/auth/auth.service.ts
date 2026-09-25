@@ -5,6 +5,7 @@ import type { AuthResponse, LoginInput, RegisterInput } from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { hashPassword, verifyPassword } from "./password.util";
 import { generarRefreshToken, hashRefreshToken } from "./refresh-token.util";
+import { MS_PER_DAY } from "../common/time";
 
 const DUMMY_HASH = hashPassword("dummy-para-timing");
 
@@ -38,7 +39,7 @@ export class AuthService {
       data: { email: input.email, password: hashPassword(input.password) },
     });
     this.logger.log(`Usuario registrado: ${user.id}`);
-    return this.emitirTokens(user.id, user.email);
+    return await this.emitirTokens(user.id, user.email);
   }
 
   async login(input: LoginInput): Promise<AuthResponse> {
@@ -52,7 +53,7 @@ export class AuthService {
     if (!verifyPassword(input.password, user.password)) {
       throw new UnauthorizedException("Credenciales inválidas.");
     }
-    return this.emitirTokens(user.id, user.email);
+    return await this.emitirTokens(user.id, user.email);
   }
 
   async refresh(rawToken: string): Promise<AuthResponse> {
@@ -68,7 +69,7 @@ export class AuthService {
       where: { id: stored.id },
       data: { revokedAt: new Date() },
     });
-    return this.emitirTokens(stored.user.id, stored.user.email);
+    return await this.emitirTokens(stored.user.id, stored.user.email);
   }
 
   async logout(rawToken: string): Promise<{ ok: true }> {
@@ -83,7 +84,7 @@ export class AuthService {
   private async emitirTokens(id: string, email: string): Promise<AuthResponse> {
     const payload: JwtPayload = { sub: id, email };
     const refreshToken = generarRefreshToken();
-    const expiresAt = new Date(Date.now() + this.refreshTtlDays * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + this.refreshTtlDays * MS_PER_DAY);
     await this.prisma.refreshToken.create({
       data: { userId: id, tokenHash: hashRefreshToken(refreshToken), expiresAt },
     });

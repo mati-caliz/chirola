@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { roundToCents } from "./money";
 
 const cuitRegex = /^\d{11}$/;
 const nonNegative = z.number().nonnegative().default(0);
@@ -57,5 +58,5 @@ export function purchaseInvoiceTotal(input: {
     input.iva27 +
     input.exempt +
     input.untaxed;
-  return Math.round((sum + Number.EPSILON) * 100) / 100;
+  return roundToCents(sum);
 }

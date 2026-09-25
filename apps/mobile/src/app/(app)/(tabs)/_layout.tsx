@@ -2,6 +2,7 @@ import { Tabs, useRouter } from "expo-router";
 import { type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { TabBar, type TabId } from "@/components/ds";
 import { useActiveIssuer } from "@/lib/active-issuer";
+import type { ReactNode } from "react";
 
 const routeToTab: Record<string, TabId> = {
   index: "inicio",
@@ -17,23 +18,25 @@ const tabToRoute: Record<TabId, string> = {
   mas: "mas",
 };
 
-function AppTabBar({ state, navigation }: BottomTabBarProps) {
+function AppTabBar({ state, navigation }: Readonly<BottomTabBarProps>): ReactNode {
   const router = useRouter();
   const { activeIssuer } = useActiveIssuer();
-  const activeRoute = state.routes[state.index].name;
-  const active = routeToTab[activeRoute] ?? "inicio";
+  const activeRoute = state.routes[state.index]?.name;
+  const active = activeRoute === undefined ? "inicio" : (routeToTab[activeRoute] ?? "inicio");
   return (
     <TabBar
       active={active}
-      onSelect={(id) => navigation.navigate(tabToRoute[id])}
-      onEmitir={() =>
-        router.push(activeIssuer ? `/(app)/issuers/${activeIssuer.id}/vouchers/new` : "/(app)/(tabs)/mas")
-      }
+      onSelect={(id) => {
+        navigation.navigate(tabToRoute[id]);
+      }}
+      onEmitir={() => {
+        router.push(activeIssuer ? `/(app)/issuers/${activeIssuer.id}/vouchers/new` : "/(app)/(tabs)/mas");
+      }}
     />
   );
 }
 
-export default function TabsLayout() {
+export default function TabsLayout(): ReactNode {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <AppTabBar {...props} />}>
       <Tabs.Screen name="index" />

@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { XMLParser } from "fast-xml-parser";
-import { exportItemTotal } from "@chirola/shared";
+import { exportItemTotal, hasText } from "@chirola/shared";
 import {
   callSoap,
   escapeXml,
@@ -11,6 +10,7 @@ import {
   type ArcaCallRecorder,
 } from "../arca-soap.util";
 import { isProduction } from "../arca-environment";
+import { collectRecordsByTag, xmlText } from "../arca-xml";
 import type { ArcaParamEntry, AuthContext } from "../wsfe/wsfe.types";
 import { WsfexRejectionError } from "./wsfex-errors";
 import type { ExportCaeRequest, ExportCaeResult } from "./wsfex.types";
@@ -24,30 +24,20 @@ const APPROVED_RESULT = "A";
 
 const num = (value: number): string => value.toFixed(2);
 
-function collectByTag(root: unknown, tag: string): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
-  const walk = (node: unknown): void => {
-    if (node == null || typeof node !== "object") return;
-    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-      if (key === tag) {
-        for (const entry of Array.isArray(value) ? value : [value]) {
-          if (entry && typeof entry === "object") {
-            out.push(entry as Record<string, unknown>);
-          }
-        }
-      } else {
-        walk(value);
-      }
-    }
-  };
-  walk(root);
-  return out;
+interface ParamTableSpec {
+  operation: string;
+  tag: string;
+  idField: string;
+  descriptionField: string;
+}
+
+function optionalElement(tag: string, value: string | undefined): string {
+  return hasText(value) ? `<ar:${tag}>${escapeXml(value)}</ar:${tag}>` : "";
 }
 
 @Injectable()
 export class WsfexService {
   private readonly logger = new Logger(WsfexService.name);
-  private readonly parser = new XMLParser({ ignoreAttributes: false });
 
   constructor(
     private readonly config: ConfigService,
@@ -139,20 +129,15 @@ export class WsfexService {
     return Number(xml.optional("Cbte_nro", "0"));
   }
 
-  private paramTable(
-    auth: AuthContext,
-    operation: string,
-    tag: string,
-    idField: string,
-    descriptionField: string,
-  ): Promise<ArcaParamEntry[]> {
+  private paramTable(auth: AuthContext, table: ParamTableSpec): Promise<ArcaParamEntry[]> {
+    const { operation, tag, idField, descriptionField } = table;
     return this.call(auth, operation, `<ar:${operation}>${this.authBlock(auth)}</ar:${operation}>`).then(
       (xml) => {
         this.assertNoError(xml);
-        return collectByTag(xml.raw(), tag)
+        return collectRecordsByTag(xml.raw(), tag)
           .map((node) => ({
             id: Number(node[idField]),
-            description: String(node[descriptionField] ?? ""),
+            description: xmlText(node[descriptionField]),
           }))
           .filter((entry) => Number.isFinite(entry.id));
       },
@@ -160,15 +145,30 @@ export class WsfexService {
   }
 
   getCountries(auth: AuthContext): Promise<ArcaParamEntry[]> {
-    return this.paramTable(auth, "FEXGetPARAM_DST_pais", "ClsFEXResponse_DST_pais", "DST_Codigo", "DST_Ds");
+    return this.paramTable(auth, {
+      operation: "FEXGetPARAM_DST_pais",
+      tag: "ClsFEXResponse_DST_pais",
+      idField: "DST_Codigo",
+      descriptionField: "DST_Ds",
+    });
   }
 
   getUnitsOfMeasure(auth: AuthContext): Promise<ArcaParamEntry[]> {
-    return this.paramTable(auth, "FEXGetPARAM_UMed", "ClsFEXResponse_UMed", "Umed_Id", "Umed_Ds");
+    return this.paramTable(auth, {
+      operation: "FEXGetPARAM_UMed",
+      tag: "ClsFEXResponse_UMed",
+      idField: "Umed_Id",
+      descriptionField: "Umed_Ds",
+    });
   }
 
   getExportTypes(auth: AuthContext): Promise<ArcaParamEntry[]> {
-    return this.paramTable(auth, "FEXGetPARAM_Tipo_Expo", "ClsFEXResponse_Tex", "Tex_Id", "Tex_Ds");
+    return this.paramTable(auth, {
+      operation: "FEXGetPARAM_Tipo_Expo",
+      tag: "ClsFEXResponse_Tex",
+      idField: "Tex_Id",
+      descriptionField: "Tex_Ds",
+    });
   }
 
   async getCountryTaxIds(auth: AuthContext): Promise<ArcaParamEntry[]> {
@@ -178,10 +178,10 @@ export class WsfexService {
       `<ar:FEXGetPARAM_DST_CUIT>${this.authBlock(auth)}</ar:FEXGetPARAM_DST_CUIT>`,
     );
     this.assertNoError(xml);
-    return collectByTag(xml.raw(), "ClsFEXResponse_DST_cuit")
+    return collectRecordsByTag(xml.raw(), "ClsFEXResponse_DST_cuit")
       .map((node) => ({
-        id: Number(node.DST_CUIT),
-        description: String(node.DST_Ds ?? ""),
+        id: Number(node["DST_CUIT"]),
+        description: xmlText(node["DST_Ds"]),
       }))
       .filter((entry) => Number.isFinite(entry.id));
   }
@@ -193,9 +193,9 @@ export class WsfexService {
       `<ar:FEXGetPARAM_Incoterms>${this.authBlock(auth)}</ar:FEXGetPARAM_Incoterms>`,
     );
     this.assertNoError(xml);
-    return collectByTag(xml.raw(), "ClsFEXResponse_Inc").map((node, index) => ({
+    return collectRecordsByTag(xml.raw(), "ClsFEXResponse_Inc").map((node, index) => ({
       id: index,
-      description: `${String(node.Inc_Id ?? "")} — ${String(node.Inc_Ds ?? "")}`,
+      description: `${xmlText(node["Inc_Id"])} — ${xmlText(node["Inc_Ds"])}`,
     }));
   }
 
@@ -222,21 +222,15 @@ export class WsfexService {
       `<ar:Cliente>${escapeXml(request.client.legalName)}</ar:Cliente>` +
       `<ar:Cuit_pais_cliente>${request.countryTaxId}</ar:Cuit_pais_cliente>` +
       `<ar:Domicilio_cliente>${escapeXml(request.client.address)}</ar:Domicilio_cliente>` +
-      (request.client.taxId
-        ? `<ar:Id_impositivo>${escapeXml(request.client.taxId)}</ar:Id_impositivo>`
-        : "") +
+      optionalElement("Id_impositivo", request.client.taxId) +
       `<ar:Moneda_Id>${escapeXml(request.currency)}</ar:Moneda_Id>` +
       `<ar:Moneda_ctz>${request.exchangeRate}</ar:Moneda_ctz>` +
-      (request.commercialNotes
-        ? `<ar:Obs_comerciales>${escapeXml(request.commercialNotes)}</ar:Obs_comerciales>`
-        : "") +
+      optionalElement("Obs_comerciales", request.commercialNotes) +
       `<ar:Imp_total>${num(request.totalAmount)}</ar:Imp_total>` +
-      (request.notes ? `<ar:Obs>${escapeXml(request.notes)}</ar:Obs>` : "") +
-      (request.paymentMethod ? `<ar:Forma_pago>${escapeXml(request.paymentMethod)}</ar:Forma_pago>` : "") +
-      (request.incoterm ? `<ar:Incoterms>${escapeXml(request.incoterm)}</ar:Incoterms>` : "") +
-      (request.incotermDescription
-        ? `<ar:Incoterms_Ds>${escapeXml(request.incotermDescription)}</ar:Incoterms_Ds>`
-        : "") +
+      optionalElement("Obs", request.notes) +
+      optionalElement("Forma_pago", request.paymentMethod) +
+      optionalElement("Incoterms", request.incoterm) +
+      optionalElement("Incoterms_Ds", request.incotermDescription) +
       `<ar:Idioma_cbte>${request.language}</ar:Idioma_cbte>` +
       this.buildItems(request) +
       this.buildAssociatedVouchers(request) +
@@ -271,7 +265,7 @@ export class WsfexService {
         .map(
           (item) =>
             "<ar:Item>" +
-            (item.code ? `<ar:Pro_codigo>${escapeXml(item.code)}</ar:Pro_codigo>` : "") +
+            optionalElement("Pro_codigo", item.code) +
             `<ar:Pro_ds>${escapeXml(item.description)}</ar:Pro_ds>` +
             `<ar:Pro_qty>${item.quantity}</ar:Pro_qty>` +
             `<ar:Pro_umed>${item.unitOfMeasureId}</ar:Pro_umed>` +
@@ -307,7 +301,7 @@ export class WsfexService {
     this.assertNoError(xml);
 
     const result = xml.optional("Resultado", "");
-    if (result && result !== APPROVED_RESULT) {
+    if (result !== "" && result !== APPROVED_RESULT) {
       const observations = xml.observations();
       throw new WsfexRejectionError(
         observations.map(({ code }) => code),

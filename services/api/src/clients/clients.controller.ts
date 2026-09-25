@@ -10,6 +10,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
 import { IssuersService } from "../issuers/issuers.service";
+import type { Client } from "@prisma/client";
 import { ClientsService } from "./clients.service";
 
 @Controller("issuers/:issuerId/clients")
@@ -20,7 +21,7 @@ export class ClientsController {
     private readonly issuers: IssuersService,
   ) {}
 
-  private async assertIssuer(issuerId: string, user: JwtPayload) {
+  private async assertIssuer(issuerId: string, user: JwtPayload): Promise<void> {
     await this.issuers.getFromUser(issuerId, user.sub);
   }
 
@@ -29,21 +30,25 @@ export class ClientsController {
     @CurrentUser() user: JwtPayload,
     @Param("issuerId") issuerId: string,
     @Body(new ZodValidationPipe(createClientSchema)) body: CreateClient,
-  ) {
+  ): Promise<Client> {
     await this.assertIssuer(issuerId, user);
-    return this.clients.create(issuerId, body);
+    return await this.clients.create(issuerId, body);
   }
 
   @Get()
-  async list(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string) {
+  async list(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string): Promise<Client[]> {
     await this.assertIssuer(issuerId, user);
-    return this.clients.list(issuerId);
+    return await this.clients.list(issuerId);
   }
 
   @Get(":id")
-  async get(@CurrentUser() user: JwtPayload, @Param("issuerId") issuerId: string, @Param("id") id: string) {
+  async get(
+    @CurrentUser() user: JwtPayload,
+    @Param("issuerId") issuerId: string,
+    @Param("id") id: string,
+  ): Promise<Client> {
     await this.assertIssuer(issuerId, user);
-    return this.clients.get(issuerId, id);
+    return await this.clients.get(issuerId, id);
   }
 
   @Patch(":id")
@@ -52,9 +57,9 @@ export class ClientsController {
     @Param("issuerId") issuerId: string,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updateClientSchema)) body: UpdateClient,
-  ) {
+  ): Promise<Client> {
     await this.assertIssuer(issuerId, user);
-    return this.clients.update(issuerId, id, body);
+    return await this.clients.update(issuerId, id, body);
   }
 
   @Delete(":id")
@@ -62,8 +67,8 @@ export class ClientsController {
     @CurrentUser() user: JwtPayload,
     @Param("issuerId") issuerId: string,
     @Param("id") id: string,
-  ) {
+  ): Promise<{ ok: boolean }> {
     await this.assertIssuer(issuerId, user);
-    return this.clients.delete(issuerId, id);
+    return await this.clients.delete(issuerId, id);
   }
 }

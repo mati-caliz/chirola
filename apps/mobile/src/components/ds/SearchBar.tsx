@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Search, X } from "lucide-react-native";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
 
 export const SearchBar = ({
   value,
@@ -15,7 +16,7 @@ export const SearchBar = ({
   placeholder?: string;
   onClear?: () => void;
   style?: ViewStyle;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
   return (
@@ -41,8 +42,12 @@ export const SearchBar = ({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textTertiary}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={() => {
+          setFocused(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+        }}
         style={{
           flex: 1,
           minWidth: 0,
@@ -51,7 +56,7 @@ export const SearchBar = ({
           color: theme.colors.textPrimary,
         }}
       />
-      {value ? (
+      {hasText(value) ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Borrar búsqueda"

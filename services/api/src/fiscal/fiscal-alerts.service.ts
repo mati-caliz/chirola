@@ -1,15 +1,16 @@
 import { Injectable } from "@nestjs/common";
+import {
+  VencimientoStatus,
+  type CertificateExpiryAlert,
+  type FiscalAlerts,
+  type Vencimiento,
+} from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
-import { upcomingVencimientos, VencimientoStatus, type Vencimiento } from "./vencimiento-calendar";
+import { upcomingVencimientos } from "./vencimiento-calendar";
 
 const DEFAULT_HORIZON_DAYS = 90;
 const CERT_WARNING_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-export interface FiscalAlerts {
-  vencimientos: Vencimiento[];
-  certificate: { validUntil: string; daysToExpiry: number } | null;
-}
 
 @Injectable()
 export class FiscalAlertsService {
@@ -31,9 +32,7 @@ export class FiscalAlertsService {
     };
   }
 
-  private async certificateAlert(
-    issuerId: string,
-  ): Promise<{ validUntil: string; daysToExpiry: number } | null> {
+  private async certificateAlert(issuerId: string): Promise<CertificateExpiryAlert | null> {
     const certificate = await this.prisma.certificate.findUnique({
       where: { issuerId },
     });

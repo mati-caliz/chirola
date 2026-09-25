@@ -28,7 +28,7 @@ export class FieldEncryptionService {
     try {
       return decryptField(this.key, ciphertext);
     } catch (err) {
-      this.logger.error("Fallo al descifrar campo", err as Error);
+      this.logger.error("Fallo al descifrar campo", err);
       throw new InternalServerErrorException("No se pudo descifrar la clave privada del certificado.");
     }
   }

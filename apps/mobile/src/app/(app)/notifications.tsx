@@ -1,124 +1,103 @@
-import { BellOff, CalendarClock, ShieldAlert } from "lucide-react-native";
+import { BellOff, ShieldAlert } from "lucide-react-native";
 import { ActivityIndicator, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { Banner, Card, Divider, EmptyState, Screen, StatusBadge } from "@/components/ds";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { Banner, Card, EmptyState, Screen } from "@/components/ds";
 import { useActiveIssuer } from "@/lib/active-issuer";
-import { getFiscalAlerts, type VencimientoStatus } from "@/lib/resources";
+import { getFiscalAlerts } from "@/lib/resources";
+import type { FiscalAlerts } from "@chirola/shared";
 import { formatDate } from "@/lib/format";
 import { useTheme } from "@/hooks/use-theme";
-import { type StatusKey } from "@/theme/tokens";
+import { VencimientoList } from "@/screens/fiscal/VencimientoList";
+import { hasText } from "@chirola/shared";
+import type { ReactNode } from "react";
 
-const vencimientoStatus: Record<VencimientoStatus, { key: StatusKey; label: string }> = {
-  OVERDUE: { key: "rechazado", label: "Vencido" },
-  DUE_SOON: { key: "observado", label: "Pronto" },
-  UPCOMING: { key: "pendiente", label: "Próximo" },
+type CertificateAlert = NonNullable<FiscalAlerts["certificate"]>;
+
+const CertificateExpiryBanner = ({ certificate }: Readonly<{ certificate: CertificateAlert }>): ReactNode => {
+  const expired = certificate.daysToExpiry <= 0;
+  return (
+    <Banner
+      kind={expired ? "error" : "warning"}
+      title={expired ? "Tu certificado venció" : `Tu certificado vence en ${certificate.daysToExpiry} días`}
+      body={`Vence el ${formatDate(certificate.validUntil)}. Renovalo para seguir emitiendo.`}
+    />
+  );
 };
 
-export default function NotificationsScreen() {
+const RenewCertificateCard = ({ issuerId }: Readonly<{ issuerId: string }>): ReactNode => {
   const theme = useTheme();
   const router = useRouter();
-  const { activeIssuer, activeIssuerId } = useActiveIssuer();
+  return (
+    <Card
+      onPress={() => {
+        router.push(`/(app)/issuers/${issuerId}/certificate`);
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <ShieldAlert size={20} color={theme.colors.textBrand} strokeWidth={2} />
+        <Text
+          style={{
+            fontFamily: theme.font.semibold,
+            fontSize: theme.fontSize.callout,
+            color: theme.colors.textBrand,
+          }}
+        >
+          Renovar certificado
+        </Text>
+      </View>
+    </Card>
+  );
+};
 
+const AlertsList = ({ alerts }: Readonly<{ alerts: FiscalAlerts }>): ReactNode => {
+  const { activeIssuer } = useActiveIssuer();
+  const certificateAlert = activeIssuer ? alerts.certificate : null;
+  return (
+    <>
+      {certificateAlert ? <CertificateExpiryBanner certificate={certificateAlert} /> : null}
+      {alerts.vencimientos.length > 0 ? <VencimientoList vencimientos={alerts.vencimientos} /> : null}
+      {certificateAlert && activeIssuer ? <RenewCertificateCard issuerId={activeIssuer.id} /> : null}
+    </>
+  );
+};
+
+const hasAnyAlert = (alerts: FiscalAlerts | undefined): alerts is FiscalAlerts =>
+  alerts !== undefined && (alerts.certificate !== null || alerts.vencimientos.length > 0);
+
+const NotificationsContent = (): ReactNode => {
+  const theme = useTheme();
+  const { activeIssuerId } = useActiveIssuer();
   const { data, isLoading } = useQuery({
     queryKey: ["fiscal-alerts", activeIssuerId],
-    queryFn: () => getFiscalAlerts(activeIssuerId as string),
-    enabled: Boolean(activeIssuerId),
+    queryFn: hasText(activeIssuerId) ? () => getFiscalAlerts(activeIssuerId) : skipToken,
   });
 
-  const hasAlerts = Boolean(data && (data.certificate || data.vencimientos.length > 0));
+  if (isLoading) {
+    return (
+      <View style={{ paddingVertical: 40, alignItems: "center" }}>
+        <ActivityIndicator color={theme.colors.actionPrimary} size="large" />
+      </View>
+    );
+  }
+  if (!hasAnyAlert(data)) {
+    return (
+      <EmptyState
+        icon={(iconProps) => <BellOff {...iconProps} strokeWidth={1.75} />}
+        title="Estás al día"
+        body="No hay vencimientos próximos ni avisos de tu certificado."
+      />
+    );
+  }
+  return <AlertsList alerts={data} />;
+};
 
+export default function NotificationsScreen(): ReactNode {
   return (
     <>
       <Stack.Screen options={{ title: "Novedades" }} />
       <Screen>
-        {isLoading ? (
-          <View style={{ paddingVertical: 40, alignItems: "center" }}>
-            <ActivityIndicator color={theme.colors.actionPrimary} size="large" />
-          </View>
-        ) : !hasAlerts ? (
-          <EmptyState
-            icon={(p) => <BellOff {...p} strokeWidth={1.75} />}
-            title="Estás al día"
-            body="No hay vencimientos próximos ni avisos de tu certificado."
-          />
-        ) : (
-          <>
-            {data?.certificate && activeIssuer ? (
-              <Banner
-                kind={data.certificate.daysToExpiry <= 0 ? "error" : "warning"}
-                title={
-                  data.certificate.daysToExpiry <= 0
-                    ? "Tu certificado venció"
-                    : `Tu certificado vence en ${data.certificate.daysToExpiry} días`
-                }
-                body={`Vence el ${formatDate(data.certificate.validUntil)}. Renovalo para seguir emitiendo.`}
-              />
-            ) : null}
-
-            {data && data.vencimientos.length > 0 ? (
-              <Card pad={4}>
-                {data.vencimientos.map((item, index) => {
-                  const badge = vencimientoStatus[item.status];
-                  return (
-                    <View key={`${item.type}-${item.dueDate}`}>
-                      {index > 0 ? <Divider inset={16} /> : null}
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 12,
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                        }}
-                      >
-                        <CalendarClock size={20} color={theme.colors.textSecondary} strokeWidth={2} />
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              fontFamily: theme.font.medium,
-                              fontSize: theme.fontSize.callout,
-                              color: theme.colors.textPrimary,
-                            }}
-                          >
-                            {item.label}
-                          </Text>
-                          <Text
-                            style={{
-                              fontFamily: theme.font.regular,
-                              fontSize: theme.fontSize.caption,
-                              color: theme.colors.textSecondary,
-                            }}
-                          >
-                            Vence {formatDate(item.dueDate)}
-                          </Text>
-                        </View>
-                        <StatusBadge status={badge.key} label={badge.label} size="sm" />
-                      </View>
-                    </View>
-                  );
-                })}
-              </Card>
-            ) : null}
-
-            {data?.certificate && activeIssuer ? (
-              <Card onPress={() => router.push(`/(app)/issuers/${activeIssuer.id}/certificate`)}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <ShieldAlert size={20} color={theme.colors.textBrand} strokeWidth={2} />
-                  <Text
-                    style={{
-                      fontFamily: theme.font.semibold,
-                      fontSize: theme.fontSize.callout,
-                      color: theme.colors.textBrand,
-                    }}
-                  >
-                    Renovar certificado
-                  </Text>
-                </View>
-              </Card>
-            ) : null}
-          </>
-        )}
+        <NotificationsContent />
       </Screen>
     </>
   );

@@ -1,4 +1,7 @@
-const BOM = "﻿";
+import { CUIT_LENGTH } from "@chirola/shared";
+
+const BOM = "\uFEFF";
+const FIRST_DATA_LINE_NUMBER = 2;
 const SEMICOLON = ";";
 const COMMA = ",";
 
@@ -65,7 +68,7 @@ function splitLine(line: string, delimiter: string): string[] {
   let quoted = false;
 
   for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
+    const char = line.charAt(i);
     if (char === '"') {
       if (quoted && line[i + 1] === '"') {
         current += '"';
@@ -99,10 +102,10 @@ export function parseArcaAmount(raw: string): number {
 }
 
 export function parseArcaDate(raw: string): string {
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
   if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
 
-  const localMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  const localMatch = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(raw);
   if (localMatch) return `${localMatch[3]}-${localMatch[2]}-${localMatch[1]}`;
 
   throw new CsvFormatError(`Fecha ilegible: "${raw}".`);
@@ -118,7 +121,7 @@ function parseInteger(raw: string, label: string): number {
 
 function parseCuit(raw: string): string {
   const digits = raw.replace(/\D/g, "");
-  if (digits.length !== 11) {
+  if (digits.length !== CUIT_LENGTH) {
     throw new CsvFormatError(`CUIT del emisor inválido: "${raw}".`);
   }
   return digits;
@@ -130,12 +133,13 @@ export function parseMisComprobantesCsv(csv: string): ParsedCsv {
     .split(/\r?\n/)
     .filter((line) => line.trim() !== "");
 
-  if (lines.length === 0) {
+  const [headerLine, ...dataLines] = lines;
+  if (headerLine === undefined) {
     throw new CsvFormatError("El archivo está vacío.");
   }
 
-  const delimiter = detectDelimiter(lines[0]);
-  const headers = splitLine(lines[0], delimiter).map(normalizeHeader);
+  const delimiter = detectDelimiter(headerLine);
+  const headers = splitLine(headerLine, delimiter).map(normalizeHeader);
   const missing = REQUIRED_COLUMNS.filter((column) => !headers.includes(column));
   if (missing.length > 0) {
     throw new CsvFormatError(`Al archivo le faltan columnas de Mis Comprobantes: ${missing.join(", ")}.`);
@@ -146,10 +150,10 @@ export function parseMisComprobantesCsv(csv: string): ParsedCsv {
   const rows: ParsedPurchaseRow[] = [];
   const invalid: InvalidPurchaseRow[] = [];
 
-  for (let i = 1; i < lines.length; i += 1) {
-    const fields = splitLine(lines[i], delimiter);
+  for (const [dataIndex, dataLine] of dataLines.entries()) {
+    const fields = splitLine(dataLine, delimiter);
     const at = (column: string): string => fields[columnIndex(column)] ?? "";
-    const line = i + 1;
+    const line = dataIndex + FIRST_DATA_LINE_NUMBER;
     try {
       rows.push({
         line,

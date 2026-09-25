@@ -3,6 +3,8 @@ import type { EmissionPlan } from "@chirola/shared";
 import { Amount, Banner, BottomSheet, Button } from "@/components/ds";
 import { formatCurrency, formatVoucherNumber } from "@/lib/format";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import type { ReactNode } from "react";
 
 interface ConfirmEmissionSheetProps {
   open: boolean;
@@ -16,6 +18,23 @@ interface ConfirmEmissionSheetProps {
   onConfirm: () => void;
 }
 
+const PlanTotal = ({
+  planLoading,
+  plan,
+  currency,
+}: Readonly<{ planLoading: boolean; plan: EmissionPlan | undefined; currency: string }>): ReactNode => {
+  const theme = useTheme();
+  if (planLoading) {
+    return <ActivityIndicator style={{ marginTop: 12 }} color={theme.colors.actionPrimary} />;
+  }
+  if (plan === undefined) return null;
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Amount value={formatCurrency(plan.totalAmount, currency)} size="xl" />
+    </View>
+  );
+};
+
 export const ConfirmEmissionSheet = ({
   open,
   typeLabel,
@@ -26,7 +45,7 @@ export const ConfirmEmissionSheet = ({
   planError,
   onClose,
   onConfirm,
-}: ConfirmEmissionSheetProps) => {
+}: ConfirmEmissionSheetProps): ReactNode => {
   const theme = useTheme();
   return (
     <BottomSheet open={open} title="Revisá antes de emitir" onClose={onClose}>
@@ -60,13 +79,7 @@ export const ConfirmEmissionSheet = ({
           {typeLabel}
           {plan ? ` ${formatVoucherNumber(plan.salesPoint, plan.number)}` : ""}
         </Text>
-        {planLoading ? (
-          <ActivityIndicator style={{ marginTop: 12 }} color={theme.colors.actionPrimary} />
-        ) : plan ? (
-          <View style={{ marginTop: 8 }}>
-            <Amount value={formatCurrency(plan.totalAmount, currency)} size="xl" />
-          </View>
-        ) : null}
+        <PlanTotal planLoading={planLoading} plan={plan} currency={currency} />
         <Text
           style={{
             fontFamily: theme.font.regular,
@@ -78,7 +91,7 @@ export const ConfirmEmissionSheet = ({
           a {clientLabel} · IVA incluido
         </Text>
       </View>
-      {planError ? (
+      {hasText(planError) ? (
         <View style={{ marginBottom: 12 }}>
           <Banner
             kind="warning"

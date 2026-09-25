@@ -4,6 +4,7 @@ import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
 import { IssuersService } from "../issuers/issuers.service";
 import { TaxpayersService } from "./taxpayers.service";
+import { TaxpayerInfo } from "@chirola/shared";
 
 @Controller("issuers/:issuerId/taxpayers")
 @UseGuards(JwtAuthGuard)
@@ -18,8 +19,8 @@ export class TaxpayersController {
     @CurrentUser() user: JwtPayload,
     @Param("issuerId") issuerId: string,
     @Param("cuit") cuit: string,
-  ) {
+  ): Promise<TaxpayerInfo> {
     const issuer = await this.issuers.getFromUser(issuerId, user.sub);
-    return this.taxpayers.lookup(issuer, cuit);
+    return await this.taxpayers.lookup(issuer, cuit);
   }
 }

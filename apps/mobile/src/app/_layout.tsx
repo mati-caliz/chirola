@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import {
@@ -25,9 +25,9 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/query";
 import { ThemeModeProvider, useThemeMode } from "@/theme/theme-mode";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+export default function RootLayout(): ReactNode {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -43,7 +43,7 @@ export default function RootLayout() {
   );
 }
 
-function ThemedRoot() {
+function ThemedRoot(): ReactNode {
   const { scheme } = useThemeMode();
   const { loading } = useAuth();
   const [fontsLoaded] = useFonts({
@@ -59,7 +59,7 @@ function ThemedRoot() {
   const ready = !loading && fontsLoaded;
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
+    if (ready) void SplashScreen.hideAsync();
   }, [ready]);
 
   if (!ready) return null;
@@ -72,7 +72,7 @@ function ThemedRoot() {
   );
 }
 
-function RootNavigator() {
+function RootNavigator(): ReactNode {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();

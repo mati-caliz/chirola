@@ -15,11 +15,23 @@ const WSAA_FAULT_MESSAGES: Record<string, string> = {
   "cms.bad.base64": "ARCA no pudo leer el pedido de autenticación. Hay que volver a cargar el certificado.",
 };
 
+function withoutNamespacePrefix(qualifiedName: string): string {
+  return qualifiedName.slice(qualifiedName.indexOf(":") + 1);
+}
+
+function knownFaultMessage(soapXml: string): string | undefined {
+  const qualifiedCode = /<faultcode[^>]*>([^<]+)<\/faultcode>/.exec(soapXml)?.[1];
+  if (qualifiedCode === undefined) return undefined;
+  const code = withoutNamespacePrefix(qualifiedCode);
+  return code === "" ? undefined : WSAA_FAULT_MESSAGES[code.trim()];
+}
+
 export function wsaaFaultMessage(soapXml: string, httpStatus: number): string {
-  const code = /<faultcode[^>]*>(?:[^:<]*:)?([^<]+)<\/faultcode>/.exec(soapXml)?.[1];
-  const known = code ? WSAA_FAULT_MESSAGES[code.trim()] : undefined;
-  if (known) return known;
+  const known = knownFaultMessage(soapXml);
+  if (known !== undefined && known !== "") return known;
 
   const fault = /<faultstring[^>]*>([^<]+)<\/faultstring>/.exec(soapXml)?.[1];
-  return fault ? `ARCA rechazó la autenticación: ${fault.trim()}` : `WSAA devolvió error HTTP ${httpStatus}.`;
+  return fault === undefined
+    ? `WSAA devolvió error HTTP ${httpStatus}.`
+    : `ARCA rechazó la autenticación: ${fault.trim()}`;
 }

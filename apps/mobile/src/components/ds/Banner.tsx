@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useTheme, type Theme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+import { isRenderable } from "@/lib/react-node";
 
 export type BannerKind = "error" | "warning" | "success" | "info";
 
-function kindColors(theme: Theme, kind: BannerKind) {
+function kindColors(theme: Theme, kind: BannerKind): { bg: string; fg: string } {
   const { colors } = theme;
   switch (kind) {
     case "warning":
@@ -13,7 +15,7 @@ function kindColors(theme: Theme, kind: BannerKind) {
       return { bg: colors.statusAprobadoBg, fg: colors.statusAprobadoFg };
     case "info":
       return { bg: colors.surfaceBrandSubtle, fg: colors.textBrand };
-    default:
+    case "error":
       return { bg: colors.statusRechazadoBg, fg: colors.statusRechazadoFg };
   }
 }
@@ -30,7 +32,7 @@ export const Banner = ({
   body?: string;
   detail?: string;
   action?: ReactNode;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const { bg, fg } = kindColors(theme, kind);
@@ -46,7 +48,7 @@ export const Banner = ({
       <Text style={{ fontFamily: theme.font.bold, fontSize: theme.fontSize.callout, color: fg }}>
         {title}
       </Text>
-      {body ? (
+      {hasText(body) ? (
         <Text
           style={{
             marginTop: 4,
@@ -59,8 +61,12 @@ export const Banner = ({
           {body}
         </Text>
       ) : null}
-      {detail ? (
-        <Pressable onPress={() => setOpen((prev) => !prev)}>
+      {hasText(detail) ? (
+        <Pressable
+          onPress={() => {
+            setOpen((prev) => !prev);
+          }}
+        >
           <Text
             style={{
               marginTop: 8,
@@ -74,7 +80,7 @@ export const Banner = ({
           </Text>
         </Pressable>
       ) : null}
-      {detail && open ? (
+      {hasText(detail) && open ? (
         <Text
           style={{
             marginTop: 6,
@@ -86,7 +92,7 @@ export const Banner = ({
           {detail}
         </Text>
       ) : null}
-      {action ? <View style={{ marginTop: 12 }}>{action}</View> : null}
+      {isRenderable(action) ? <View style={{ marginTop: 12 }}>{action}</View> : null}
     </View>
   );
 };

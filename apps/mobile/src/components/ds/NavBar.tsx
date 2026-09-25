@@ -2,6 +2,9 @@ import { type ReactNode } from "react";
 import { ChevronLeft } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useTheme } from "@/hooks/use-theme";
+import { hasText } from "@chirola/shared";
+
+const TITLE_PADDING_WITHOUT_BACK = 12;
 
 export const NavBar = ({
   title,
@@ -13,7 +16,7 @@ export const NavBar = ({
   subtitle?: string;
   onBack?: () => void;
   trailing?: ReactNode;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   return (
     <View
@@ -36,7 +39,7 @@ export const NavBar = ({
           <ChevronLeft size={24} color={theme.colors.textPrimary} strokeWidth={2} />
         </Pressable>
       ) : null}
-      <View style={{ flex: 1, minWidth: 0, paddingLeft: onBack ? 0 : 12 }}>
+      <View style={{ flex: 1, minWidth: 0, paddingLeft: onBack ? 0 : TITLE_PADDING_WITHOUT_BACK }}>
         <Text
           numberOfLines={1}
           style={{
@@ -47,7 +50,7 @@ export const NavBar = ({
         >
           {title}
         </Text>
-        {subtitle ? (
+        {hasText(subtitle) ? (
           <Text
             numberOfLines={1}
             style={{

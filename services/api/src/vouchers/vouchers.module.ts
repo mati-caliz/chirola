@@ -15,6 +15,15 @@ import { PendingVouchersController } from "./pending-vouchers.controller";
 import { V1PendingVouchersController } from "./v1-pending-vouchers.controller";
 import { CreditNoteDraftService } from "./credit-note-draft.service";
 import { DraftAmountsService } from "./draft-amounts.service";
+import { VoucherAccessService } from "./voucher-access.service";
+import { VoucherEmissionService } from "./voucher-emission.service";
+import { EmissionPlanService } from "./emission-plan.service";
+import { CaeRequestService } from "./cae-request.service";
+import { IssuedVoucherRecorder } from "./issued-voucher-recorder.service";
+import { PendingVoucherQueue } from "./pending-voucher-queue.service";
+import { PendingVoucherRetryService } from "./pending-voucher-retry.service";
+import { voucherTablesProvider } from "./voucher-tables";
+import { voucherRetryPolicyProvider } from "./voucher-ports";
 import { ArcaModule } from "../arca/arca.module";
 import { CertsModule } from "../certs/certs.module";
 import { IssuersModule } from "../issuers/issuers.module";
@@ -50,6 +59,15 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PendingVouchersService,
     CreditNoteDraftService,
     DraftAmountsService,
+    VoucherAccessService,
+    VoucherEmissionService,
+    EmissionPlanService,
+    CaeRequestService,
+    IssuedVoucherRecorder,
+    PendingVoucherQueue,
+    PendingVoucherRetryService,
+    voucherTablesProvider,
+    voucherRetryPolicyProvider,
   ],
   exports: [VouchersService],
 })

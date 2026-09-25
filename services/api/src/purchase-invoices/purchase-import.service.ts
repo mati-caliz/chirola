@@ -3,6 +3,7 @@ import { ivaRates, purchaseInvoiceTotal } from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   CsvFormatError,
+  ParsedCsv,
   parseMisComprobantesCsv,
   type InvalidPurchaseRow,
   type ParsedPurchaseRow,
@@ -44,6 +45,38 @@ export interface ImportPreview {
 const RATE_TOLERANCE = 0.005;
 const AMOUNT_TOLERANCE = 0.01;
 const NO_IVA_RATE = 0;
+const PERCENT_BASE = 100;
+
+interface TaxedAmounts {
+  netAmount21: number;
+  iva21: number;
+  netAmount105: number;
+  iva105: number;
+  netAmount27: number;
+  iva27: number;
+}
+
+type PurchaseAmounts = TaxedAmounts & { exempt: number; untaxed: number };
+
+interface TaxedFields {
+  net: keyof TaxedAmounts;
+  iva: keyof TaxedAmounts;
+}
+
+const EMPTY_TAXED_AMOUNTS: TaxedAmounts = {
+  netAmount21: 0,
+  iva21: 0,
+  netAmount105: 0,
+  iva105: 0,
+  netAmount27: 0,
+  iva27: 0,
+};
+
+const TAXED_FIELDS_BY_RATE: ReadonlyMap<number, TaxedFields> = new Map<number, TaxedFields>([
+  [21, { net: "netAmount21", iva: "iva21" }],
+  [10.5, { net: "netAmount105", iva: "iva105" }],
+  [27, { net: "netAmount27", iva: "iva27" }],
+]);
 
 function inferIvaRate(row: ParsedPurchaseRow): number | null {
   if (row.ivaAmount === 0) {
@@ -52,21 +85,16 @@ function inferIvaRate(row: ParsedPurchaseRow): number | null {
   if (row.netTaxed === 0) return null;
 
   const ratio = row.ivaAmount / row.netTaxed;
-  const match = ivaRates.find((rate) => rate > 0 && Math.abs(ratio - rate / 100) < RATE_TOLERANCE);
+  const match = ivaRates.find((rate) => rate > 0 && Math.abs(ratio - rate / PERCENT_BASE) < RATE_TOLERANCE);
   return match ?? null;
 }
 
-function amountsForRate(row: ParsedPurchaseRow, ivaRate: number) {
-  const taxed = { netAmount21: 0, iva21: 0, netAmount105: 0, iva105: 0, netAmount27: 0, iva27: 0 };
-  if (ivaRate === 21) {
-    taxed.netAmount21 = row.netTaxed;
-    taxed.iva21 = row.ivaAmount;
-  } else if (ivaRate === 10.5) {
-    taxed.netAmount105 = row.netTaxed;
-    taxed.iva105 = row.ivaAmount;
-  } else if (ivaRate === 27) {
-    taxed.netAmount27 = row.netTaxed;
-    taxed.iva27 = row.ivaAmount;
+function amountsForRate(row: ParsedPurchaseRow, ivaRate: number): PurchaseAmounts {
+  const taxed: TaxedAmounts = { ...EMPTY_TAXED_AMOUNTS };
+  const fields = TAXED_FIELDS_BY_RATE.get(ivaRate);
+  if (fields !== undefined) {
+    taxed[fields.net] = row.netTaxed;
+    taxed[fields.iva] = row.ivaAmount;
   }
   return { ...taxed, exempt: row.exempt, untaxed: row.untaxed };
 }
@@ -88,8 +116,9 @@ export class PurchaseImportService {
     const classified = rows.map((row) => this.classify(row, existing));
 
     for (const [index, row] of rows.entries()) {
-      if (classified[index].status !== ImportRowStatus.IMPORTABLE) continue;
-      const ivaRate = classified[index].ivaRate ?? NO_IVA_RATE;
+      const classification = classified[index];
+      if (classification?.status !== ImportRowStatus.IMPORTABLE) continue;
+      const ivaRate = classification.ivaRate ?? NO_IVA_RATE;
       const amounts = amountsForRate(row, ivaRate);
       await this.prisma.purchaseInvoice.create({
         data: {
@@ -109,7 +138,7 @@ export class PurchaseImportService {
     return this.summarize(classified, invalid);
   }
 
-  private parse(csv: string) {
+  private parse(csv: string): ParsedCsv {
     try {
       return parseMisComprobantesCsv(csv);
     } catch (err) {

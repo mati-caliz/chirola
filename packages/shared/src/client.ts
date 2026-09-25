@@ -2,13 +2,15 @@ import { z } from "zod";
 
 const recipientDocTypes = [80, 86, 96, 99] as const;
 
-const elevenDigitDocTypes = [80, 86];
+const supportedDocTypes: readonly number[] = recipientDocTypes;
+
+const elevenDigitDocTypes: readonly number[] = [80, 86];
 
 const baseClient = {
   docType: z
     .number()
     .int()
-    .refine((v) => (recipientDocTypes as readonly number[]).includes(v), {
+    .refine((docType) => supportedDocTypes.includes(docType), {
       message: "Tipo de documento no soportado",
     }),
   docNumber: z.string().min(1),
@@ -19,7 +21,7 @@ const baseClient = {
 
 function validateDocNumber(data: { docType: number; docNumber?: string }, ctx: z.RefinementCtx): void {
   if (
-    data.docNumber != null &&
+    data.docNumber !== undefined &&
     elevenDigitDocTypes.includes(data.docType) &&
     !/^\d{11}$/.test(data.docNumber)
   ) {
@@ -42,10 +44,22 @@ export const updateClientSchema = z
     email: z.string().email().nullable().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.docType != null && data.docNumber != null) {
+    if (data.docType !== undefined && data.docNumber !== undefined) {
       validateDocNumber({ docType: data.docType, docNumber: data.docNumber }, ctx);
     }
   });
+
+export const clientSchema = z.object({
+  id: z.string(),
+  issuerId: z.string(),
+  docType: z.number(),
+  docNumber: z.string(),
+  legalName: z.string().nullable(),
+  ivaCondition: z.string().nullable(),
+  email: z.string().nullable(),
+});
+
+export type Client = z.infer<typeof clientSchema>;
 
 export type CreateClient = z.infer<typeof createClientSchema>;
 export type UpdateClient = z.infer<typeof updateClientSchema>;

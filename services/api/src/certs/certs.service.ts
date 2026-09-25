@@ -1,10 +1,24 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import * as forge from "node-forge";
-import { IssuerOnboardingStatus, hasConfirmedDelegation, normalizeCuit } from "@chirola/shared";
+import {
+  IssuerOnboardingStatus,
+  hasConfirmedDelegation,
+  hasText,
+  normalizeCuit,
+  type GenerateCsr,
+} from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { FieldEncryptionService } from "../crypto/field-encryption.service";
 import type { CertificateCredentials } from "../arca/wsaa/wsaa.types";
 import { certificateHolderCuit } from "./certificate-subject";
+import { optionalField } from "../common/optional-field";
+
+const CSR_KEY_BITS = 2048;
+
+export interface CsrSubject {
+  cuit: string;
+  legalName: string;
+}
 
 @Injectable()
 export class CertsService {
@@ -26,29 +40,27 @@ export class CertsService {
     const privateKeyEnc = this.encryption.encrypt(privateKeyPem);
     await this.prisma.certificate.upsert({
       where: { issuerId },
-      create: { issuerId, privateKeyEnc, certPem, holderCuit, alias, validUntil },
-      update: { privateKeyEnc, certPem, holderCuit, alias, validUntil },
+      create: { issuerId, privateKeyEnc, certPem, holderCuit, ...optionalField("alias", alias), validUntil },
+      update: { privateKeyEnc, certPem, holderCuit, ...optionalField("alias", alias), validUntil },
     });
     await this.markCertificateLoaded(issuerId);
   }
 
   async generateCsr(
     issuerId: string,
-    cuit: string,
-    legalName: string,
-    alias?: string,
-    regenerate = false,
+    { cuit, legalName }: CsrSubject,
+    { alias, regenerate = false }: GenerateCsr = {},
   ): Promise<{ csrPem: string }> {
     if (!regenerate) {
       const pending = await this.prisma.certificate.findUnique({
         where: { issuerId },
       });
-      if (pending?.csrPem && !pending.certPem) {
+      if (hasText(pending?.csrPem) && !hasText(pending.certPem)) {
         return { csrPem: pending.csrPem };
       }
     }
 
-    const keys = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+    const keys = forge.pki.rsa.generateKeyPair({ bits: CSR_KEY_BITS });
     const csr = forge.pki.createCertificationRequest();
     csr.publicKey = keys.publicKey;
     csr.setSubject([
@@ -66,8 +78,8 @@ export class CertsService {
 
     await this.prisma.certificate.upsert({
       where: { issuerId },
-      create: { issuerId, privateKeyEnc, csrPem, certPem: null, alias },
-      update: { privateKeyEnc, csrPem, certPem: null, alias, validUntil: null },
+      create: { issuerId, privateKeyEnc, csrPem, certPem: null, ...optionalField("alias", alias) },
+      update: { privateKeyEnc, csrPem, certPem: null, ...optionalField("alias", alias), validUntil: null },
     });
 
     return { csrPem };
@@ -117,7 +129,7 @@ export class CertsService {
     if (!issuer) throw new NotFoundException("Emisor inexistente.");
 
     const holderCuit = certificateHolderCuit(cert);
-    if (!holderCuit) {
+    if (!hasText(holderCuit)) {
       throw new BadRequestException(
         "El certificado no declara el CUIT de su titular. " + "No parece un certificado emitido por ARCA.",
       );
@@ -126,7 +138,7 @@ export class CertsService {
     const expectedHolderCuit = normalizeCuit(issuer.representativeCuit ?? issuer.cuit);
     if (holderCuit !== expectedHolderCuit) {
       throw new BadRequestException(
-        issuer.representativeCuit
+        hasText(issuer.representativeCuit)
           ? `El certificado pertenece al CUIT ${holderCuit}, pero el emisor declara ` +
               `como representante al CUIT ${issuer.representativeCuit}.`
           : `El certificado pertenece al CUIT ${holderCuit} y el emisor es el CUIT ` +
@@ -166,7 +178,7 @@ export class CertsService {
     const cert = await this.prisma.certificate.findUnique({
       where: { issuerId },
     });
-    if (!cert || !cert.certPem) {
+    if (!hasText(cert?.certPem)) {
       throw new NotFoundException("El emisor no tiene un certificado cargado todavía.");
     }
     return {
@@ -178,7 +190,7 @@ export class CertsService {
 
   private async backfillHolderCuit(issuerId: string, certPem: string): Promise<string | null> {
     const holderCuit = certificateHolderCuit(this.parseCertificate(certPem));
-    if (!holderCuit) return null;
+    if (!hasText(holderCuit)) return null;
     await this.prisma.certificate.update({
       where: { issuerId },
       data: { holderCuit },

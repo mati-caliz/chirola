@@ -1,5 +1,6 @@
-import { Body, Controller, HttpCode, Post, UseGuards, UsePipes } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards, UsePipes } from "@nestjs/common";
 import {
+  AuthResponse,
   loginSchema,
   refreshSchema,
   registerSchema,
@@ -18,28 +19,28 @@ export class AuthController {
   @Post("register")
   @UseGuards(CredentialsRateLimitGuard)
   @UsePipes(new ZodValidationPipe(registerSchema))
-  register(@Body() body: RegisterInput) {
+  register(@Body() body: RegisterInput): Promise<AuthResponse> {
     return this.auth.register(body);
   }
 
   @Post("login")
   @UseGuards(CredentialsRateLimitGuard)
   @UsePipes(new ZodValidationPipe(loginSchema))
-  login(@Body() body: LoginInput) {
+  login(@Body() body: LoginInput): Promise<AuthResponse> {
     return this.auth.login(body);
   }
 
   @Post("refresh")
   @UseGuards(RefreshRateLimitGuard)
   @UsePipes(new ZodValidationPipe(refreshSchema))
-  refresh(@Body() body: RefreshInput) {
+  refresh(@Body() body: RefreshInput): Promise<AuthResponse> {
     return this.auth.refresh(body.refreshToken);
   }
 
   @Post("logout")
-  @HttpCode(200)
+  @HttpCode(HttpStatus.OK)
   @UsePipes(new ZodValidationPipe(refreshSchema))
-  logout(@Body() body: RefreshInput) {
+  logout(@Body() body: RefreshInput): Promise<{ ok: true }> {
     return this.auth.logout(body.refreshToken);
   }
 }

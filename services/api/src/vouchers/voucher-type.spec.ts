@@ -1,10 +1,10 @@
 import {
   discriminatesIva,
-  reportsIvaToArca,
   FiscalCondition,
   inferFiscalCondition,
   isCreditNote,
   issuableInvoiceTypes,
+  reportsIvaToArca,
   requiresRecipientCuit,
   requiresRetentionNotice,
   voucherLetter,
@@ -24,6 +24,12 @@ describe("tipos de comprobante M (C.1)", () => {
     expect(discriminatesIva(VoucherType.FACTURA_C)).toBe(false);
   });
 
+  it("la B informa IVA a ARCA aunque no lo discrimine en el comprobante", () => {
+    expect(reportsIvaToArca(VoucherType.FACTURA_B)).toBe(true);
+    expect(reportsIvaToArca(VoucherType.NOTA_CREDITO_B)).toBe(true);
+    expect(reportsIvaToArca(VoucherType.FACTURA_C)).toBe(false);
+  });
+
   it("la M exige identificar al receptor con CUIT", () => {
     expect(requiresRecipientCuit(VoucherType.FACTURA_M)).toBe(true);
   });
@@ -41,17 +47,6 @@ describe("tipos de comprobante M (C.1)", () => {
 
   it("incluye la M entre las facturas emitibles", () => {
     expect(issuableInvoiceTypes).toContain(VoucherType.FACTURA_M);
-  });
-});
-
-describe("IVA informado a ARCA", () => {
-  it("informa IVA para B aunque no lo discrimine en el comprobante", () => {
-    expect(reportsIvaToArca(VoucherType.FACTURA_B)).toBe(true);
-    expect(discriminatesIva(VoucherType.FACTURA_B)).toBe(false);
-  });
-
-  it("no informa IVA para C", () => {
-    expect(reportsIvaToArca(VoucherType.FACTURA_C)).toBe(false);
   });
 });
 

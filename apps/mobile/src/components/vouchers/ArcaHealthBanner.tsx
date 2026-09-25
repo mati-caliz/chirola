@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Banner } from "@/components/ds";
 import { getArcaHealth } from "@/lib/resources";
+import type { ReactNode } from "react";
 
 const HEALTH_REFRESH_MS = 60_000;
 
-export const ArcaHealthBanner = ({ issuerId }: { issuerId: string }) => {
+export const ArcaHealthBanner = ({ issuerId }: { issuerId: string }): ReactNode => {
   const { data } = useQuery({
     queryKey: ["arca-health", issuerId],
     queryFn: () => getArcaHealth(issuerId),

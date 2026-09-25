@@ -1,87 +1,31 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
+import type { Issuer } from "@prisma/client";
 import {
-  arcaParamTypeSchema,
-  type ArcaParamTypeName,
-  uploadCertificateSchema,
   createIssuerSchema,
   paymentAccountSchema,
   type PaymentAccount,
   commercialAddressSchema,
   type CommercialAddress,
-  matchCertificateSchema,
-  generateCsrSchema,
   representativeSchema,
-  type UploadCertificate,
   type CreateIssuer,
-  type MatchCertificate,
-  type GenerateCsr,
   type Representative,
 } from "@chirola/shared";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtPayload } from "../auth/auth.service";
-import { IssuersService } from "./issuers.service";
-import { CertsService } from "../certs/certs.service";
-import { ArcaParamsService } from "./arca-params.service";
-import { ArcaParamCacheService } from "./arca-param-cache.service";
-import { ArcaHealthService } from "./arca-health.service";
+import { IssuersService, type IssuerDetail, type IssuerWithCertificateSummary } from "./issuers.service";
 
 @Controller("issuers")
 @UseGuards(JwtAuthGuard)
 export class IssuersController {
-  constructor(
-    private readonly issuers: IssuersService,
-    private readonly certs: CertsService,
-    private readonly params: ArcaParamsService,
-    private readonly paramCache: ArcaParamCacheService,
-    private readonly arcaHealth: ArcaHealthService,
-  ) {}
-
-  @Get(":id/params/:paramType")
-  async paramTable(
-    @CurrentUser() user: JwtPayload,
-    @Param("id") id: string,
-    @Param("paramType", new ZodValidationPipe(arcaParamTypeSchema))
-    paramType: ArcaParamTypeName,
-  ) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.paramCache.get(issuer, paramType);
-  }
-
-  @Get(":id/arca-health")
-  async arcaHealthCheck(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.arcaHealth.check(issuer.environment);
-  }
-
-  @Get(":id/currencies")
-  async currencies(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.params.getCurrencies(issuer);
-  }
-
-  @Get(":id/exchange-rate/:currencyId")
-  async exchangeRate(
-    @CurrentUser() user: JwtPayload,
-    @Param("id") id: string,
-    @Param("currencyId") currencyId: string,
-  ) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.params.getExchangeRate(issuer, currencyId);
-  }
-
-  @Get(":id/fiscal-condition")
-  async fiscalCondition(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.params.detectFiscalCondition(issuer);
-  }
+  constructor(private readonly issuers: IssuersService) {}
 
   @Post()
   create(
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(createIssuerSchema)) body: CreateIssuer,
-  ) {
+  ): Promise<Issuer> {
     return this.issuers.create(user.sub, body);
   }
 
@@ -90,9 +34,9 @@ export class IssuersController {
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(paymentAccountSchema)) body: PaymentAccount,
-  ) {
+  ): Promise<Issuer> {
     const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.issuers.updatePaymentAccount(issuer.id, body);
+    return await this.issuers.updatePaymentAccount(issuer.id, body);
   }
 
   @Put(":id/commercial-address")
@@ -100,36 +44,15 @@ export class IssuersController {
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
-  ) {
+  ): Promise<IssuerDetail> {
     await this.issuers.getFromUser(id, user.sub);
     await this.issuers.updateCommercialAddress(id, body);
-    return this.issuers.getWithCertificate(id);
+    return await this.issuers.getWithCertificate(id);
   }
 
   @Get()
-  list(@CurrentUser() user: JwtPayload) {
+  list(@CurrentUser() user: JwtPayload): Promise<IssuerWithCertificateSummary[]> {
     return this.issuers.list(user.sub);
-  }
-
-  @Post(":id/csr")
-  async generateCsr(
-    @CurrentUser() user: JwtPayload,
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(generateCsrSchema)) body: GenerateCsr,
-  ) {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return this.certs.generateCsr(id, issuer.cuit, issuer.legalName, body.alias, body.regenerate);
-  }
-
-  @Put(":id/certificate")
-  async matchCertificate(
-    @CurrentUser() user: JwtPayload,
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(matchCertificateSchema)) body: MatchCertificate,
-  ) {
-    await this.issuers.getFromUser(id, user.sub);
-    await this.certs.matchCertificate(id, body.certPem);
-    return { ok: true };
   }
 
   @Put(":id/representative")
@@ -137,21 +60,9 @@ export class IssuersController {
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
-  ) {
+  ): Promise<IssuerDetail> {
     await this.issuers.getFromUser(id, user.sub);
     await this.issuers.updateRepresentative(id, body);
-    return this.issuers.getWithCertificate(id);
-  }
-
-  @Post(":id/certificate")
-  async uploadCertificate(
-    @CurrentUser() user: JwtPayload,
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(uploadCertificateSchema))
-    body: UploadCertificate,
-  ) {
-    await this.issuers.getFromUser(id, user.sub);
-    await this.certs.saveCertificate(id, body.privateKeyPem, body.certPem, body.alias);
-    return { ok: true };
+    return await this.issuers.getWithCertificate(id);
   }
 }

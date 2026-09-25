@@ -3,14 +3,12 @@ import { ConfigService } from "@nestjs/config";
 import { RecipientIvaCondition } from "@chirola/shared";
 import { PadronService } from "./padron.service";
 import { RecordedArcaCalls } from "../arca-call-recorder.fixture";
+import { captureFetchRequests, stubFetchResponse } from "../fetch.fixture";
 
 const recordedCalls = new RecordedArcaCalls();
 
 function service(): PadronService {
-  const config = {
-    get: (_key: string, def?: string) => def,
-  } as unknown as ConfigService;
-  return new PadronService(config, recordedCalls);
+  return new PadronService(new ConfigService(), recordedCalls);
 }
 
 const auth = {
@@ -27,10 +25,6 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-function respondWith(xml: string, status = 200): void {
-  global.fetch = (async () => new Response(xml, { status })) as unknown as typeof fetch;
-}
-
 function personaResponse(inner: string): string {
   return (
     '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>' +
@@ -42,7 +36,7 @@ function personaResponse(inner: string): string {
 
 describe("PadronService", () => {
   it("extrae razón social, estado y domicilio de una persona jurídica", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse(
         "<datosGenerales>" +
           "<razonSocial>ACME SOCIEDAD ANONIMA</razonSocial>" +
@@ -73,7 +67,7 @@ describe("PadronService", () => {
   });
 
   it("arma el nombre de una persona física con apellido y nombre", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse(
         "<datosGenerales>" +
           "<apellido>PEREZ</apellido>" +
@@ -90,7 +84,7 @@ describe("PadronService", () => {
   });
 
   it("deduce responsable inscripto cuando está inscripto en IVA", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse(
         "<datosGenerales><razonSocial>ACME SA</razonSocial></datosGenerales>" +
           "<datosRegimenGeneral><impuesto><idImpuesto>30</idImpuesto></impuesto></datosRegimenGeneral>",
@@ -103,7 +97,7 @@ describe("PadronService", () => {
   });
 
   it("deduce monotributo cuando el padrón trae categoría", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse(
         "<datosGenerales><apellido>PEREZ</apellido><nombre>JUAN</nombre></datosGenerales>" +
           "<datosMonotributo><categoriaMonotributo><idCategoria>12</idCategoria></categoriaMonotributo></datosMonotributo>",
@@ -116,7 +110,7 @@ describe("PadronService", () => {
   });
 
   it("deduce sujeto exento cuando sólo figura el impuesto de exento", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse(
         "<datosGenerales><razonSocial>FUNDACION X</razonSocial></datosGenerales>" +
           "<datosRegimenGeneral><impuesto><idImpuesto>32</idImpuesto></impuesto></datosRegimenGeneral>",
@@ -129,7 +123,7 @@ describe("PadronService", () => {
   });
 
   it("cae a consumidor final cuando no hay impuestos declarados", async () => {
-    respondWith(
+    stubFetchResponse(
       personaResponse("<datosGenerales><apellido>PEREZ</apellido><nombre>JUAN</nombre></datosGenerales>"),
     );
 
@@ -139,7 +133,7 @@ describe("PadronService", () => {
   });
 
   it("devuelve null en domicilio cuando el padrón no lo informa", async () => {
-    respondWith(personaResponse("<datosGenerales><razonSocial>ACME SA</razonSocial></datosGenerales>"));
+    stubFetchResponse(personaResponse("<datosGenerales><razonSocial>ACME SA</razonSocial></datosGenerales>"));
 
     const taxpayer = await service().getTaxpayer(auth, "30707153745");
 
@@ -147,7 +141,7 @@ describe("PadronService", () => {
   });
 
   it("traduce el fault de CUIT inexistente en un 404", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault>' +
         "<faultcode>soap:Server</faultcode>" +
         "<faultstring>No existe persona con ese Id</faultstring>" +
@@ -159,7 +153,7 @@ describe("PadronService", () => {
   });
 
   it("propaga los demás errores de ARCA sin convertirlos en 404", async () => {
-    respondWith(
+    stubFetchResponse(
       '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault>' +
         "<faultstring>Token invalido</faultstring>" +
         "</soap:Fault></soap:Body></soap:Envelope>",
@@ -170,17 +164,13 @@ describe("PadronService", () => {
   });
 
   it("manda token, sign, cuit representada e idPersona en el envelope", async () => {
-    let sentBody = "";
-    global.fetch = (async (_url: string, init: { body: string }) => {
-      sentBody = init.body;
-      return new Response(
-        personaResponse("<datosGenerales><razonSocial>ACME SA</razonSocial></datosGenerales>"),
-        { status: 200 },
-      );
-    }) as unknown as typeof fetch;
+    const requests = captureFetchRequests(
+      personaResponse("<datosGenerales><razonSocial>ACME SA</razonSocial></datosGenerales>"),
+    );
 
     await service().getTaxpayer(auth, "30707153745");
 
+    const sentBody = requests.at(-1)?.body ?? "";
     expect(sentBody).toContain("<token>token</token>");
     expect(sentBody).toContain("<sign>sign</sign>");
     expect(sentBody).toContain("<cuitRepresentada>20111111112</cuitRepresentada>");

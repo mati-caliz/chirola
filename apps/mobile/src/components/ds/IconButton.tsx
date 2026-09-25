@@ -6,14 +6,14 @@ export type IconButtonVariant = "plain" | "tonal" | "filled";
 
 export type IconRender = (props: { color: string; size: number }) => ReactNode;
 
-function variantColors(theme: Theme, variant: IconButtonVariant) {
+function variantColors(theme: Theme, variant: IconButtonVariant): { bg: string; fg: string } {
   const { colors } = theme;
   switch (variant) {
     case "tonal":
       return { bg: colors.actionSecondary, fg: colors.actionSecondaryText };
     case "filled":
       return { bg: colors.actionPrimary, fg: colors.actionPrimaryText };
-    default:
+    case "plain":
       return { bg: "transparent", fg: colors.textSecondary };
   }
 }
@@ -32,7 +32,7 @@ export const IconButton = ({
   iconSize?: number;
   variant?: IconButtonVariant;
   onPress?: () => void;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const { bg, fg } = variantColors(theme, variant);
   return (

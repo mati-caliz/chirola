@@ -13,7 +13,7 @@ export const preferenceKeys = {
 export type PreferenceKey = (typeof preferenceKeys)[keyof typeof preferenceKeys];
 
 export async function getPreference(key: PreferenceKey): Promise<string | null> {
-  return AsyncStorage.getItem(`${PREFIX}${key}`);
+  return await AsyncStorage.getItem(`${PREFIX}${key}`);
 }
 
 export async function setPreference(key: PreferenceKey, value: string): Promise<void> {

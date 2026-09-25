@@ -1,21 +1,21 @@
 import { PrismaClient } from "@prisma/client";
-import { normalizeCuit } from "@chirola/shared";
+import { hasText, normalizeCuit } from "@chirola/shared";
 import { certificateHolderCuit } from "../src/certs/certificate-subject";
 import * as forge from "node-forge";
 
 const prisma = new PrismaClient();
 
-type Finding = {
+interface Finding {
   issuerId: string;
   cuit: string;
   environment: string;
   representativeCuit: string | null;
   holderCuit: string | null;
   verdict: string;
-};
+}
 
 function verdictFor(expectedHolderCuit: string, holderCuit: string | null): string {
-  if (!holderCuit) return "SIN CUIT EN EL CERTIFICADO";
+  if (!hasText(holderCuit)) return "SIN CUIT EN EL CERTIFICADO";
   return holderCuit === expectedHolderCuit ? "OK" : "NO COINCIDE";
 }
 
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
   const findings: Finding[] = issuers.map((issuer) => {
     const certPem = issuer.certificate?.certPem ?? null;
-    const holderCuit = certPem ? certificateHolderCuit(forge.pki.certificateFromPem(certPem)) : null;
+    const holderCuit = hasText(certPem) ? certificateHolderCuit(forge.pki.certificateFromPem(certPem)) : null;
     const expectedHolderCuit = normalizeCuit(issuer.representativeCuit ?? issuer.cuit);
     return {
       issuerId: issuer.id,
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
       environment: issuer.environment,
       representativeCuit: issuer.representativeCuit,
       holderCuit,
-      verdict: certPem ? verdictFor(expectedHolderCuit, holderCuit) : "SIN CERTIFICADO",
+      verdict: hasText(certPem) ? verdictFor(expectedHolderCuit, holderCuit) : "SIN CERTIFICADO",
     };
   });
 

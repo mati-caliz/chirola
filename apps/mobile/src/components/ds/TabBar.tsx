@@ -3,31 +3,39 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/use-theme";
 import { type IconRender } from "@/components/ds/IconButton";
+import type { ReactNode } from "react";
 
 export type TabId = "inicio" | "comprobantes" | "fiscal" | "mas";
 
-const tabs: { id: TabId; label: string; icon: IconRender }[] = [
-  {
-    id: "inicio",
-    label: "Inicio",
-    icon: ({ color, size }) => <Home color={color} size={size} strokeWidth={2} />,
-  },
-  {
-    id: "comprobantes",
-    label: "Comprobantes",
-    icon: ({ color, size }) => <FileText color={color} size={size} strokeWidth={2} />,
-  },
-  {
-    id: "fiscal",
-    label: "Fiscal",
-    icon: ({ color, size }) => <BarChart3 color={color} size={size} strokeWidth={2} />,
-  },
-  {
-    id: "mas",
-    label: "Más",
-    icon: ({ color, size }) => <MoreHorizontal color={color} size={size} strokeWidth={2} />,
-  },
-];
+interface TabDefinition {
+  id: TabId;
+  label: string;
+  icon: IconRender;
+}
+
+const homeTab: TabDefinition = {
+  id: "inicio",
+  label: "Inicio",
+  icon: ({ color, size }) => <Home color={color} size={size} strokeWidth={2} />,
+};
+
+const vouchersTab: TabDefinition = {
+  id: "comprobantes",
+  label: "Comprobantes",
+  icon: ({ color, size }) => <FileText color={color} size={size} strokeWidth={2} />,
+};
+
+const fiscalTab: TabDefinition = {
+  id: "fiscal",
+  label: "Fiscal",
+  icon: ({ color, size }) => <BarChart3 color={color} size={size} strokeWidth={2} />,
+};
+
+const moreTab: TabDefinition = {
+  id: "mas",
+  label: "Más",
+  icon: ({ color, size }) => <MoreHorizontal color={color} size={size} strokeWidth={2} />,
+};
 
 export const TabBar = ({
   active = "inicio",
@@ -37,11 +45,11 @@ export const TabBar = ({
   active?: TabId;
   onSelect?: (id: TabId) => void;
   onEmitir?: () => void;
-}) => {
+}): ReactNode => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  const Tab = ({ id, label, icon }: { id: TabId; label: string; icon: IconRender }) => {
+  const Tab = ({ id, label, icon }: Readonly<TabDefinition>): ReactNode => {
     const selected = active === id;
     const color = selected ? theme.colors.textBrand : theme.colors.textTertiary;
     return (
@@ -76,8 +84,8 @@ export const TabBar = ({
         borderTopColor: theme.colors.borderSubtle,
       }}
     >
-      <Tab {...tabs[0]} />
-      <Tab {...tabs[1]} />
+      <Tab {...homeTab} />
+      <Tab {...vouchersTab} />
       <View style={{ flex: 1 }}>
         <Pressable
           accessibilityRole="button"
@@ -113,8 +121,8 @@ export const TabBar = ({
           Emitir
         </Text>
       </View>
-      <Tab {...tabs[2]} />
-      <Tab {...tabs[3]} />
+      <Tab {...fiscalTab} />
+      <Tab {...moreTab} />
     </View>
   );
 };

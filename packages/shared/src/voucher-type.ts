@@ -121,8 +121,8 @@ export function isCreditNote(voucherType: number): boolean {
 
 export function voucherLetter(voucherType: number): string {
   const name = voucherTypeName[voucherType] ?? "";
-  const match = name.match(/ ([ABCEM])$/);
-  return match ? match[1] : "";
+  const match = / ([ABCEM])$/.exec(name);
+  return match?.[1] ?? "";
 }
 
 const ivaDiscriminatingLetters: readonly string[] = ["A", "M"];

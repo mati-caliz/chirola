@@ -12,41 +12,47 @@ export const fiscalPeriodQuerySchema = z.object({
 
 export type FiscalPeriodQuery = z.infer<typeof fiscalPeriodQuerySchema>;
 
-export interface SalesBookEntry {
-  voucherId: string;
-  voucherDate: string;
-  voucherType: number;
-  voucherTypeName: string;
-  salesPoint: number;
-  number: number;
-  recipientDocType: number | null;
-  recipientDocNumber: string | null;
-  recipientName: string | null;
-  currency: string;
-  exchangeRate: number;
-  netAmount: number;
-  exemptAmount: number;
-  untaxedAmount: number;
-  ivaByRate: { rate: number; amount: number }[];
-  ivaAmount: number;
-  tributeAmount: number;
-  totalAmount: number;
-  cae: string | null;
-}
+export const salesBookEntrySchema = z.object({
+  voucherId: z.string(),
+  voucherDate: z.string(),
+  voucherType: z.number(),
+  voucherTypeName: z.string(),
+  salesPoint: z.number(),
+  number: z.number(),
+  recipientDocType: z.number().nullable(),
+  recipientDocNumber: z.string().nullable(),
+  recipientName: z.string().nullable(),
+  currency: z.string(),
+  exchangeRate: z.number(),
+  netAmount: z.number(),
+  exemptAmount: z.number(),
+  untaxedAmount: z.number(),
+  ivaByRate: z.array(z.object({ rate: z.number(), amount: z.number() })),
+  ivaAmount: z.number(),
+  tributeAmount: z.number(),
+  totalAmount: z.number(),
+  cae: z.string().nullable(),
+});
 
-export interface SalesBookTotals {
-  voucherCount: number;
-  netAmount: number;
-  exemptAmount: number;
-  untaxedAmount: number;
-  ivaAmount: number;
-  tributeAmount: number;
-  totalAmount: number;
-}
+export type SalesBookEntry = z.infer<typeof salesBookEntrySchema>;
 
-export interface SalesBook {
-  year: number;
-  month: number;
-  entries: SalesBookEntry[];
-  totals: SalesBookTotals;
-}
+export const salesBookTotalsSchema = z.object({
+  voucherCount: z.number(),
+  netAmount: z.number(),
+  exemptAmount: z.number(),
+  untaxedAmount: z.number(),
+  ivaAmount: z.number(),
+  tributeAmount: z.number(),
+  totalAmount: z.number(),
+});
+
+export type SalesBookTotals = z.infer<typeof salesBookTotalsSchema>;
+
+export const salesBookSchema = z.object({
+  year: z.number(),
+  month: z.number(),
+  entries: z.array(salesBookEntrySchema),
+  totals: salesBookTotalsSchema,
+});
+
+export type SalesBook = z.infer<typeof salesBookSchema>;

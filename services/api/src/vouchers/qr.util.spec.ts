@@ -16,8 +16,8 @@ describe("buildQrUrl", () => {
       cae: "75123456789012",
     });
     expect(url.startsWith("https://www.afip.gob.ar/fe/qr/?p=")).toBe(true);
-    const b64 = url.replace("https://www.afip.gob.ar/fe/qr/?p=", "");
-    const payload = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+    const encodedPayload = url.replace("https://www.afip.gob.ar/fe/qr/?p=", "");
+    const payload: unknown = JSON.parse(Buffer.from(encodedPayload, "base64").toString("utf8"));
     expect(payload).toMatchObject({
       ver: 1,
       fecha: "2026-07-12",

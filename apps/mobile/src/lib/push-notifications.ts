@@ -3,19 +3,20 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { z } from "zod";
-import { PushPlatform } from "@chirola/shared";
+import { PushPlatform, hasText } from "@chirola/shared";
 import { registerPushToken, removePushToken } from "./resources";
 import { getPreference, preferenceKeys, removePreference, setPreference } from "./storage";
 
 const ANDROID_CHANNEL_ID = "default";
 const ANDROID_CHANNEL_NAME = "Avisos de ARCA";
-const GRANTED = "granted";
-
-const easExtraSchema = z.object({ eas: z.object({ projectId: z.string().min(1) }) });
+const easConfigSchema = z.object({ projectId: z.string().min(1) });
+const easExtraSchema = z.object({ eas: easConfigSchema });
 
 function easProjectId(): string | null {
-  if (Constants.easConfig?.projectId) {
-    return Constants.easConfig.projectId;
+  const easConfig: unknown = Constants.easConfig;
+  const parsedEasConfig = easConfigSchema.safeParse(easConfig);
+  if (parsedEasConfig.success) {
+    return parsedEasConfig.data.projectId;
   }
   const parsed = easExtraSchema.safeParse(Constants.expoConfig?.extra);
   return parsed.success ? parsed.data.eas.projectId : null;
@@ -23,16 +24,16 @@ function easProjectId(): string | null {
 
 async function hasPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
-  if (current.status === GRANTED) {
+  if (current.status === Notifications.PermissionStatus.GRANTED) {
     return true;
   }
   const requested = await Notifications.requestPermissionsAsync();
-  return requested.status === GRANTED;
+  return requested.status === Notifications.PermissionStatus.GRANTED;
 }
 
 export async function registerForPushNotifications(): Promise<void> {
   const projectId = easProjectId();
-  if (!Device.isDevice || !projectId || !(await hasPermission())) {
+  if (!Device.isDevice || projectId === null || !(await hasPermission())) {
     return;
   }
   if (Platform.OS === "android") {
@@ -51,7 +52,7 @@ export async function registerForPushNotifications(): Promise<void> {
 
 export async function unregisterPushNotifications(): Promise<void> {
   const token = await getPreference(preferenceKeys.pushToken);
-  if (!token) {
+  if (!hasText(token)) {
     return;
   }
   try {

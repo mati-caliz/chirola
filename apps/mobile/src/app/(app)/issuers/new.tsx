@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Stack, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createIssuerSchema, type CreateIssuer } from "@chirola/shared";
 import { Banner, Button, Input, Screen, Segmented, Subtitle } from "@/components/ds";
 import { createIssuer } from "@/lib/resources";
+import { hasText } from "@chirola/shared";
 
 type IvaCondition = CreateIssuer["ivaCondition"];
 type Environment = CreateIssuer["environment"];
 
-export default function NewIssuerScreen() {
+export default function NewIssuerScreen(): ReactNode {
   const router = useRouter();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [cuit, setCuit] = useState("");
   const [legalName, setLegalName] = useState("");
   const [ivaCondition, setIvaCondition] = useState<IvaCondition>("RESPONSABLE_INSCRIPTO");
@@ -20,13 +21,15 @@ export default function NewIssuerScreen() {
   const mutation = useMutation({
     mutationFn: createIssuer,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["issuers"] });
+      void queryClient.invalidateQueries({ queryKey: ["issuers"] });
       router.back();
     },
-    onError: (e) => setError(e instanceof Error ? e.message : "No se pudo crear el emisor."),
+    onError: (entry) => {
+      setError(entry instanceof Error ? entry.message : "No se pudo crear el emisor.");
+    },
   });
 
-  const onSubmit = () => {
+  const onSubmit = (): void => {
     setError(null);
     const parsed = createIssuerSchema.safeParse({ cuit, legalName, ivaCondition, environment });
     if (!parsed.success) {
@@ -41,7 +44,7 @@ export default function NewIssuerScreen() {
       <Stack.Screen options={{ title: "Nuevo emisor" }} />
       <Screen>
         <Subtitle>Un emisor es el CUIT en cuyo nombre vas a facturar.</Subtitle>
-        {error ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
+        {hasText(error) ? <Banner kind="error" title="Revisá los datos" body={error} /> : null}
         <Input
           label="CUIT"
           value={cuit}

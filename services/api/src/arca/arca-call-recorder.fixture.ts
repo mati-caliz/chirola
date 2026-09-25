@@ -4,8 +4,9 @@ import type { ArcaCallRecorder } from "./arca-soap.util";
 export class RecordedArcaCalls implements ArcaCallRecorder {
   readonly entries: ArcaCallLogEntry[] = [];
 
-  async record(entry: ArcaCallLogEntry): Promise<void> {
+  record(entry: ArcaCallLogEntry): Promise<void> {
     this.entries.push(entry);
+    return Promise.resolve();
   }
 
   last(): ArcaCallLogEntry | undefined {
