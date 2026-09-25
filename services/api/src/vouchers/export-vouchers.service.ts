@@ -55,13 +55,10 @@ export class ExportVouchersService {
   ) {}
 
   async issue(userId: string, input: IssueExportVoucher): Promise<ExportedVoucher> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id: input.issuerId },
+    const issuer = await this.prisma.issuer.findFirst({
+      where: { id: input.issuerId, userId },
     });
     if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
-    }
-    if (issuer.userId !== userId) {
       throw new NotFoundException("Emisor inexistente.");
     }
 

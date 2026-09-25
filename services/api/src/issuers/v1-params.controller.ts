@@ -2,7 +2,6 @@ import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import type { Issuer } from "@prisma/client";
 import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
 import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
-import { ApiClientService } from "../service-auth/api-client.service";
 import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { RateLimitGuard } from "../service-auth/rate-limit.guard";
 import { IssuersService } from "./issuers.service";
@@ -17,7 +16,6 @@ export class V1ParamsController {
   constructor(
     private readonly issuers: IssuersService,
     private readonly params: ArcaParamsService,
-    private readonly apiClients: ApiClientService,
     private readonly arcaHealth: ArcaHealthService,
   ) {}
 
@@ -67,8 +65,7 @@ export class V1ParamsController {
     return await this.arcaHealth.check(issuer.environment);
   }
 
-  private async resolve(apiClient: AuthenticatedApiClient, issuerId: string): Promise<Issuer> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    return await this.issuers.getById(issuerId);
+  private resolve(apiClient: AuthenticatedApiClient, issuerId: string): Promise<Issuer> {
+    return this.issuers.getOwned({ apiClientId: apiClient.id }, issuerId);
   }
 }

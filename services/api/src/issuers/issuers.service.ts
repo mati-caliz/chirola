@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, type Issuer } from "@prisma/client";
 import {
   describeIssuerOnboardingStatus,
@@ -10,10 +10,13 @@ import {
   type Representative,
 } from "@chirola/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { ApiClientService } from "../service-auth/api-client.service";
 
 const SERVICE_USER_DOMAIN = "service.chirola.internal";
 const SERVICE_USER_UNUSABLE_HASH = "service-account-no-login";
 const UNIQUE_CONSTRAINT_ERROR = "P2002";
+const MISSING_ISSUER_MESSAGE = "Emisor inexistente.";
+const FOREIGN_ISSUER_MESSAGE = "El emisor no pertenece al usuario.";
 
 const CERTIFICATE_SUMMARY_INCLUDE = {
   certificate: { select: { alias: true, validUntil: true } },
@@ -47,6 +50,15 @@ export interface IssuerCertificateDetail {
   status: IssuerCertificateStatusName;
 }
 
+export type IssuerOwner = { userId: string } | { apiClientId: string };
+
+type IssuerGrants = Pick<ApiClientService, "assertIssuerGranted">;
+
+interface OwnedIssuerWhere {
+  id: string;
+  userId?: string;
+}
+
 export type IssuerDetail = Issuer & {
   certificateValidUntil: Date | null;
   onboarding: string;
@@ -66,7 +78,10 @@ function describeCertificate(certificate: StoredCertificateDetail): IssuerCertif
 
 @Injectable()
 export class IssuersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ApiClientService) private readonly grants: IssuerGrants,
+  ) {}
 
   private serviceUserEmail(apiClientId: string): string {
     return `${apiClientId}@${SERVICE_USER_DOMAIN}`;
@@ -121,12 +136,13 @@ export class IssuersService {
     });
   }
 
-  async getWithCertificate(id: string): Promise<IssuerDetail> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id },
+  async getWithCertificate(owner: IssuerOwner, id: string): Promise<IssuerDetail> {
+    const where = await this.ownedIssuerWhere(owner, id);
+    const issuer = await this.prisma.issuer.findFirst({
+      where,
       include: { certificate: { select: CERTIFICATE_DETAIL_SELECT } },
     });
-    if (!issuer) throw new NotFoundException("Emisor inexistente.");
+    if (!issuer) return await this.rejectUnowned(owner, id);
     const { certificate, ...rest } = issuer;
     return {
       ...rest,
@@ -136,12 +152,13 @@ export class IssuersService {
     };
   }
 
-  async updateRepresentative(id: string, input: Representative): Promise<Issuer> {
-    const issuer = await this.prisma.issuer.findUnique({
-      where: { id },
+  async updateRepresentative(owner: IssuerOwner, id: string, input: Representative): Promise<Issuer> {
+    const where = await this.ownedIssuerWhere(owner, id);
+    const issuer = await this.prisma.issuer.findFirst({
+      where,
       include: { certificate: { select: { certPem: true, holderCuit: true } } },
     });
-    if (!issuer) throw new NotFoundException("Emisor inexistente.");
+    if (!issuer) return await this.rejectUnowned(owner, id);
 
     const loadedHolderCuit = hasText(issuer.certificate?.certPem) ? issuer.certificate.holderCuit : null;
     const expectedHolderCuit = normalizeCuit(input.representativeCuit ?? issuer.cuit);
@@ -154,7 +171,7 @@ export class IssuersService {
     }
 
     return await this.prisma.issuer.update({
-      where: { id },
+      where,
       data: { representativeCuit: input.representativeCuit },
     });
   }
@@ -172,16 +189,18 @@ export class IssuersService {
     });
   }
 
-  async updatePaymentAccount(id: string, input: PaymentAccount): Promise<Issuer> {
+  async updatePaymentAccount(owner: IssuerOwner, id: string, input: PaymentAccount): Promise<Issuer> {
+    const where = await this.requireOwnedIssuerWhere(owner, id);
     return await this.prisma.issuer.update({
-      where: { id },
+      where,
       data: { cbu: input.cbu, paymentAlias: input.paymentAlias ?? null },
     });
   }
 
-  async updateCommercialAddress(id: string, input: CommercialAddress): Promise<Issuer> {
+  async updateCommercialAddress(owner: IssuerOwner, id: string, input: CommercialAddress): Promise<Issuer> {
+    const where = await this.requireOwnedIssuerWhere(owner, id);
     return await this.prisma.issuer.update({
-      where: { id },
+      where,
       data: { commercialAddress: input.commercialAddress },
     });
   }
@@ -193,18 +212,36 @@ export class IssuersService {
     });
   }
 
-  async getFromUser(id: string, userId: string): Promise<Issuer> {
-    const issuer = await this.prisma.issuer.findUnique({ where: { id } });
-    if (!issuer) throw new NotFoundException("Emisor inexistente.");
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
-    }
+  getFromUser(id: string, userId: string): Promise<Issuer> {
+    return this.getOwned({ userId }, id);
+  }
+
+  async getOwned(owner: IssuerOwner, id: string): Promise<Issuer> {
+    const where = await this.ownedIssuerWhere(owner, id);
+    const issuer = await this.prisma.issuer.findFirst({ where });
+    if (!issuer) return await this.rejectUnowned(owner, id);
     return issuer;
   }
 
-  async getById(id: string): Promise<Issuer> {
-    const issuer = await this.prisma.issuer.findUnique({ where: { id } });
-    if (!issuer) throw new NotFoundException("Emisor inexistente.");
-    return issuer;
+  private async requireOwnedIssuerWhere(owner: IssuerOwner, id: string): Promise<OwnedIssuerWhere> {
+    const where = await this.ownedIssuerWhere(owner, id);
+    const issuer = await this.prisma.issuer.findFirst({ where, select: { id: true } });
+    if (!issuer) return await this.rejectUnowned(owner, id);
+    return where;
+  }
+
+  private async ownedIssuerWhere(owner: IssuerOwner, id: string): Promise<OwnedIssuerWhere> {
+    if ("apiClientId" in owner) {
+      await this.grants.assertIssuerGranted(owner.apiClientId, id);
+      return { id };
+    }
+    return { id, userId: owner.userId };
+  }
+
+  private async rejectUnowned(owner: IssuerOwner, id: string): Promise<never> {
+    if ("userId" in owner && (await this.prisma.issuer.count({ where: { id } })) > 0) {
+      throw new ForbiddenException(FOREIGN_ISSUER_MESSAGE);
+    }
+    throw new NotFoundException(MISSING_ISSUER_MESSAGE);
   }
 }

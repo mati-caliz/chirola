@@ -8,10 +8,16 @@ import {
   type VoucherAccessTables,
   type VoucherDetail,
   type VoucherListEntry,
+  type VoucherScope,
 } from "./voucher-tables";
 
 const DEFAULT_VOUCHER_LIST_LIMIT = 20;
 const MAX_VOUCHER_LIST_LIMIT = 100;
+const MISSING_ISSUER_MESSAGE = "Emisor inexistente.";
+const FOREIGN_ISSUER_MESSAGE = "El emisor no pertenece al usuario.";
+const MISSING_VOUCHER_MESSAGE = "Comprobante inexistente.";
+const FOREIGN_VOUCHER_MESSAGE = "El comprobante no pertenece al usuario.";
+const VOUCHER_DETAIL_INCLUDE = { items: true, client: true, salesPoint: true, issuer: true } as const;
 
 function listLimit(limit: number | undefined): number {
   return limit === undefined || !Number.isFinite(limit) || limit < 1
@@ -26,18 +32,26 @@ export class VoucherAccessService {
     @Inject(ApiClientService) private readonly grants: IssuerGrants,
   ) {}
 
-  async findIssuer(issuerId: string): Promise<StoredIssuer> {
-    const issuer = await this.tables.issuer.findUnique({ where: { id: issuerId } });
-    if (!issuer) {
-      throw new NotFoundException("Emisor inexistente.");
+  async assertIssuerExists(issuerId: string): Promise<void> {
+    if ((await this.tables.issuer.count({ where: { id: issuerId } })) === 0) {
+      throw new NotFoundException(MISSING_ISSUER_MESSAGE);
     }
-    return issuer;
   }
 
   async findOwnedIssuer(userId: string, issuerId: string): Promise<StoredIssuer> {
-    const issuer = await this.findIssuer(issuerId);
-    if (issuer.userId !== userId) {
-      throw new ForbiddenException("El emisor no pertenece al usuario.");
+    const issuer = await this.tables.issuer.findFirst({ where: { id: issuerId, userId } });
+    if (issuer) {
+      return issuer;
+    }
+    await this.assertIssuerExists(issuerId);
+    throw new ForbiddenException(FOREIGN_ISSUER_MESSAGE);
+  }
+
+  async findGrantedIssuer(apiClient: AuthenticatedApiClient, issuerId: string): Promise<StoredIssuer> {
+    await this.assertGranted(apiClient, issuerId);
+    const issuer = await this.tables.issuer.findFirst({ where: { id: issuerId } });
+    if (!issuer) {
+      throw new NotFoundException(MISSING_ISSUER_MESSAGE);
     }
     return issuer;
   }
@@ -47,16 +61,21 @@ export class VoucherAccessService {
   }
 
   async get(userId: string, id: string): Promise<VoucherDetail> {
-    const voucher = await this.loadVoucher(id);
-    if (voucher.issuer.userId !== userId) {
-      throw new ForbiddenException("El comprobante no pertenece al usuario.");
+    const voucher = await this.findScopedVoucher({ id, issuer: { userId } });
+    if (voucher) {
+      return voucher;
     }
-    return voucher;
+    await this.findVoucherIssuerId(id);
+    throw new ForbiddenException(FOREIGN_VOUCHER_MESSAGE);
   }
 
   async getForApiClient(apiClient: AuthenticatedApiClient, id: string): Promise<VoucherDetail> {
-    const voucher = await this.loadVoucher(id);
-    await this.assertGranted(apiClient, voucher.issuerId);
+    const issuerId = await this.findVoucherIssuerId(id);
+    await this.assertGranted(apiClient, issuerId);
+    const voucher = await this.findScopedVoucher({ id, issuerId });
+    if (!voucher) {
+      throw new NotFoundException(MISSING_VOUCHER_MESSAGE);
+    }
     return voucher;
   }
 
@@ -69,14 +88,15 @@ export class VoucherAccessService {
     });
   }
 
-  private async loadVoucher(id: string): Promise<VoucherDetail> {
-    const voucher = await this.tables.voucher.findUnique({
-      where: { id },
-      include: { items: true, client: true, salesPoint: true, issuer: true },
-    });
-    if (!voucher) {
-      throw new NotFoundException("Comprobante inexistente.");
+  private findScopedVoucher(where: VoucherScope): Promise<VoucherDetail | null> {
+    return this.tables.voucher.findFirst({ where, include: VOUCHER_DETAIL_INCLUDE });
+  }
+
+  private async findVoucherIssuerId(id: string): Promise<string> {
+    const owner = await this.tables.voucher.findUnique({ where: { id }, select: { issuerId: true } });
+    if (!owner) {
+      throw new NotFoundException(MISSING_VOUCHER_MESSAGE);
     }
-    return voucher;
+    return owner.issuerId;
   }
 }

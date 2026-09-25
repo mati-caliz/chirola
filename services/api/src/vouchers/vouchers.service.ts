@@ -70,8 +70,8 @@ export class VouchersService {
     input: IssueVoucher,
     idempotencyKey?: string,
   ): Promise<IssuedVoucher> {
-    const issuer = await this.access.findIssuer(input.issuerId);
-    await this.access.assertGranted(apiClient, issuer.id);
+    await this.access.assertIssuerExists(input.issuerId);
+    const issuer = await this.access.findGrantedIssuer(apiClient, input.issuerId);
     return await this.emission.issueAuthorized(issuer, input, idempotencyKey);
   }
 
@@ -94,8 +94,7 @@ export class VouchersService {
     apiClient: AuthenticatedApiClient,
     input: IssueVoucher,
   ): Promise<EmissionPlan> {
-    await this.access.assertGranted(apiClient, input.issuerId);
-    const issuer = await this.access.findIssuer(input.issuerId);
+    const issuer = await this.access.findGrantedIssuer(apiClient, input.issuerId);
     return await this.plans.computeEmissionPlan(issuer, input);
   }
 

@@ -1,10 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   creditNoteTypeFor,
   hasText,
@@ -15,15 +9,11 @@ import {
   type IssueVoucher,
   type VoucherConceptType,
 } from "@chirola/shared";
-import { PrismaService } from "../prisma/prisma.service";
-import { ApiClientService, type AuthenticatedApiClient } from "../service-auth/api-client.service";
+import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { toArcaDate, toLocalIsoDate } from "../arca/arca-date";
 import { recipientFromQr, type QrRecipient } from "./qr-image.util";
 import { parseTaxTreatment } from "./stored-tax-treatment";
-
-type LoadedVoucher = Prisma.VoucherGetPayload<{
-  include: { items: true; salesPoint: true; client: true; issuer: true };
-}>;
+import { VoucherAccessService } from "./voucher-access.service";
 
 type Numeric = number | { toString(): string };
 
@@ -133,33 +123,13 @@ export function buildCreditNoteDraft(voucher: CreditNoteSourceVoucher, today: Da
 
 @Injectable()
 export class CreditNoteDraftService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly apiClients: ApiClientService,
-  ) {}
+  constructor(private readonly access: VoucherAccessService) {}
 
   async draftForUser(userId: string, voucherId: string): Promise<IssueVoucher> {
-    const voucher = await this.load(voucherId);
-    if (voucher.issuer.userId !== userId) {
-      throw new ForbiddenException("El comprobante no pertenece al usuario.");
-    }
-    return buildCreditNoteDraft(voucher, new Date());
+    return buildCreditNoteDraft(await this.access.get(userId, voucherId), new Date());
   }
 
   async draftForApiClient(apiClient: AuthenticatedApiClient, voucherId: string): Promise<IssueVoucher> {
-    const voucher = await this.load(voucherId);
-    await this.apiClients.assertIssuerGranted(apiClient.id, voucher.issuerId);
-    return buildCreditNoteDraft(voucher, new Date());
-  }
-
-  private async load(voucherId: string): Promise<LoadedVoucher> {
-    const voucher = await this.prisma.voucher.findUnique({
-      where: { id: voucherId },
-      include: { items: true, salesPoint: true, client: true, issuer: true },
-    });
-    if (!voucher) {
-      throw new NotFoundException("Comprobante inexistente.");
-    }
-    return voucher;
+    return buildCreditNoteDraft(await this.access.getForApiClient(apiClient, voucherId), new Date());
   }
 }

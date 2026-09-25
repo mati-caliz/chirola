@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { VoucherAccessService } from "./voucher-access.service";
+import { buildAccessTables } from "./voucher-access-tables.fixture";
 import { buildVoucherDetail } from "./voucher-detail.fixture";
 import type { StoredIssuer } from "./voucher-emission.types";
 import type { IssuerGrants } from "./voucher-ports";
@@ -31,18 +32,14 @@ function harness(options: { vouchers?: VoucherDetail[]; grantedIssuerIds?: strin
   const { vouchers = [], grantedIssuerIds = [ISSUER.id] } = options;
   const listQueries: FindManyArgs[] = [];
   const grantChecks: AccessHarness["grantChecks"] = [];
-  const tables: VoucherAccessTables = {
-    issuer: {
-      findUnique: ({ where }) => Promise.resolve(where.id === ISSUER.id ? ISSUER : null),
+  const tables = buildAccessTables({
+    issuers: [ISSUER],
+    vouchers,
+    findMany: (args) => {
+      listQueries.push(args);
+      return Promise.resolve([]);
     },
-    voucher: {
-      findUnique: ({ where }) => Promise.resolve(vouchers.find((voucher) => voucher.id === where.id) ?? null),
-      findMany: (args) => {
-        listQueries.push(args);
-        return Promise.resolve([]);
-      },
-    },
-  };
+  });
   const grants: IssuerGrants = {
     assertIssuerGranted: (apiClientId, issuerId) => {
       grantChecks.push({ apiClientId, issuerId });
@@ -55,12 +52,14 @@ function harness(options: { vouchers?: VoucherDetail[]; grantedIssuerIds?: strin
 }
 
 describe("VoucherAccessService issuer lookups", () => {
-  it("returns an existing issuer", async () => {
-    await expect(harness().service.findIssuer(ISSUER.id)).resolves.toEqual(ISSUER);
+  it("confirms an existing issuer", async () => {
+    await expect(harness().service.assertIssuerExists(ISSUER.id)).resolves.toBeUndefined();
   });
 
   it("reports a missing issuer as not found", async () => {
-    await expect(harness().service.findIssuer("missing")).rejects.toThrow(NotFoundException);
+    await expect(harness().service.assertIssuerExists("missing")).rejects.toThrow(
+      new NotFoundException("Emisor inexistente."),
+    );
   });
 
   it("returns the issuer to its owner", async () => {
@@ -70,6 +69,33 @@ describe("VoucherAccessService issuer lookups", () => {
   it("forbids an issuer owned by another user", async () => {
     await expect(harness().service.findOwnedIssuer(STRANGER_ID, ISSUER.id)).rejects.toThrow(
       new ForbiddenException("El emisor no pertenece al usuario."),
+    );
+  });
+
+  it("reports a missing issuer to its would-be owner as not found", async () => {
+    await expect(harness().service.findOwnedIssuer(OWNER_ID, "missing")).rejects.toThrow(
+      new NotFoundException("Emisor inexistente."),
+    );
+  });
+
+  it("returns the issuer to a granted api client", async () => {
+    const { service, grantChecks } = harness();
+
+    await expect(service.findGrantedIssuer(API_CLIENT, ISSUER.id)).resolves.toEqual(ISSUER);
+    expect(grantChecks).toEqual([{ apiClientId: API_CLIENT.id, issuerId: ISSUER.id }]);
+  });
+
+  it("does not return the issuer to an api client without grant", async () => {
+    const { service } = harness({ grantedIssuerIds: [] });
+
+    await expect(service.findGrantedIssuer(API_CLIENT, ISSUER.id)).rejects.toThrow(ForbiddenException);
+  });
+
+  it("reports a granted but missing issuer as not found", async () => {
+    const { service } = harness({ grantedIssuerIds: ["missing"] });
+
+    await expect(service.findGrantedIssuer(API_CLIENT, "missing")).rejects.toThrow(
+      new NotFoundException("Emisor inexistente."),
     );
   });
 
@@ -111,6 +137,15 @@ describe("VoucherAccessService voucher lookups", () => {
     const { service } = harness({ vouchers: [voucher], grantedIssuerIds: [] });
 
     await expect(service.getForApiClient(API_CLIENT, voucher.id)).rejects.toThrow(ForbiddenException);
+  });
+
+  it("reports a missing voucher to an api client as not found before checking grants", async () => {
+    const { service, grantChecks } = harness();
+
+    await expect(service.getForApiClient(API_CLIENT, "missing")).rejects.toThrow(
+      new NotFoundException("Comprobante inexistente."),
+    );
+    expect(grantChecks).toEqual([]);
   });
 });
 

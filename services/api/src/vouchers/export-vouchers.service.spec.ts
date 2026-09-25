@@ -92,8 +92,8 @@ async function harness(cae: ExportCaeResult = caeResult()): Promise<Harness> {
   };
   const prisma = {
     issuer: {
-      findUnique: ({ where }: { where: { id: string } }) =>
-        Promise.resolve(where.id === ISSUER.id ? ISSUER : null),
+      findFirst: ({ where }: { where: { id: string; userId: string } }) =>
+        Promise.resolve(where.id === ISSUER.id && where.userId === ISSUER.userId ? ISSUER : null),
     },
     salesPoint: {
       upsert: (args: unknown) => {

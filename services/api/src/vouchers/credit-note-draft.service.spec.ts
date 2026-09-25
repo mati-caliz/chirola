@@ -1,6 +1,14 @@
-import { UnprocessableEntityException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { VoucherConcept, VoucherStatus, VoucherType } from "@chirola/shared";
-import { buildCreditNoteDraft, type CreditNoteSourceVoucher } from "./credit-note-draft.service";
+import {
+  buildCreditNoteDraft,
+  CreditNoteDraftService,
+  type CreditNoteSourceVoucher,
+} from "./credit-note-draft.service";
+import { VoucherAccessService } from "./voucher-access.service";
+import { buildAccessTables } from "./voucher-access-tables.fixture";
+import { buildVoucherDetail } from "./voucher-detail.fixture";
+import type { IssuerGrants } from "./voucher-ports";
 
 const TODAY = new Date(2026, 8, 22);
 
@@ -67,6 +75,55 @@ describe("buildCreditNoteDraft", () => {
   it("rechaza un comprobante que ARCA no autorizó", () => {
     expect(() => buildCreditNoteDraft(sourceVoucher({ status: VoucherStatus.REJECTED }), TODAY)).toThrow(
       UnprocessableEntityException,
+    );
+  });
+});
+
+describe("CreditNoteDraftService access", () => {
+  const OWNER_ID = "user-1";
+  const STRANGER_ID = "user-2";
+  const API_CLIENT = { id: "client-1", name: "respondi" };
+  const voucher = buildVoucherDetail();
+
+  function draftsWith(grantedIssuerIds: string[]): CreditNoteDraftService {
+    const tables = buildAccessTables({
+      issuers: [],
+      vouchers: [voucher],
+      findMany: () => Promise.resolve([]),
+    });
+    const grants: IssuerGrants = {
+      assertIssuerGranted: (_apiClientId, issuerId) =>
+        grantedIssuerIds.includes(issuerId)
+          ? Promise.resolve()
+          : Promise.reject(new ForbiddenException("El emisor no está habilitado para este cliente.")),
+    };
+    return new CreditNoteDraftService(new VoucherAccessService(tables, grants));
+  }
+
+  it("drafts the credit note for the owner of the voucher", async () => {
+    const draft = await draftsWith([]).draftForUser(OWNER_ID, voucher.id);
+
+    expect(draft.associatedVouchers).toEqual([expect.objectContaining({ number: voucher.number })]);
+  });
+
+  it("forbids drafting from a voucher of another user", async () => {
+    await expect(draftsWith([]).draftForUser(STRANGER_ID, voucher.id)).rejects.toThrow(
+      new ForbiddenException("El comprobante no pertenece al usuario."),
+    );
+  });
+
+  it("reports a missing voucher as not found", async () => {
+    await expect(draftsWith([]).draftForUser(OWNER_ID, "missing")).rejects.toThrow(
+      new NotFoundException("Comprobante inexistente."),
+    );
+  });
+
+  it("drafts for an api client granted on the issuer and refuses one without grant", async () => {
+    await expect(draftsWith([voucher.issuerId]).draftForApiClient(API_CLIENT, voucher.id)).resolves.toEqual(
+      expect.objectContaining({ issuerId: voucher.issuerId }),
+    );
+    await expect(draftsWith([]).draftForApiClient(API_CLIENT, voucher.id)).rejects.toThrow(
+      ForbiddenException,
     );
   });
 });

@@ -37,8 +37,7 @@ export class V1FiscalController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ): Promise<Vencimiento[]> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    const issuer = await this.issuers.getById(issuerId);
+    const issuer = await this.issuers.getOwned({ apiClientId: apiClient.id }, issuerId);
     return this.alerts.getVencimientos(issuer.cuit, parseOptionalDate(from), parseOptionalDate(to));
   }
 
@@ -47,8 +46,7 @@ export class V1FiscalController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Query("issuerId") issuerId: string,
   ): Promise<FiscalAlerts> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    const issuer = await this.issuers.getById(issuerId);
+    const issuer = await this.issuers.getOwned({ apiClientId: apiClient.id }, issuerId);
     return await this.alerts.getAlerts(issuer);
   }
 }

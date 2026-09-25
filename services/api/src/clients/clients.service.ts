@@ -46,7 +46,7 @@ export class ClientsService {
     await this.get(issuerId, id);
     try {
       return await this.prisma.client.update({
-        where: { id },
+        where: { id, issuerId },
         data: {
           ...optionalField("docType", input.docType),
           ...optionalField("docNumber", input.docNumber),
@@ -62,7 +62,7 @@ export class ClientsService {
 
   async delete(issuerId: string, id: string): Promise<{ ok: boolean }> {
     await this.get(issuerId, id);
-    await this.prisma.client.delete({ where: { id } });
+    await this.prisma.client.delete({ where: { id, issuerId } });
     return { ok: true };
   }
 

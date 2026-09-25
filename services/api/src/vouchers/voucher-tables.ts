@@ -40,10 +40,24 @@ export const VOUCHER_LIST_SELECT = {
 
 export type VoucherListEntry = Prisma.VoucherGetPayload<{ select: typeof VOUCHER_LIST_SELECT }>;
 
+export interface IssuerScope {
+  id: string;
+  userId?: string;
+}
+
+export type VoucherScope = { id: string; issuerId: string } | { id: string; issuer: { userId: string } };
+
 export interface VoucherAccessTables {
-  issuer: IssuerTable;
+  issuer: {
+    findFirst(args: { where: IssuerScope }): Promise<StoredIssuer | null>;
+    count(args: { where: { id: string } }): Promise<number>;
+  };
   voucher: {
-    findUnique(args: { where: { id: string }; include: VoucherDetailInclude }): Promise<VoucherDetail | null>;
+    findFirst(args: { where: VoucherScope; include: VoucherDetailInclude }): Promise<VoucherDetail | null>;
+    findUnique(args: {
+      where: { id: string };
+      select: { issuerId: true };
+    }): Promise<{ issuerId: string } | null>;
     findMany(args: {
       where: { issuerId: string };
       orderBy: Prisma.VoucherOrderByWithRelationInput[];

@@ -51,8 +51,7 @@ export class V1IssuersController {
     @CurrentApiClient() apiClient: AuthenticatedApiClient,
     @Param("id") id: string,
   ): Promise<IssuerDetail> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, id);
-    return await this.issuers.getWithCertificate(id);
+    return await this.issuers.getWithCertificate({ apiClientId: apiClient.id }, id);
   }
 
   @Get(":id/sales-points")
@@ -70,9 +69,9 @@ export class V1IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
   ): Promise<IssuerDetail> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, id);
-    await this.issuers.updateRepresentative(id, body);
-    return await this.issuers.getWithCertificate(id);
+    const owner = { apiClientId: apiClient.id };
+    await this.issuers.updateRepresentative(owner, id, body);
+    return await this.issuers.getWithCertificate(owner, id);
   }
 
   @Put(":id/commercial-address")
@@ -81,9 +80,9 @@ export class V1IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
   ): Promise<IssuerDetail> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, id);
-    await this.issuers.updateCommercialAddress(id, body);
-    return await this.issuers.getWithCertificate(id);
+    const owner = { apiClientId: apiClient.id };
+    await this.issuers.updateCommercialAddress(owner, id, body);
+    return await this.issuers.getWithCertificate(owner, id);
   }
 
   @Post(":id/csr")
@@ -92,8 +91,7 @@ export class V1IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(generateCsrSchema)) body: GenerateCsr,
   ): Promise<{ csrPem: string }> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, id);
-    const issuer = await this.issuers.getById(id);
+    const issuer = await this.issuers.getOwned({ apiClientId: apiClient.id }, id);
     return await this.certs.generateCsr(id, issuer, body);
   }
 
@@ -105,6 +103,6 @@ export class V1IssuersController {
   ): Promise<IssuerDetail> {
     await this.apiClients.assertIssuerGranted(apiClient.id, id);
     await this.certs.matchCertificate(id, body.certPem);
-    return await this.issuers.getWithCertificate(id);
+    return await this.issuers.getWithCertificate({ apiClientId: apiClient.id }, id);
   }
 }

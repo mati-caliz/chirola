@@ -35,8 +35,7 @@ export class IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(paymentAccountSchema)) body: PaymentAccount,
   ): Promise<Issuer> {
-    const issuer = await this.issuers.getFromUser(id, user.sub);
-    return await this.issuers.updatePaymentAccount(issuer.id, body);
+    return await this.issuers.updatePaymentAccount({ userId: user.sub }, id, body);
   }
 
   @Put(":id/commercial-address")
@@ -45,9 +44,9 @@ export class IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(commercialAddressSchema)) body: CommercialAddress,
   ): Promise<IssuerDetail> {
-    await this.issuers.getFromUser(id, user.sub);
-    await this.issuers.updateCommercialAddress(id, body);
-    return await this.issuers.getWithCertificate(id);
+    const owner = { userId: user.sub };
+    await this.issuers.updateCommercialAddress(owner, id, body);
+    return await this.issuers.getWithCertificate(owner, id);
   }
 
   @Get()
@@ -61,8 +60,8 @@ export class IssuersController {
     @Param("id") id: string,
     @Body(new ZodValidationPipe(representativeSchema)) body: Representative,
   ): Promise<IssuerDetail> {
-    await this.issuers.getFromUser(id, user.sub);
-    await this.issuers.updateRepresentative(id, body);
-    return await this.issuers.getWithCertificate(id);
+    const owner = { userId: user.sub };
+    await this.issuers.updateRepresentative(owner, id, body);
+    return await this.issuers.getWithCertificate(owner, id);
   }
 }

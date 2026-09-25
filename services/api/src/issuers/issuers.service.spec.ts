@@ -2,6 +2,7 @@ import { ConflictException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { IssuersService } from "./issuers.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ApiClientService } from "../service-auth/api-client.service";
 import { instantiateWithDoubles } from "../common/testing/instantiate-with-doubles";
 
 const input = {
@@ -18,7 +19,10 @@ function prismaWithTransaction(transactionClient: object): object {
 }
 
 function serviceWith(prisma: object): Promise<IssuersService> {
-  return instantiateWithDoubles(IssuersService, [{ token: PrismaService, value: prisma }]);
+  return instantiateWithDoubles(IssuersService, [
+    { token: PrismaService, value: prisma },
+    { token: ApiClientService, value: { assertIssuerGranted: () => Promise.resolve() } },
+  ]);
 }
 
 function resolvedWith<Value>(value: Value): jest.Mock<Promise<Value>> {
@@ -100,12 +104,14 @@ describe("IssuersService.createForApiClient con domicilio comercial", () => {
 describe("IssuersService.updateCommercialAddress", () => {
   it("actualiza sólo el domicilio comercial del emisor", async () => {
     const issuerUpdate = resolvedWith({ id: "issuer-1" });
-    const service = await serviceWith({ issuer: { update: issuerUpdate } });
+    const service = await serviceWith({
+      issuer: { findFirst: resolvedWith({ id: "issuer-1" }), update: issuerUpdate },
+    });
 
-    await service.updateCommercialAddress("issuer-1", { commercialAddress: null });
+    await service.updateCommercialAddress({ userId: "user-1" }, "issuer-1", { commercialAddress: null });
 
     expect(issuerUpdate).toHaveBeenCalledWith({
-      where: { id: "issuer-1" },
+      where: { id: "issuer-1", userId: "user-1" },
       data: { commercialAddress: null },
     });
   });
@@ -124,7 +130,7 @@ describe("IssuersService.getWithCertificate", () => {
   const validUntil = new Date("2027-09-24T00:00:00.000Z");
 
   function serviceReturning(certificate: object | null): Promise<IssuersService> {
-    return serviceWith({ issuer: { findUnique: resolvedWith({ ...storedIssuer, certificate }) } });
+    return serviceWith({ issuer: { findFirst: resolvedWith({ ...storedIssuer, certificate }) } });
   }
 
   it("expone el vencimiento del certificado activo y el domicilio comercial", async () => {
@@ -134,7 +140,7 @@ describe("IssuersService.getWithCertificate", () => {
       certPem: "PEM",
       holderCuit: "20111111112",
     });
-    const issuer = await service.getWithCertificate("issuer-1");
+    const issuer = await service.getWithCertificate({ userId: "user-1" }, "issuer-1");
 
     expect(issuer).toEqual(
       expect.objectContaining({
@@ -157,13 +163,13 @@ describe("IssuersService.getWithCertificate", () => {
       certPem: null,
       holderCuit: null,
     });
-    const issuer = await service.getWithCertificate("issuer-1");
+    const issuer = await service.getWithCertificate({ userId: "user-1" }, "issuer-1");
 
     expect(issuer.certificateValidUntil).toBeNull();
   });
 
   it("devuelve el vencimiento en null si el emisor no tiene certificado", async () => {
-    const issuer = await (await serviceReturning(null)).getWithCertificate("issuer-1");
+    const issuer = await (await serviceReturning(null)).getWithCertificate({ userId: "user-1" }, "issuer-1");
 
     expect(issuer.certificateValidUntil).toBeNull();
     expect(issuer.certificate).toBeNull();

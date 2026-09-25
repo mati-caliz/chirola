@@ -3,6 +3,7 @@ import { issueVoucherSchema, PendingVoucherStatus, type IssueVoucher } from "@ch
 import { VouchersService } from "./vouchers.service";
 import { IssuerLockService } from "./issuer-lock.service";
 import { VoucherAccessService } from "./voucher-access.service";
+import { buildAccessTables } from "./voucher-access-tables.fixture";
 import { VoucherEmissionService } from "./voucher-emission.service";
 import { EmissionPlanService } from "./emission-plan.service";
 import { CaeRequestService } from "./cae-request.service";
@@ -24,7 +25,6 @@ import type {
   PendingVoucherRow,
   PendingVoucherTables,
   ReplayableVoucher,
-  VoucherAccessTables,
 } from "./voucher-tables";
 
 export interface StoredVoucher extends ReplayableVoucher {
@@ -237,10 +237,7 @@ export function buildHarness(): Harness {
   const webhooks = { dispatch: jest.fn(dispatch) };
   const push = { notifyIssuerOwner: jest.fn(notifyIssuerOwner) };
   const grants: IssuerGrants = { assertIssuerGranted: () => Promise.resolve() };
-  const accessTables: VoucherAccessTables = {
-    issuer: pendingTables.issuer,
-    voucher: { findUnique: notUsed, findMany: notUsed },
-  };
+  const accessTables = buildAccessTables({ issuers: [ISSUER], vouchers: [], findMany: notUsed });
   const planTables: EmissionPlanTables = { issuer: { findUniqueOrThrow: notUsed } };
 
   const issuerLock = new IssuerLockService();

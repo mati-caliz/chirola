@@ -114,7 +114,7 @@ export class PurchaseInvoicesService {
     const merged = mergeAmounts(input, existing);
 
     return await this.prisma.purchaseInvoice.update({
-      where: { id },
+      where: { id, issuerId },
       data: {
         ...optionalField("supplierCuit", input.supplierCuit),
         ...optionalField("supplierName", input.supplierName),
@@ -131,7 +131,7 @@ export class PurchaseInvoicesService {
 
   async remove(issuerId: string, id: string): Promise<{ ok: boolean }> {
     await this.getScoped(issuerId, id);
-    await this.prisma.purchaseInvoice.delete({ where: { id } });
+    await this.prisma.purchaseInvoice.delete({ where: { id, issuerId } });
     return { ok: true };
   }
 

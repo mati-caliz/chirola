@@ -3,6 +3,7 @@ import { IssuerOnboardingStatus, type IssueVoucher } from "@chirola/shared";
 import { fakeIssuerAuth, fakeIssuerOnboarding } from "../issuer-arca/issuer-arca.fixture";
 import { EmissionPlanService } from "./emission-plan.service";
 import { VoucherAccessService } from "./voucher-access.service";
+import { buildAccessTables } from "./voucher-access-tables.fixture";
 import { buildVoucherDetail } from "./voucher-detail.fixture";
 import { buildInput } from "./voucher-emission.fixture";
 import type { IssuedVoucher, StoredIssuer } from "./voucher-emission.types";
@@ -56,14 +57,12 @@ function accessWith(
   grantChecks: string[];
 } {
   const grantChecks: string[] = [];
-  const tables: VoucherAccessTables = {
-    issuer: { findUnique: ({ where }) => Promise.resolve(where.id === ISSUER.id ? ISSUER : null) },
-    voucher: {
-      findUnique: ({ where }) => Promise.resolve(vouchers.find((voucher) => voucher.id === where.id) ?? null),
-      findMany: ({ where }) =>
-        Promise.resolve(vouchers.filter((voucher) => voucher.issuerId === where.issuerId).map(listEntryOf)),
-    },
-  };
+  const tables = buildAccessTables({
+    issuers: [ISSUER],
+    vouchers,
+    findMany: ({ where }) =>
+      Promise.resolve(vouchers.filter((voucher) => voucher.issuerId === where.issuerId).map(listEntryOf)),
+  });
   const grants: IssuerGrants = {
     assertIssuerGranted: (_apiClientId, issuerId) => {
       grantChecks.push(issuerId);
@@ -226,6 +225,16 @@ describe("VouchersService issuing and previews", () => {
     const { service, issued } = await harness({ grantedIssuerIds: [] });
 
     await expect(service.issueForApiClient(API_CLIENT, buildInput())).rejects.toThrow(ForbiddenException);
+    expect(issued).toEqual([]);
+  });
+
+  it("reports a missing issuer to an api client as not found before checking grants", async () => {
+    const { service, issued, grantChecks } = await harness({ grantedIssuerIds: [] });
+
+    await expect(
+      service.issueForApiClient(API_CLIENT, { ...buildInput(), issuerId: "missing" }),
+    ).rejects.toThrow(new NotFoundException("Emisor inexistente."));
+    expect(grantChecks).toEqual([]);
     expect(issued).toEqual([]);
   });
 

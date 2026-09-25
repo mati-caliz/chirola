@@ -3,7 +3,6 @@ import { ServiceAuthGuard } from "../service-auth/service-auth.guard";
 import { RateLimitGuard } from "../service-auth/rate-limit.guard";
 import { ServiceAuditInterceptor } from "../service-auth/service-audit.interceptor";
 import { CurrentApiClient } from "../service-auth/current-api-client.decorator";
-import { ApiClientService } from "../service-auth/api-client.service";
 import type { AuthenticatedApiClient } from "../service-auth/api-client.service";
 import { IssuersService } from "../issuers/issuers.service";
 import { TaxpayersService } from "./taxpayers.service";
@@ -16,7 +15,6 @@ export class V1TaxpayersController {
   constructor(
     private readonly taxpayers: TaxpayersService,
     private readonly issuers: IssuersService,
-    private readonly apiClients: ApiClientService,
   ) {}
 
   @Get(":cuit")
@@ -25,8 +23,7 @@ export class V1TaxpayersController {
     @Query("issuerId") issuerId: string,
     @Param("cuit") cuit: string,
   ): Promise<TaxpayerInfo> {
-    await this.apiClients.assertIssuerGranted(apiClient.id, issuerId);
-    const issuer = await this.issuers.getById(issuerId);
+    const issuer = await this.issuers.getOwned({ apiClientId: apiClient.id }, issuerId);
     return await this.taxpayers.lookup(issuer, cuit);
   }
 }
