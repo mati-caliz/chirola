@@ -1,3 +1,3 @@
 typescript services/api
-typescript apps/mobile
-typescript packages/shared
+typescript apps/mobile coverage-pending
+typescript packages/shared coverage-pending

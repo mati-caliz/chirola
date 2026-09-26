@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
-    "test:coverage": "jest --coverage",
+    "test:coverage": "jest --coverage && node scripts/check-coverage.mjs",
     "verify": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test:coverage"
   },
   "dependencies": {
